@@ -10,6 +10,13 @@ Click once. Every screen size follows to the same state, even when the layouts a
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
 
+## Screenshots
+
+| Logical sync | Difference report |
+|---|---|
+| ![Desktop clicks Products; every phone opens its drawer and the Products accordion](docs/media/screenshot-sync.png) | ![Per-device findings: sideways scroll, wide table, small tap targets, hidden content](docs/media/screenshot-report.png) |
+| Desktop clicks **Products**. Each phone opens its own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
+
 ## What it does
 
 Samestate opens any page on a wall of devices (phones, tablets, laptops, desktops) and keeps them in the
@@ -44,7 +51,8 @@ Samestate is a Chrome extension. No server and no terminal.
 1. Download this repo (**Code → Download ZIP**) and unzip it.
 2. Open `chrome://extensions`.
 3. Turn on **Developer mode** (top right).
-4. Click **Load unpacked** and choose the `extension` folder.
+4. Click **Load unpacked** and choose the `extension` folder **inside** the unzipped repo
+   (the one that contains `manifest.json`), not the repo's top-level folder.
 5. Pin the Samestate icon from the puzzle-piece menu.
 
 Then go to any page and click the icon. The page opens in a new tab on every device.
