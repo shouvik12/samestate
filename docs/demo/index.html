@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tidepool — analytics that explain themselves</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="index.html">tide<b>pool</b></a>
+  <nav class="desk" aria-label="Main">
+    <div class="dd">
+      <button class="dd-btn" aria-expanded="false" aria-controls="prod-menu">Products</button>
+      <div class="dd-menu" id="prod-menu" hidden>
+        <a href="index.html#features">Dashboards</a>
+        <a href="index.html#plans">Alerts</a>
+        <a href="pricing.html">Warehouse sync</a>
+      </div>
+    </div>
+    <a href="pricing.html">Pricing</a>
+    <a href="index.html#stories">Customers</a>
+  </nav>
+  <form class="search desk-search" role="search"><input type="search" name="q" placeholder="Search docs" aria-label="Search docs"></form>
+  <button class="btn ghost signin desk-only">Sign in</button>
+  <button class="icon search-toggle" aria-label="Search" aria-controls="m-search" aria-expanded="false"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+  <button class="icon hamburger" aria-label="Open navigation" aria-controls="drawer" aria-expanded="false"><span></span><span></span><span></span></button>
+</header>
+<div id="m-search" class="m-search" hidden><form role="search"><input type="search" name="q" placeholder="Search docs" aria-label="Search docs"></form></div>
+<div class="backdrop" id="backdrop" hidden></div>
+<aside class="drawer" id="drawer" aria-label="Mobile">
+  <button class="acc" aria-expanded="false">Products</button>
+  <div class="acc-panel" hidden>
+    <a href="index.html#features">Dashboards</a>
+    <a href="index.html#plans">Alerts</a>
+    <a href="pricing.html">Warehouse sync</a>
+  </div>
+  <a href="pricing.html">Pricing</a>
+  <a href="index.html#stories">Customers</a>
+  <button class="btn signin">Sign in</button>
+</aside>
+<p class="search-result" id="search-result" hidden></p>
+
+<main>
+<section class="hero">
+  <div>
+    <p class="eyebrow">Product analytics</p>
+    <h1>Numbers that explain themselves</h1>
+    <p class="lead">Tidepool turns raw events into plain-language answers, so the whole team can read the dashboard.</p>
+    <p class="tour">Watch the two-minute tour to see a live workspace with sample data.</p>
+    <div class="cta"><a class="btn" href="pricing.html">Start free</a><a class="btn ghost" href="#features">See features</a><a class="btn ghost call" href="#stories">Talk to us</a></div>
+  </div>
+  <picture><source media="(max-width: 700px)" srcset="hero-tall.svg"><img src="hero-wide.svg" alt="Dashboard preview" width="640" height="400"></picture>
+</section>
+
+<section id="features">
+  <h2>Features</h2>
+  <div class="grid">
+    <article class="card"><h3>Ask in plain words</h3><p>Type a question, get a chart and a sentence that says what changed.</p><span class="tip">?<span class="tip-body">Works with 14 languages.</span></span></article>
+    <article class="card"><h3>Alerts that wait for signal</h3><p>No pings for noise. Tidepool waits until a change is real before it tells you.</p><span class="tip">?<span class="tip-body">Uses a seven-day baseline.</span></span></article>
+    <article class="card"><h3>Warehouse sync every fifteen minutes without pipelines</h3><p>Point it at Postgres, BigQuery or Snowflake and keep your own tables.</p></article>
+  </div>
+</section>
+
+<section id="plans">
+  <h2>Compare plans</h2>
+  <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-bill="monthly">Monthly</button><button role="tab" aria-selected="false" data-bill="yearly">Yearly</button></div>
+  <table>
+    <caption>Plan comparison</caption>
+    <thead><tr><th>Plan</th><th>Events / month</th><th>Seats</th><th>History</th><th>Support</th><th>Price</th></tr></thead>
+    <tbody>
+      <tr><td>Starter</td><td>100,000</td><td>3</td><td>90 days</td><td>Community</td><td class="price" data-m="$0" data-y="$0">$0</td></tr>
+      <tr><td>Team</td><td>5,000,000</td><td>25</td><td>2 years</td><td>Email, next day</td><td class="price" data-m="$49" data-y="$39">$49</td></tr>
+      <tr><td>Scale</td><td>Unlimited</td><td>Unlimited</td><td>Forever</td><td>Dedicated engineer</td><td class="price" data-m="$299" data-y="$249">$299</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="stories">
+  <h2>Customer stories</h2>
+  <div class="carousel">
+    <blockquote>We stopped arguing about which dashboard was right.<cite>Mina, Harbor Co.</cite></blockquote>
+    <blockquote>Support now answers data questions without filing a ticket.<cite>Okoro, Fernway</cite></blockquote>
+    <blockquote>The alerts are quiet until they matter.<cite>Lise, Northdock</cite></blockquote>
+    <blockquote>Setup took one afternoon and no pipeline work.<cite>Tavi, Brightmoor</cite></blockquote>
+  </div>
+  <details><summary>How is my data stored?</summary><p>Events stay in your own warehouse. Tidepool reads them and stores only aggregates.</p></details>
+</section>
+</main>
+
+<footer><p>© Tidepool Labs. A fictional company for the Samestate demo.</p><a class="fine" href="pricing.html#terms">Terms</a> <a class="fine" href="pricing.html#privacy">Privacy</a></footer>
+
+<dialog id="signin"><form method="dialog"><h3>Sign in</h3><label>Email<input type="email" name="email" placeholder="you@company.com"></label><label class="chk"><input type="checkbox" name="remember"> Remember me</label><div class="row"><button class="btn" value="ok">Continue</button><button class="btn ghost close" value="cancel" aria-label="Close">Close</button></div></form></dialog>
+<div class="cookies" id="cookies" aria-label="Cookie settings"><p>We use cookies to measure how the demo is used.</p><button class="btn">Accept</button></div>
+<script src="../agent.js" data-samestate="demo"></script>
+<script src="site.js"></script>
+</body>
+</html>
