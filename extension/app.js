@@ -17,7 +17,7 @@ const DEVICES = [
   { id: 'ipad', name: 'iPad Pro 11"', w: 834, h: 1194, scale: .42, kind: 'tablet', os: 'ios', ua: IPAD },
   { id: 'small', name: 'Small mobile', w: 320, h: 568, scale: .62, kind: 'phone', os: 'ios', ua: IPHONE, on: false },
   { id: 'large', name: 'Large display', w: 2560, h: 1440, scale: .22, kind: 'desktop', ua: '', on: false }
-].map((d, i) => Object.assign({ on: true }, d, { slot: i, touch: d.kind !== 'desktop', ready: false, rot: false, linked: true, pos: i }));
+].map((d, i) => Object.assign({ on: true }, d, { slot: i, touch: d.kind !== 'desktop', ready: false, rot: false, linked: true, x: null, y: null }));
 const SYNC = { click: ['Clicks & menus', true], scroll: ['Scrolling', true], hover: ['Hover', true] };
 const KIND_SYNC = { click: 'click', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover' };
 
@@ -104,67 +104,100 @@ function buildFrames() {
   relayout();
 }
 /* ---------------------------- arranging the wall ---------------------------- */
-// Screens are reordered with the CSS order property: moving an iframe in the page would reload it.
-// The arrangement lasts until the Samestate tab is closed or reloaded.
-let layoutLocked = false, dragDev = null;
-function moveScreen(list, moved, onto) { // "moved" takes the place of "onto"; returns the new order
-  const order = [...list].sort((a, b) => a.pos - b.pos);
-  const from = order.indexOf(moved), to = order.indexOf(onto);
-  if (from < 0 || to < 0 || from === to) return order;
-  order.splice(from, 1);
-  order.splice(to, 0, moved);
-  order.forEach((d, i) => { d.pos = i; });
-  return order;
+// Screens can be dragged by their title bar to any place on the wall. The first drag pins every screen where
+// it is, then each one moves freely. Screens are positioned with CSS, never moved in the page, because moving
+// an iframe would reload it. Choosing Grid or Row again returns to the automatic layout. The arrangement
+// lasts until the Samestate tab is closed or reloaded.
+const SNAP = 10, WALL_PAD = 40;
+let layoutLocked = false, freeLayout = false, drag = null, topZ = 1;
+const snap = v => Math.max(0, Math.round(v / SNAP) * SNAP);
+// Where a dragged screen lands: its start position plus the pointer movement, snapped and kept on the wall.
+function dragTarget(start, from, to) {
+  return { x: snap(start.x + to.x - from.x), y: snap(start.y + to.y - from.y) };
+}
+// The wall must be large enough to scroll to every screen.
+function wallSize(boxes) {
+  let w = 0, h = 0;
+  for (const b of boxes) { w = Math.max(w, b.x + b.w); h = Math.max(h, b.y + b.h); }
+  return { w: w + WALL_PAD, h: h + WALL_PAD };
+}
+// A screen switched on after the wall was arranged goes to the right of everything else.
+function nextFreeSpot(boxes) {
+  return { x: boxes.length ? snap(Math.max(...boxes.map(b => b.x + b.w)) + 30) : 26, y: 22 };
+}
+const boxOf = d => ({ x: d.x, y: d.y, w: d.el.offsetWidth, h: d.el.offsetHeight });
+function fitWall() {
+  const f = $('#frames');
+  if (!freeLayout || mode === 'focus') { f.style.width = f.style.height = ''; return; }
+  const placed = active().filter(d => d.x != null), { w, h } = wallSize(placed.map(boxOf));
+  f.style.width = w + 'px'; f.style.height = h + 'px';
+}
+function placeScreens() {
+  for (const d of active()) {
+    if (freeLayout && d.x == null) Object.assign(d, nextFreeSpot(active().filter(o => o.x != null).map(boxOf)));
+    d.el.style.left = freeLayout ? d.x + 'px' : '';
+    d.el.style.top = freeLayout ? d.y + 'px' : '';
+  }
+  fitWall();
+}
+function pinScreens() { // switch from the automatic layout to free placement, keeping every screen where it is
+  const f = $('#frames'), origin = f.getBoundingClientRect();
+  for (const d of active()) {
+    const r = d.el.getBoundingClientRect();
+    d.x = Math.round(r.left - origin.left); d.y = Math.round(r.top - origin.top);
+  }
+  freeLayout = true;
+  f.classList.add('free');
+  placeScreens();
+}
+function unpinScreens() {
+  freeLayout = false;
+  DEVICES.forEach(d => { d.x = d.y = null; if (d.el) d.el.style.zIndex = ''; });
+  $('#frames').classList.remove('free');
+  placeScreens();
 }
 function applyArrangement() {
-  for (const d of DEVICES) {
-    if (!d.el) continue;
-    d.el.style.order = d.pos;
-    d.el.querySelector('.dev-head').draggable = !layoutLocked;
-  }
   $('#frames').classList.toggle('locked', layoutLocked);
+  $('#frames').classList.toggle('free', freeLayout);
+  placeScreens();
   const lock = $('#lock');
   lock.classList.toggle('on', layoutLocked);
   lock.querySelector('span').textContent = layoutLocked ? 'Unlock layout' : 'Lock layout';
-  lock.title = layoutLocked ? 'Screens are fixed in place. Click to allow dragging.' : 'Drag a screen by its title to move it. Click to fix screens in place.';
-}
-function endArrange() {
-  dragDev = null;
-  $('#frames').classList.remove('arranging');
-  document.querySelectorAll('.dev.dragging,.dev.drop-target').forEach(el => el.classList.remove('dragging', 'drop-target'));
+  lock.title = layoutLocked ? 'Screens are fixed in place. Click to allow dragging.' : 'Drag a screen by its title bar to move it. Click to fix screens in place.';
 }
 function arrangeable(d) {
-  const el = d.el, head = el.querySelector('.dev-head');
-  head.addEventListener('dragstart', e => {
-    if (layoutLocked || mode === 'focus' || e.target.closest?.('button')) { e.preventDefault(); return; }
-    dragDev = d;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', d.name);
-    // Changing the page inside dragstart cancels the drag in Chrome, so mark it just after.
-    setTimeout(() => { if (dragDev === d) { el.classList.add('dragging'); $('#frames').classList.add('arranging'); } }, 0);
-  });
-  head.addEventListener('dragend', endArrange);
-  el.addEventListener('dragover', e => {
-    if (!dragDev || dragDev === d) return;
+  const head = d.el.querySelector('.dev-head');
+  head.addEventListener('pointerdown', e => {
+    if (layoutLocked || mode === 'focus' || e.button !== 0 || e.target.closest('button')) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    el.classList.add('drop-target');
+    if (!freeLayout) pinScreens();
+    drag = { d, id: e.pointerId, from: { x: e.clientX, y: e.clientY }, start: { x: d.x, y: d.y } };
+    head.setPointerCapture(e.pointerId);
+    d.el.style.zIndex = ++topZ; // the screen being moved stays on top of the ones it passes
+    d.el.classList.add('dragging');
+    $('#frames').classList.add('arranging'); // preview pages must not catch the pointer mid-drag
   });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drop-target'); });
-  el.addEventListener('drop', e => {
-    if (!dragDev || dragDev === d) return;
-    e.preventDefault();
-    moveScreen(DEVICES, dragDev, d);
-    endArrange();
-    applyArrangement();
+  head.addEventListener('pointermove', e => {
+    if (drag?.d !== d || e.pointerId !== drag.id) return;
+    Object.assign(d, dragTarget(drag.start, drag.from, { x: e.clientX, y: e.clientY }));
+    d.el.style.left = d.x + 'px'; d.el.style.top = d.y + 'px';
+    fitWall();
   });
+  const end = e => {
+    if (drag?.d !== d || e.pointerId !== drag.id) return;
+    drag = null;
+    d.el.classList.remove('dragging');
+    $('#frames').classList.remove('arranging');
+  };
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
 }
-$('#lock').onclick = () => { layoutLocked = !layoutLocked; endArrange(); applyArrangement(); };
+$('#lock').onclick = () => { layoutLocked = !layoutLocked; applyArrangement(); };
 
 function setMode(m) { mode = m; document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); relayout(); }
 function setZoom(v) { zoom = v / 100; $('#zoom').value = v; $('#zoomv').textContent = v + '%'; active().forEach(layout); }
 $('#zoom').addEventListener('input', e => setZoom(+e.target.value));
-$('#mode').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.v); });
+$('#mode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (freeLayout && b.dataset.v !== 'focus') unpinScreens(); setMode(b.dataset.v); });
 $('#align').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#align button').forEach(x => x.classList.toggle('on', x === b)); $('#frames').style.alignItems = b.dataset.v; });
 $('#filters').onclick = () => $('#devlist').classList.toggle('closed');
 $('#land').onclick = () => { active().forEach(d => { if (d.touch) d.rot = true; }); relayout(); };

@@ -132,6 +132,7 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 #skip:hover{background:var(--line)}
 .tour p{margin:0;font-size:14px;line-height:1.45}
 .dev.unlinked .dev-head button[data-a=link]{color:var(--warn);opacity:1}.dev.unlinked .dev-body{opacity:.72}
-.frames:not(.locked):not(.focus) .dev-head{cursor:grab}.frames.arranging iframe{pointer-events:none}
-.dev.dragging{opacity:.45}.dev.drop-target .dev-body{outline:2px dashed var(--acc);outline-offset:5px}
+.frames:not(.locked):not(.focus) .dev-head{cursor:grab;touch-action:none;user-select:none}.frames.arranging,.frames.arranging .dev-head{cursor:grabbing}.frames.arranging iframe{pointer-events:none}
+.frames.free:not(.focus){display:block;position:relative;padding:0;min-width:100%;min-height:100%;box-sizing:border-box}.frames.free:not(.focus) .dev{position:absolute;margin:0}
+.dev.dragging .dev-body{box-shadow:0 0 0 2px var(--acc),0 22px 50px #0009}
 .item.on{color:var(--warn)}
