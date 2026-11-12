@@ -27,8 +27,9 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
   Enable **Match visible text** to help match controls and compare content when layouts use different markup.
   The bundled demo also maps the desktop Products menu to the phone’s navigation drawer.
 - **Video playback.** Play or pause the main video across the wall from the **Sync** drawer.
-- **Difference report.** Every device is measured against a reference device. Click a finding to outline
-  the elements in the preview.
+- **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
+  once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
+  its details. **By device** lists every screen's findings separately.
 - **Sync log.** Shows which devices matched, skipped, or could not reach a control.
 - **Screenshots and recordings.** Save the visible device wall as a PNG or a silent WebM video.
 
@@ -159,7 +160,6 @@ docs/             The same app as a static page for the live demo (GitHub Pages)
 
 - Chrome Web Store listing
 - Per-device user-agent in the extension
-- Group identical findings across devices
 
 ## Release Notes
 
@@ -167,6 +167,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Grouped findings** — the difference report lists each problem once with the screens it affects, with **By device** for the per-screen list ([details](changelogs/CHANGELOG-grouped-findings.md)) |
 | **2026-11-13** | 02:02:13 +09:00 | `c9dde7a` | **Address placeholder** — the address bar's example is just `https://your-site.com`, without `localhost:3000` ([details](changelogs/CHANGELOG-address-placeholder.md)) |
 | **2026-11-13** | 01:14:00 +09:00 | `e4d22de` | **Demo tour pointer** — a pointer performs each demo action, with the explanation beside the control and a result label on every preview ([details](changelogs/CHANGELOG-demo-tour-pointer.md)) |
 | **2026-11-13** | 00:48:00 +09:00 | `4fc0889` | **Demo tour features** — the guided demo now shows every feature added since the first release, pointing at each control it uses ([details](changelogs/CHANGELOG-demo-tour-features.md)) |

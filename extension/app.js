@@ -1438,13 +1438,14 @@ const STEPS = [
   },
   {
     title: 'Difference report', at: '#detect', wait: 3600,
-    text: '<b>Detect differences</b> measures every screen against the Desktop. Clicking a finding outlines it in the preview, here the table that is too wide for the iPhone.',
+    text: '<b>Detect differences</b> measures every screen against the Desktop and lists each problem once, with the screens it affects. Clicking one outlines it on all of them, here the table that is too wide for the phones.',
     run: async t => {
       if (!await t.click('#detect')) return;
+      reportView = 'issue'; // the tour shows the grouped report, without changing the saved choice
       await detect();
       if (!t.ok()) return;
       t.focus('#panel', 'left');
-      const finding = () => Array.from(document.querySelectorAll('#findings .finding')).find(el => el.querySelector('.t')?.textContent.startsWith('Table'));
+      const finding = () => Array.from(document.querySelectorAll('#findings .finding')).find(el => el.querySelector('.t')?.textContent.startsWith('Table is wider'));
       if (!await t.nap(1600) || !finding() || !await t.click(finding)) return;
       finding()?.click();
     }
@@ -1942,37 +1943,38 @@ function analyze(snaps, refId) {
   const ref = snaps.find(s => s.dev.id === refId) || snaps[0];
   if (!ref) return [];
   const out = [], referenceKeys = new Map();
-  function add(sev, cat, dev, title, detail, keys = [], refKeys = keys.map(key => referenceKeys.get(key)).filter(Boolean)) {
-    out.push({ sev, cat, dev, title, detail, keys, refKeys, reference: ref.dev });
+  // kind names the check, the same on every device, so the report can group one problem across screens.
+  function add(sev, cat, dev, kind, title, detail, keys = [], refKeys = keys.map(key => referenceKeys.get(key)).filter(Boolean)) {
+    out.push({ sev, cat, dev, kind, title, detail, keys, refKeys, reference: ref.dev });
   }
   const R = index(ref.data);
   for (const { dev, data } of snaps) {
     referenceKeys.clear();
     const I = index(data), vis = [...I.values()].filter(i => i.visible), n = screenName(dev);
     // ---- per-device checks
-    if (data.docW > data.vw + 2) add('issue', 'Layout', dev, `Page scrolls sideways (+${data.docW - data.vw}px)`, data.overflow.length ? 'Pushed out by ' + data.overflow.map(o => q(o.name) + ' +' + o.by + 'px').join(', ') : 'Content is wider than the viewport.', data.overflow.map(o => o.key));
-    if (dev.touch && !data.metaViewport) add('issue', 'Usability', dev, 'No viewport meta tag', 'The page renders at desktop width and gets shrunk on phones.');
-    const broken = vis.filter(i => i.cat === 'image' && i.broken); if (broken.length) add('issue', 'Images', dev, `${broken.length} broken image${broken.length > 1 ? 's' : ''}`, list(broken.map(i => i.name)), broken.map(i => i.key));
-    const blurry = vis.filter(i => i.cat === 'image' && i.natW && i.w > i.natW * 1.25); if (blurry.length) add('warn', 'Images', dev, `${blurry.length} image${blurry.length > 1 ? 's' : ''} stretched beyond source size`, blurry.slice(0, 3).map(i => `${q(i.name)} ${i.natW}px shown at ${i.w}px`).join(', '), blurry.map(i => i.key));
-    const trunc = vis.filter(i => i.truncated); if (trunc.length) add('warn', 'Content', dev, `${trunc.length} text element${trunc.length > 1 ? 's' : ''} cut off`, list(trunc.map(i => i.name)), trunc.map(i => i.key));
-    const tiny = vis.filter(i => (i.cat === 'text' || i.cat === 'heading' || i.cat === 'link') && i.size < 12); if (tiny.length) add('warn', 'Typography', dev, `${tiny.length} text element${tiny.length > 1 ? 's' : ''} under 12px`, list(tiny.map(i => `${i.name} (${i.size}px)`)), tiny.map(i => i.key));
-    const edge = vis.filter(i => (i.cat === 'text' || i.cat === 'heading') && i.w > 60 && (i.x < 6 || i.x + i.w > data.vw - 6) && i.x + i.w <= data.vw + 2); if (edge.length) add('warn', 'Layout', dev, `${edge.length} text block${edge.length > 1 ? 's' : ''} touch the screen edge`, list(edge.map(i => i.name)), edge.map(i => i.key));
+    if (data.docW > data.vw + 2) add('issue', 'Layout', dev, 'Page scrolls sideways', `Page scrolls sideways (+${data.docW - data.vw}px)`, data.overflow.length ? 'Pushed out by ' + data.overflow.map(o => q(o.name) + ' +' + o.by + 'px').join(', ') : 'Content is wider than the viewport.', data.overflow.map(o => o.key));
+    if (dev.touch && !data.metaViewport) add('issue', 'Usability', dev, 'No viewport meta tag', 'No viewport meta tag', 'The page renders at desktop width and gets shrunk on phones.');
+    const broken = vis.filter(i => i.cat === 'image' && i.broken); if (broken.length) add('issue', 'Images', dev, 'Broken images', `${broken.length} broken image${broken.length > 1 ? 's' : ''}`, list(broken.map(i => i.name)), broken.map(i => i.key));
+    const blurry = vis.filter(i => i.cat === 'image' && i.natW && i.w > i.natW * 1.25); if (blurry.length) add('warn', 'Images', dev, 'Images stretched beyond source size', `${blurry.length} image${blurry.length > 1 ? 's' : ''} stretched beyond source size`, blurry.slice(0, 3).map(i => `${q(i.name)} ${i.natW}px shown at ${i.w}px`).join(', '), blurry.map(i => i.key));
+    const trunc = vis.filter(i => i.truncated); if (trunc.length) add('warn', 'Content', dev, 'Text cut off', `${trunc.length} text element${trunc.length > 1 ? 's' : ''} cut off`, list(trunc.map(i => i.name)), trunc.map(i => i.key));
+    const tiny = vis.filter(i => (i.cat === 'text' || i.cat === 'heading' || i.cat === 'link') && i.size < 12); if (tiny.length) add('warn', 'Typography', dev, 'Text under 12px', `${tiny.length} text element${tiny.length > 1 ? 's' : ''} under 12px`, list(tiny.map(i => `${i.name} (${i.size}px)`)), tiny.map(i => i.key));
+    const edge = vis.filter(i => (i.cat === 'text' || i.cat === 'heading') && i.w > 60 && (i.x < 6 || i.x + i.w > data.vw - 6) && i.x + i.w <= data.vw + 2); if (edge.length) add('warn', 'Layout', dev, 'Text touches the screen edge', `${edge.length} text block${edge.length > 1 ? 's' : ''} touch the screen edge`, list(edge.map(i => i.name)), edge.map(i => i.key));
     const hiding = data.fixed.filter(f => f.hides && f.hides.length);
-    for (const f of hiding) add('issue', 'Usability', dev, `Overlay hides ${f.hides.length} control${f.hides.length > 1 ? 's' : ''}`, `${q(f.name || 'fixed element')} sits on top of ${list(f.hides, 4)}`, [f.key]);
-    for (const f of data.fixed) if (!f.hides && !hiding.some(h => h.name === f.name)) add('warn', 'Usability', dev, `Fixed element covers ${f.cover}% of the screen`, q(f.name || 'element'), [f.key]);
+    for (const f of hiding) add('issue', 'Usability', dev, 'Overlay hides controls', `Overlay hides ${f.hides.length} control${f.hides.length > 1 ? 's' : ''}`, `${q(f.name || 'fixed element')} sits on top of ${list(f.hides, 4)}`, [f.key]);
+    for (const f of data.fixed) if (!f.hides && !hiding.some(h => h.name === f.name)) add('warn', 'Usability', dev, 'Fixed element covers the screen', `Fixed element covers ${f.cover}% of the screen`, q(f.name || 'element'), [f.key]);
     for (const t of vis.filter(i => i.cat === 'table')) {
-      if (t.wide && !t.scrollable) add('issue', 'Tables', dev, 'Table is wider than its container', `${q(t.name)} overflows with no scroll wrapper.`, [t.key]);
-      else if (t.wide) add('info', 'Tables', dev, dev.touch ? 'Table needs a sideways swipe' : 'Table needs horizontal scrolling', `${q(t.name)}: ${t.cols} columns in a scroll area.`, [t.key]);
+      if (t.wide && !t.scrollable) add('issue', 'Tables', dev, 'Table is wider than its container', 'Table is wider than its container', `${q(t.name)} overflows with no scroll wrapper.`, [t.key]);
+      else if (t.wide) add('info', 'Tables', dev, 'Table needs sideways scrolling', dev.touch ? 'Table needs a sideways swipe' : 'Table needs horizontal scrolling', `${q(t.name)}: ${t.cols} columns in a scroll area.`, [t.key]);
     }
     if (dev.touch) {
       const taps = vis.filter(i => (i.cat === 'link' || i.cat === 'button' || i.cat === 'input') && !i.inline);
       const bad = taps.filter(i => Math.min(i.w, i.h) < 24), small = taps.filter(i => Math.min(i.w, i.h) >= 24 && Math.min(i.w, i.h) < 40);
-      if (bad.length) add('issue', 'Input', dev, `${bad.length} tap target${bad.length > 1 ? 's' : ''} under 24px`, list(bad.map(i => `${i.name} (${i.w}×${i.h})`)), bad.map(i => i.key));
-      if (small.length) add('warn', 'Input', dev, `${small.length} tap target${small.length > 1 ? 's' : ''} under 40px`, list(small.map(i => `${i.name} (${i.w}×${i.h})`)), small.map(i => i.key));
-      const zoomy = vis.filter(i => i.cat === 'input' && /field/.test(i.kind || '') && i.size < 16); if (zoomy.length && dev.os === 'ios' && dev.kind === 'phone') add('info', 'Input', dev, `${zoomy.length} field${zoomy.length > 1 ? 's' : ''} under 16px font`, 'iOS Safari zooms the page when these are focused.', zoomy.map(i => i.key));
-      const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, `${sw.length} swipeable area${sw.length > 1 ? 's' : ''}`, 'Scrolls sideways by swipe' + (sw.some(s => s.snap) ? ' with snap points.' : '.'), sw.map(s => s.key));
+      if (bad.length) add('issue', 'Input', dev, 'Tap targets under 24px', `${bad.length} tap target${bad.length > 1 ? 's' : ''} under 24px`, list(bad.map(i => `${i.name} (${i.w}×${i.h})`)), bad.map(i => i.key));
+      if (small.length) add('warn', 'Input', dev, 'Tap targets under 40px', `${small.length} tap target${small.length > 1 ? 's' : ''} under 40px`, list(small.map(i => `${i.name} (${i.w}×${i.h})`)), small.map(i => i.key));
+      const zoomy = vis.filter(i => i.cat === 'input' && /field/.test(i.kind || '') && i.size < 16); if (zoomy.length && dev.os === 'ios' && dev.kind === 'phone') add('info', 'Input', dev, 'Fields under 16px font', `${zoomy.length} field${zoomy.length > 1 ? 's' : ''} under 16px font`, 'iOS Safari zooms the page when these are focused.', zoomy.map(i => i.key));
+      const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, 'Swipeable areas', `${sw.length} swipeable area${sw.length > 1 ? 's' : ''}`, 'Scrolls sideways by swipe' + (sw.some(s => s.snap) ? ' with snap points.' : '.'), sw.map(s => s.key));
     } else {
-      const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, `${sw.length} sideways scroll area${sw.length > 1 ? 's' : ''}`, 'Mouse users need a scrollbar, shift-wheel or arrow buttons here.', sw.map(s => s.key));
+      const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, 'Sideways scroll areas', `${sw.length} sideways scroll area${sw.length > 1 ? 's' : ''}`, 'Mouse users need a scrollbar, shift-wheel or arrow buttons here.', sw.map(s => s.key));
     }
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
@@ -1985,31 +1987,31 @@ function analyze(snaps, refId) {
     const extra = vis.filter(item => !matchedVisible.has(item));
     const navGone = gone.filter(i => i.inNav && (i.cat === 'link' || i.cat === 'button'));
     if (navGone.length) {
-      if (data.menuToggle) add('info', 'Navigation', dev, `Navigation collapses behind a menu button`, `${navGone.length} item${navGone.length > 1 ? 's' : ''} visible on ${rn} move into the menu: ${list(navGone.map(i => i.name), 4)}`, [], navGone.map(i => i.key));
-      else add('issue', 'Navigation', dev, `${navGone.length} navigation item${navGone.length > 1 ? 's' : ''} disappear with no menu button`, list(navGone.map(i => i.name), 4), [], navGone.map(i => i.key));
+      if (data.menuToggle) add('info', 'Navigation', dev, 'Navigation collapses behind a menu button', `Navigation collapses behind a menu button`, `${navGone.length} item${navGone.length > 1 ? 's' : ''} visible on ${rn} move into the menu: ${list(navGone.map(i => i.name), 4)}`, [], navGone.map(i => i.key));
+      else add('issue', 'Navigation', dev, 'Navigation items disappear with no menu button', `${navGone.length} navigation item${navGone.length > 1 ? 's' : ''} disappear with no menu button`, list(navGone.map(i => i.name), 4), [], navGone.map(i => i.key));
     }
     const ctlGone = gone.filter(i => !i.inNav && (i.cat === 'link' || i.cat === 'button' || i.cat === 'input'));
-    if (ctlGone.length) add('warn', 'Navigation', dev, `${ctlGone.length} control${ctlGone.length > 1 ? 's' : ''} from ${rn} not visible`, list(ctlGone.map(i => i.name), 4), [], ctlGone.map(i => i.key));
+    if (ctlGone.length) add('warn', 'Navigation', dev, `Controls from ${rn} not visible`, `${ctlGone.length} control${ctlGone.length > 1 ? 's' : ''} from ${rn} not visible`, list(ctlGone.map(i => i.name), 4), [], ctlGone.map(i => i.key));
     const txtGone = gone.filter(i => i.cat === 'heading' || i.cat === 'text');
-    if (txtGone.length) add('warn', 'Content', dev, `${txtGone.length} text block${txtGone.length > 1 ? 's' : ''} from ${rn} hidden`, list(txtGone.map(i => i.name)), [], txtGone.map(i => i.key));
+    if (txtGone.length) add('warn', 'Content', dev, `Text from ${rn} hidden`, `${txtGone.length} text block${txtGone.length > 1 ? 's' : ''} from ${rn} hidden`, list(txtGone.map(i => i.name)), [], txtGone.map(i => i.key));
     const imgGone = gone.filter(i => i.cat === 'image');
-    if (imgGone.length) add('warn', 'Images', dev, `${imgGone.length} image${imgGone.length > 1 ? 's' : ''} from ${rn} hidden`, list(imgGone.map(i => i.name)), [], imgGone.map(i => i.key));
+    if (imgGone.length) add('warn', 'Images', dev, `Images from ${rn} hidden`, `${imgGone.length} image${imgGone.length > 1 ? 's' : ''} from ${rn} hidden`, list(imgGone.map(i => i.name)), [], imgGone.map(i => i.key));
     const tblGone = gone.filter(i => i.cat === 'table');
-    if (tblGone.length) add('info', 'Tables', dev, `Table replaced by another layout`, `${q(tblGone[0].name)} is shown as a table on ${rn} but not here.`, [], tblGone.map(i => i.key));
+    if (tblGone.length) add('info', 'Tables', dev, 'Table replaced by another layout', `Table replaced by another layout`, `${q(tblGone[0].name)} is shown as a table on ${rn} but not here.`, [], tblGone.map(i => i.key));
     const xs = extra.filter(i => i.cat !== 'nav');
-    if (xs.length) add('info', 'Content', dev, `${xs.length} element${xs.length > 1 ? 's' : ''} only on ${n}`, list(xs.map(i => i.name || i.cat), 4), xs.map(i => i.key));
+    if (xs.length) add('info', 'Content', dev, `Elements not on ${rn}`, `${xs.length} element${xs.length > 1 ? 's' : ''} only on ${n}`, list(xs.map(i => i.name || i.cat), 4), xs.map(i => i.key));
 
     const differentText = both.filter(([r, i]) => r.textKey && i.textKey && r.textKey !== i.textKey);
     if (differentText.length) {
       const detail = differentText.length === 1 ? '1 matched element has different text.' : differentText.length + ' matched elements have different text.';
-      add('info', 'Content', dev, 'Visible text differs from ' + rn, detail, differentText.map(([, item]) => item.key));
+      add('info', 'Content', dev, 'Visible text differs from ' + rn, 'Visible text differs from ' + rn, detail, differentText.map(([, item]) => item.key));
     }
     const sized = both.filter(([r, i]) => (r.cat === 'heading' || r.cat === 'text') && Math.abs(r.size - i.size) >= 1);
-    if (sized.length) { const heads = sized.filter(p => p[0].cat === 'heading').sort((a, b) => a[0].level - b[0].level); const pick = (heads.length ? heads : sized).slice(0, 3); add('info', 'Typography', dev, `Type scale adapts on ${sized.length} element${sized.length > 1 ? 's' : ''}`, pick.map(([r, i]) => `${q(r.name)} ${r.size}→${i.size}px`).join(', '), sized.map(p => p[1].key)); }
+    if (sized.length) { const heads = sized.filter(p => p[0].cat === 'heading').sort((a, b) => a[0].level - b[0].level); const pick = (heads.length ? heads : sized).slice(0, 3); add('info', 'Typography', dev, 'Type scale adapts', `Type scale adapts on ${sized.length} element${sized.length > 1 ? 's' : ''}`, pick.map(([r, i]) => `${q(r.name)} ${r.size}→${i.size}px`).join(', '), sized.map(p => p[1].key)); }
     const crop = both.filter(([r, i]) => r.cat === 'image' && r.h && i.h && Math.abs(r.w / r.h - i.w / i.h) / (r.w / r.h) > .08);
-    if (crop.length) add('info', 'Images', dev, `${crop.length} image${crop.length > 1 ? 's' : ''} change shape`, crop.slice(0, 2).map(([r, i]) => `${q(r.name)} ${r.w}×${r.h} → ${i.w}×${i.h}`).join(', '), crop.map(p => p[1].key));
+    if (crop.length) add('info', 'Images', dev, 'Images change shape', `${crop.length} image${crop.length > 1 ? 's' : ''} change shape`, crop.slice(0, 2).map(([r, i]) => `${q(r.name)} ${r.w}×${r.h} → ${i.w}×${i.h}`).join(', '), crop.map(p => p[1].key));
     const tcols = both.filter(([r, i]) => r.cat === 'table' && (r.cols !== i.cols || r.display !== i.display));
-    for (const [r, i] of tcols) add('info', 'Tables', dev, r.display !== i.display ? 'Table restructured' : `Table shows ${i.cols} of ${r.cols} columns`, `${q(r.name)}: ${r.display !== i.display ? 'rendered as ' + i.display + ' instead of ' + r.display : 'columns are hidden on ' + n}.`, [i.key]);
+    for (const [r, i] of tcols) add('info', 'Tables', dev, r.display !== i.display ? 'Table restructured' : 'Table columns hidden', r.display !== i.display ? 'Table restructured' : `Table shows ${i.cols} of ${r.cols} columns`, `${q(r.name)}: ${r.display !== i.display ? 'rendered as ' + i.display + ' instead of ' + r.display : 'columns are hidden on ' + n}.`, [i.key]);
     // side-by-side → stacked
     const blocks = both.filter(([r]) => r.cat === 'heading' || r.cat === 'image').sort((a, b) => a[0].y - b[0].y || a[0].x - b[0].x);
     const overlap = (a, b) => Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
@@ -2018,7 +2020,7 @@ function analyze(snaps, refId) {
       const [ra, ia] = blocks[a], [rb, ib] = blocks[b];
       if (overlap(ra, rb) > .5 * Math.min(ra.h, rb.h) && (ra.x + ra.w <= rb.x + 2 || rb.x + rb.w <= ra.x + 2) && overlap(ia, ib) <= 0) { stacked.push(ib); break; }
     }
-    if (stacked.length > (dev.kind === 'desktop' ? 1 : 0)) add('info', 'Layout', dev, `${stacked.length} side-by-side element${stacked.length > 1 ? 's' : ''} stack vertically`, `Next to each other on ${rn}, one above the other here: ${list(stacked.map(i => i.name))}`, stacked.map(i => i.key));
+    if (stacked.length > (dev.kind === 'desktop' ? 1 : 0)) add('info', 'Layout', dev, 'Side-by-side elements stack', `${stacked.length} side-by-side element${stacked.length > 1 ? 's' : ''} stack vertically`, `Next to each other on ${rn}, one above the other here: ${list(stacked.map(i => i.name))}`, stacked.map(i => i.key));
     // reading order
     const rowMajor = k => (a, b) => overlap(a[k], b[k]) > .3 * Math.min(a[k].h, b[k].h) ? a[k].x - b[k].x : a[k].y - b[k].y; // same row → left to right
     const seq = both.filter(([r]) => r.cat === 'heading' || r.cat === 'image').sort(rowMajor(0));
@@ -2026,7 +2028,7 @@ function analyze(snaps, refId) {
     const lis = []; const keep = new Set(); // longest increasing subsequence = elements that kept their order
     { const tails = [], prev = []; pos.forEach((v, idx) => { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (pos[tails[mid]] < v) lo = mid + 1; else hi = mid; } prev[idx] = lo ? tails[lo - 1] : -1; tails[lo] = idx; }); let k = tails[tails.length - 1]; while (k >= 0 && k !== undefined) { keep.add(k); k = prev[k]; } }
     const moved = seq.filter((_, idx) => !keep.has(idx)).map(p => p[1]);
-    if (moved.length && moved.length <= seq.length / 2 && dev.kind !== 'desktop') add('info', 'Layout', dev, `Reading order changes for ${moved.length} element${moved.length > 1 ? 's' : ''}`, `Appear in a different sequence than on ${rn}: ${list(moved.map(i => i.name))}`, moved.map(i => i.key));
+    if (moved.length && moved.length <= seq.length / 2 && dev.kind !== 'desktop') add('info', 'Layout', dev, 'Reading order changes', `Reading order changes for ${moved.length} element${moved.length > 1 ? 's' : ''}`, `Appear in a different sequence than on ${rn}: ${list(moved.map(i => i.name))}`, moved.map(i => i.key));
   }
   return out;
 }
@@ -2049,15 +2051,65 @@ async function detect(quiet) {
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
+// The report lists each problem once with the screens it affects ("By issue"), or every screen's own list ("By device").
+let reportView = 'issue', reportGroups = [];
+try { if (localStorage.getItem('samestate.reportView') === 'device') reportView = 'device'; } catch {}
+const pickedScreen = new Map(); // issue group → the screen whose details are shown
+
+function issueGroups(list) {
+  const groups = new Map();
+  for (const f of list) {
+    const site = f.dev.site || null;
+    const key = [site ? sitePanels.indexOf(site) : '', f.sev, f.cat, f.kind].join('|');
+    let group = groups.get(key);
+    if (!group) groups.set(key, group = { key, site, sev: f.sev, cat: f.cat, kind: f.kind, items: [] });
+    group.items.push(f);
+  }
+  return [...groups.values()];
+}
+
 function renderFindings() {
   const order = { issue: 0, warn: 1, info: 2 };
+  const byIssue = reportView === 'issue';
+  findings.forEach((f, i) => { f.i = i; });
+  const groups = issueGroups(findings);
+  const counted = byIssue ? groups : findings;
+  const count = cat => counted.filter(item => !cat || item.cat === cat).length;
   const cats = CATS.filter(c => findings.some(f => f.cat === c));
-  $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${findings.length}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${findings.filter(f => f.cat === c).length}</button>`).join('') : '';
-  $('#diffn').textContent = findings.length || '';
-  const shown = findings.map((f, i) => Object.assign(f, { i })).filter(f => !catFilter || f.cat === catFilter);
+  $('#report-view').hidden = !findings.length;
+  document.querySelectorAll('#report-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === reportView)));
+  $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
+  $('#diffn').textContent = counted.length || '';
+  const shown = findings.filter(f => !catFilter || f.cat === catFilter);
   if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
+  const screens = sitesMode ? workspaceScreens() : viewScreens();
   let html = '';
-  for (const d of sitesMode ? workspaceScreens() : viewScreens()) {
+  if (byIssue) {
+    reportGroups = groups.filter(g => !catFilter || g.cat === catFilter);
+    for (const g of reportGroups) {
+      g.items.sort((a, b) => screens.indexOf(a.dev) - screens.indexOf(b.dev));
+      g.screens = [...new Set(g.items.map(f => f.dev))]; // a screen can have the same problem more than once, such as two overlays
+    }
+    reportGroups.sort((a, b) => order[a.sev] - order[b.sev] || b.screens.length - a.screens.length || CATS.indexOf(a.cat) - CATS.indexOf(b.cat));
+    for (const site of sitesMode ? sitePanels : [null]) {
+      const own = reportGroups.filter(g => g.site === site);
+      if (!own.length) continue;
+      const c = s => own.filter(g => g.sev === s).length;
+      const compared = 'Compared with ' + screenName(own[0].items[0].reference);
+      const name = site ? `Site ${sitePanels.indexOf(site) + 1} · ${site.url.origin === EXT ? 'Demo' : site.url.host} · ${compared}` : compared;
+      html += `<div class="group">${esc(name)}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>`;
+      for (const g of own) {
+        const pick = g.screens.includes(pickedScreen.get(g.key)) ? pickedScreen.get(g.key) : g.screens[0];
+        const details = g.items.filter(f => f.dev === pick).map(f => (f.title === g.kind ? '' : f.title + '. ') + f.detail);
+        html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}<span class="c">${g.cat}</span></div>`
+          + `<div class="screens" role="group" aria-label="Screens with this finding">${g.screens.map((d, s) => `<button type="button" class="screen-chip${d === pick ? ' on' : ''}" data-s="${s}" aria-pressed="${d === pick}" title="Show details for ${esc(screenName(d))}">${esc(screenName(d))}</button>`).join('')}</div>`
+          + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + '</div>';
+      }
+    }
+    $('#findings').innerHTML = html;
+    return;
+  }
+  for (const d of screens) {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
     html += `<div class="group">${esc(reportName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
@@ -2066,18 +2118,36 @@ function renderFindings() {
   $('#findings').innerHTML = html;
 }
 $('#chips').addEventListener('click', e => { if (e.target.dataset.cat !== undefined) { catFilter = e.target.dataset.cat || null; renderFindings(); } });
-$('#findings').addEventListener('click', e => {
-  const el = e.target.closest('.finding'); if (!el) return;
-  const f = findings[+el.dataset.i];
-  if (f.keys.length) post(f.dev, 'highlight', { keys: f.keys });
-  if (f.refKeys.length) post(f.reference, 'highlight', { keys: f.refKeys });
+$('#report-view').addEventListener('click', e => {
+  const view = e.target.closest('button')?.dataset.view;
+  if (!view || view === reportView) return;
+  reportView = view;
+  try { localStorage.setItem('samestate.reportView', view); } catch {}
+  renderFindings();
+});
+// Outlines the findings in their previews, and the matching elements on the reference screen.
+function showFindings(list) {
+  for (const f of list) if (f.keys.length) post(f.dev, 'highlight', { keys: f.keys });
+  const refKeys = [...new Set(list.flatMap(f => f.refKeys))];
+  if (refKeys.length) post(list[0].reference, 'highlight', { keys: refKeys });
+  const first = list[0];
   if (mode === 'focus') {
-    if (f.dev.site) f.dev.site.focusDev = f.dev;
-    else focusDev = f.dev;
+    if (first.dev.site) first.dev.site.focusDev = first.dev;
+    else focusDev = first.dev;
     relayout();
   }
   cvAllow = Date.now() + 900;
-  f.dev.el && f.dev.el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  first.dev.el && first.dev.el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+}
+$('#findings').addEventListener('click', e => {
+  const el = e.target.closest('.finding'); if (!el) return;
+  if (el.dataset.g === undefined) { showFindings([findings[+el.dataset.i]]); return; }
+  const group = reportGroups[+el.dataset.g], chip = e.target.closest('.screen-chip');
+  if (!chip) { showFindings(group.items); return; } // the whole issue, on every screen it affects
+  const screen = group.screens[+chip.dataset.s];
+  pickedScreen.set(group.key, screen);
+  renderFindings();
+  showFindings(group.items.filter(f => f.dev === screen));
 });
 $('#detect').onclick = () => detect();
 function showTab(t) { $('#panel').hidden = false; if (mode === 'focus') relayout(); document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $('#pane-diff').hidden = t !== 'diff'; $('#pane-log').hidden = t !== 'log'; }

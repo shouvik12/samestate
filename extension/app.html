@@ -222,6 +222,7 @@
   <aside class="right" id="panel" hidden>
     <div class="tabs"><button data-tab="diff" class="on">Differences</button><button data-tab="log">Sync log</button><button id="closepanel" title="Close">✕</button></div>
     <div class="pane" id="pane-diff">
+      <div class="report-view" id="report-view" role="group" aria-label="List findings" hidden><button type="button" data-view="issue" aria-pressed="true">By issue</button><button type="button" data-view="device" aria-pressed="false">By device</button></div>
       <div class="chips" id="chips"></div>
       <div id="findings"><p class="muted">Open a site, then press <b>Detect differences</b>. Every device is measured and compared with the reference device.</p></div>
     </div>
