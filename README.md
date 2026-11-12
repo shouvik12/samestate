@@ -138,15 +138,15 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
-| **2026-11-12** | — | — | **Close device previews** — close individual screens from the device wall ([details](changelogs/CHANGELOG-close-device-previews.md)) |
-| **2026-11-12** | — | — | **Preview borders** — each preview and its title-bar controls share a visible border ([details](changelogs/CHANGELOG-preview-borders.md)) |
-| **2026-11-12** | — | — | **Switch sites in Page steps** — enter another domain or URL to start a new journey ([details](changelogs/CHANGELOG-switch-preview-site.md)) |
-| **2026-11-12** | — | — | **Page step placement** — drag steps by their title bars while keeping their page states and step numbers ([details](changelogs/CHANGELOG-page-step-placement.md)) |
-| **2026-11-12** | — | — | **Wall scrollbar** — drag the bottom bar to reach previews on either side ([details](changelogs/CHANGELOG-wall-scrollbar.md)) |
-| **2026-11-12** | — | — | **Views and page steps** — use one shared device size across the wall or open successive pages and supported interaction states side by side ([details](changelogs/CHANGELOG-page-views.md)) |
-| **2026-11-12** | — | — | **Video playback sync** — play and pause the main video across previews, with per-device results ([details](changelogs/CHANGELOG-video-playback.md)) |
-| **2026-11-12** | — | — | **Device drawers** — reorganized the sidebar and added 83 searchable presets plus locally saved custom devices ([details](changelogs/CHANGELOG-device-drawers.md)) |
-| **2026-11-12** | — | — | **Wall capture** — save the visible device wall as a PNG screenshot or a silent WebM recording ([details](changelogs/CHANGELOG-wall-capture.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Close device previews** — close individual screens from the device wall ([details](changelogs/CHANGELOG-close-device-previews.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Preview borders** — each preview and its title-bar controls share a visible border ([details](changelogs/CHANGELOG-preview-borders.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Switch sites in Page steps** — enter another domain or URL to start a new journey ([details](changelogs/CHANGELOG-switch-preview-site.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Page step placement** — drag steps by their title bars while keeping their page states and step numbers ([details](changelogs/CHANGELOG-page-step-placement.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Wall scrollbar** — drag the bottom bar to reach previews on either side ([details](changelogs/CHANGELOG-wall-scrollbar.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Views and page steps** — use one shared device size across the wall or open successive pages and supported interaction states side by side ([details](changelogs/CHANGELOG-page-views.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Video playback sync** — play and pause the main video across previews, with per-device results ([details](changelogs/CHANGELOG-video-playback.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Device drawers** — reorganized the sidebar and added 83 searchable presets plus locally saved custom devices ([details](changelogs/CHANGELOG-device-drawers.md)) |
+| **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Wall capture** — save the visible device wall as a PNG screenshot or a silent WebM recording ([details](changelogs/CHANGELOG-wall-capture.md)) |
 | **2026-11-12** | 18:05:50 +09:00 | `82deac7` | **Free placement** — drag a screen by its title bar to any spot on the wall, such as a phone between two laptops; Grid or Row returns to the automatic layout, and Lock layout keeps the arrangement ([details](changelogs/CHANGELOG-free-placement.md)) |
 | **2026-11-12** | 17:36:29 +09:00 | `86b6a1d` | **Default site** — Samestate opens `claude.com` on every screen at start-up, with access built into the manifest; the guided demo moves to the Demo button ([details](changelogs/CHANGELOG-default-site.md)) |
 | **2026-11-12** | 17:32:12 +09:00 | `d14d868` | **Arrange screens** — drag a screen by its title bar onto another to move it, and lock the layout so it stays put; the arrangement resets when the Samestate tab is reopened ([details](changelogs/CHANGELOG-arrange-screens.md)) |
