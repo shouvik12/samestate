@@ -71,8 +71,6 @@ extension/
   app.html/js/css The device wall, the message router, the sync log and the difference engine.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
-server/           Optional Node version: a local proxy that can also clone and run a Git repo
-                  or a project folder.  node server/server.js <url | repo | folder>
 ```
 
 Matching a control across layouts is a score over id, test id, link target, accessible name, role
@@ -88,8 +86,7 @@ drawer with separate markup. Samestate is built for that case, and adds a report
 ## Known limits
 
 - Device frames have the device's size but send your browser's own user-agent. Sites that pick a
-  mobile layout on the server by user-agent will show desktop markup. (The Node version sends
-  per-device user-agents.)
+  mobile layout on the server by user-agent will show desktop markup.
 - CSS `hover` / `pointer` media queries and device pixel ratio report your real computer.
 - Security headers are removed inside Samestate tabs so pages can be framed. Use those tabs for
   previewing, not for sensitive browsing. Other tabs are untouched.
