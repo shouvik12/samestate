@@ -5,7 +5,8 @@ Click once. Every screen size follows to the same state, even when the layouts a
 <p align="center">
   <a href="https://shouvik12.github.io/samestate/"><b>▶ Live demo</b></a> ·
   <a href="#install">Install the Chrome extension</a> ·
-  <a href="#how-it-works">How it works</a>
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#release-notes">Release notes</a>
 </p>
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
@@ -93,6 +94,23 @@ docs/             The same app as a static page for the live demo (GitHub Pages)
 - Chrome Web Store listing
 - Per-device user-agent in the extension
 - Group identical findings across devices
+
+## Release Notes
+
+Each change has a file in [`changelogs/`](changelogs/) with the details.
+
+| Date | Commits | Feature / Update |
+|------|---------|-----------------:|
+| **2026-11-12** | — | **Changelog setup** — one `changelogs/CHANGELOG-<topic>.md` per change, a pre-commit hook and a CI check that require one for code changes, and this table ([details](changelogs/CHANGELOG-changelog-setup.md)) |
+| **2026-11-12** | `f631c39` | **Demo sandbox warning** — the bundled demo frame loads without a sandbox, which Chrome warned could not isolate a same-origin page; real sites keep it ([details](changelogs/CHANGELOG-demo-sandbox.md)) |
+| **2026-11-12** | `f631c39` | **Twin control matching** — a control the site renders twice (desktop bar and mobile bar) is paired by its attributes, so a day/night toggle clicked on a phone reaches the desktops; toggles already in the target state are skipped ([details](changelogs/CHANGELOG-twin-control-matching.md)) |
+| **2026-11-12** | `f631c39` | **Align screens** — one button brings every linked screen to the page and scroll position of the screen used last; a link toggle on each screen chooses which screens move together ([details](changelogs/CHANGELOG-align-screens.md)) |
+| **2026-11-12** | `f631c39` | **Redirect follow** — a site that redirects to another hostname (`example.com` → `www.example.com`) reopens there instead of showing blank frames ([details](changelogs/CHANGELOG-redirect-follow.md)) |
+| **2026-11-12** | `f631c39` | **Per-site access** — the extension asks Chrome for one site at a time instead of all sites, limits header removal and inspection to that site, and matches controls by page structure with optional visible-text matching ([details](changelogs/CHANGELOG-per-site-access.md)) |
+| **2026-11-12** | `35d7207` | **Node server removed** — dropped the optional local proxy, whose `/api/open` endpoint accepted requests from any web page ([details](changelogs/CHANGELOG-remove-node-server.md)) |
+| **2026-11-12** | `42fc89c` | **Contributing guide** added |
+| **2026-11-12** | `a264396` | **README** — screenshots, and which folder to load in Chrome |
+| **2026-11-11** | `63cb071` | **First release** |
 
 ## License
 

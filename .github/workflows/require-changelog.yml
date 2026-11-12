@@ -1,0 +1,69 @@
+name: Require changelog
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for CHANGELOG file
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          # Files changed by the whole pull request, or by the pushed commits.
+          # --diff-filter=ACMR: deletions don't count, so removing a file never fails the check.
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            RANGE="$PR_BASE...HEAD"
+          elif [ -n "$PUSH_BEFORE" ] && git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then
+            RANGE="$PUSH_BEFORE..HEAD"
+          else
+            RANGE="HEAD~1..HEAD"
+          fi
+          FILES=$(git diff --name-only --diff-filter=ACMR "$RANGE")
+
+          echo "Changed files (added/modified/copied/renamed) in $RANGE:"
+          echo "$FILES"
+
+          # Docs and repo tooling don't need a changelog
+          CODE_FILES=$(echo "$FILES" | grep -vE '\.(md|txt)$' | grep -vE '^\.(agents|github|githooks)/' || true)
+          if [ -z "$CODE_FILES" ]; then
+            echo "✅ Docs-only change: changelog not required."
+            exit 0
+          fi
+
+          # Reject changelogs placed in the repo root instead of changelogs/
+          ROOT_CHANGELOG=$(echo "$FILES" | grep -E '^CHANGELOG-.*\.md$' || true)
+          if [ -n "$ROOT_CHANGELOG" ]; then
+            echo ""
+            echo "❌ FAILED: Changelog found in repo root. It must be in changelogs/."
+            echo "   Found: $ROOT_CHANGELOG"
+            echo ""
+            exit 1
+          fi
+
+          CHANGELOG=$(echo "$FILES" | grep -E '^changelogs/CHANGELOG-.*\.md$' || true)
+          if [ -z "$CHANGELOG" ]; then
+            echo ""
+            echo "❌ FAILED: No changelog found in changelogs/ directory."
+            echo ""
+            echo "Every code change must include a changelogs/CHANGELOG-<topic>.md file."
+            echo "The format is described in .agents/workflows/commit.md."
+            echo ""
+            exit 1
+          fi
+
+          echo "✅ Found changelog:"
+          echo "$CHANGELOG"

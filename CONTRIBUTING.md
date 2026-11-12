@@ -26,9 +26,22 @@ The live demo lives in `docs/` and is served by GitHub Pages.
 ## Pull requests
 
 - One change per PR, with a sentence on what it fixes and how you tested it.
+- Include a `changelogs/CHANGELOG-<topic>.md` file (see [Changelogs](#changelogs)).
 - For difference-report changes, say which real site you tested on and how the finding count changed.
 - Keep it dependency-free; the extension has no build step.
 - Don't widen what `background.js` touches: it must only affect Samestate tabs.
+
+## Changelogs
+
+Every code change comes with a short changelog file, `changelogs/CHANGELOG-<topic>.md`, and a row in the **Release Notes** table in the README. The format is in [`.agents/workflows/commit.md`](.agents/workflows/commit.md): a bullet list of what changed, then what, why and which files.
+
+Turn on the local check once after cloning:
+
+```
+git config core.hooksPath .githooks
+```
+
+It blocks a commit that changes code without a changelog. The **Require changelog** check on GitHub does the same for pull requests. Changes that only touch `.md` or `.txt` files don't need one.
 
 ## Reporting a security issue
 

@@ -1,0 +1,50 @@
+#!/bin/sh
+# Pre-commit hook: changelog enforcement
+#
+# Checks that at least one changelogs/CHANGELOG-*.md file is being committed
+# alongside code changes.
+#
+# Turn it on once per clone:  git config core.hooksPath .githooks
+
+# Get list of staged files (deletions don't count)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# Skip check if no files staged
+if [ -z "$STAGED_FILES" ]; then
+    exit 0
+fi
+
+# Allow commits that only touch docs or repo tooling
+CODE_FILES=$(echo "$STAGED_FILES" | grep -vE '\.(md|txt)$' | grep -vE '^\.(agents|github|githooks)/')
+if [ -z "$CODE_FILES" ]; then
+    exit 0
+fi
+
+# Reject changelogs placed in the repo root
+ROOT_CHANGELOG=$(echo "$STAGED_FILES" | grep -E '^CHANGELOG-.*\.md$')
+if [ -n "$ROOT_CHANGELOG" ]; then
+    echo ""
+    echo "❌ COMMIT BLOCKED: Changelog found in repo root. It must be in changelogs/."
+    echo "   Found: $ROOT_CHANGELOG"
+    echo "   Move it: git mv $ROOT_CHANGELOG changelogs/"
+    echo ""
+    exit 1
+fi
+
+# Check if any CHANGELOG file is staged in changelogs/ directory
+CHANGELOG_FILE=$(echo "$STAGED_FILES" | grep -E '^changelogs/CHANGELOG-.*\.md$')
+
+if [ -z "$CHANGELOG_FILE" ]; then
+    echo ""
+    echo "❌ COMMIT BLOCKED: No changelog found in changelogs/ directory."
+    echo ""
+    echo "Every commit with code changes must include a changelogs/CHANGELOG-<topic>.md file."
+    echo "The format is described in .agents/workflows/commit.md."
+    echo ""
+    echo "Example:"
+    echo "  git add changelogs/CHANGELOG-my-fix.md"
+    echo ""
+    exit 1
+fi
+
+exit 0
