@@ -5,6 +5,7 @@
 - On desktop screens links keep the hand and form fields keep the I-beam; only the plain arrow is replaced
 - Both pointers are inline SVG data URLs set as the CSS `cursor`: `FINGER` with its hotspot at the centre (`14 14`), `ARROW` with its hotspot at the tip (`4 2`)
 - `applyTouchMode()` now always keeps the `#__samestate_touch` style in the page and switches its content with each device's `touch` setting
+- Fixed: the circle did not show in commit `d14d868` because the `FINGER` data URL had doubled percent signs (`%%3Csvg`), so the image failed to load and the pointer fell back to the default arrow
 
 ---
 
@@ -28,6 +29,7 @@ Every screen showed the computer's own mouse pointer, which made phone and table
 ## Testing
 - Applied both CSS rules on a live page in Chrome: the cursor values were accepted, the hotspots parsed, the circle image loaded at 28×28, and a link kept `cursor: pointer` under the arrow rule
 - Rendered the arrow SVG to an image to check its shape
+- After the fix, decoded both data URLs from `agent.js` itself and loaded the circle in Chrome (28×28); the doubled-percent version fails to load
 - Not yet confirmed inside the extension's device wall
 
 ---

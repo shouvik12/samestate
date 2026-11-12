@@ -313,7 +313,7 @@ async function startTour() {
   }
 }
 function endTour(clear) {
-  tour++; $('#tour').hidden = true; try { localStorage.setItem('samestate.seenDemo', '1'); } catch (e) {}
+  tour++; $('#tour').hidden = true;
   if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
 }
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with
@@ -660,6 +660,17 @@ document.querySelector('.right-tools').addEventListener('click', e => { const b 
 
 /* ----------------------------------- boot ----------------------------------- */
 renderLeft();
-let seenDemo = false; try { seenDemo = !!localStorage.getItem('samestate.seenDemo'); } catch (e) {}
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
-if (!seenDemo || !IS_EXT) startTour();
+// The extension starts on the default site, which the manifest already has access to, so no prompt is
+// needed. The web demo can only show the bundled sample site, so it starts with the tour.
+const DEFAULT_SITE = 'https://claude.com/';
+async function openDefault() {
+  const url = new URL(DEFAULT_SITE);
+  let allowed = false;
+  try { allowed = await chrome.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] }); } catch {}
+  if (target || openId) return; // the user already opened something
+  if (allowed) return open(DEFAULT_SITE, true);
+  $('#src').value = DEFAULT_SITE;
+  $('#joblog').textContent = `Press Enter to open ${url.host}.`;
+}
+if (IS_EXT) openDefault(); else startTour();
