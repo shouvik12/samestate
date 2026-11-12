@@ -15,8 +15,6 @@
 <header class="bar">
   <div class="navbtns">
     <a class="brand" href="./" title="Samestate — one interaction, every device"><span class="logo"><i></i><i></i><i></i></span>Samestate</a>
-    <button id="back" title="Back on all devices"><svg viewBox="0 0 24 24"><path d="M19 12H6m5-6-6 6 6 6"/></svg></button>
-    <button id="fwd" title="Forward on all devices"><svg viewBox="0 0 24 24"><path d="M5 12h13m-5-6 6 6-6 6"/></svg></button>
     <button id="reload" title="Reload all devices"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg></button>
   </div>
   <form id="open" class="url">
@@ -50,11 +48,13 @@
 
     <div class="label">Mirror</div>
     <div id="synclist"></div>
+    <label class="row" title="Visible text can include personal data. Text matching runs locally for this preview."><input id="match-text" type="checkbox" disabled>Match visible text</label>
 
+    <div class="sep"></div>
+    <button class="item" id="alignall" title="Bring every linked screen to the page and scroll position of the screen you used last"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16M9 3v6M15 9v6M9 15v6"/></svg>Align screens</button>
     <div class="sep"></div>
     <button class="item" id="detect"><svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1M16 13h1"/></svg><span>Detect differences</span></button>
     <label class="item sel"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l-3 4 3 4M19 8l3 4-3 4"/></svg>Compare to <select id="ref"></select></label>
-    <button class="item" id="clear"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>Clear storage</button>
     <div class="sep"></div>
     <button class="item" id="land"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/></svg>All to landscape</button>
     <button class="item" id="port"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/></svg>All to portrait</button>
@@ -68,11 +68,11 @@
       <div class="hero-card">
         <div class="brand big"><span class="logo"><i></i><i></i><i></i></span>Samestate</div>
         <h1>One interaction, every device.</h1>
-        <p class="sub">Open a site once. Click, type and scroll on any screen, and every other device follows to the same state.</p>
+        <p class="sub">Compare responsive layouts side by side and mirror clicks and scrolling.</p>
         <ul class="points">
-          <li><b>Logical sync</b>Opens each device's own menus and drawers to reach the same place.</li>
+          <li><b>Click sync</b>Matches controls by their position in the page structure.</li>
           <li><b>Difference report</b>Lists what changes per device: hidden content, tables, tap targets, overlays.</li>
-          <li><b>Any page</b>Live sites, pages you are signed in to, and local dev servers.</li>
+          <li><b>Sample site</b>Explore the bundled demo at different screen sizes.</li>
         </ul>
         <div class="actions"><button class="cta" id="watch">Watch the demo</button><button class="cta ghost" id="own">Use my own site</button></div>
         <pre id="joblog"></pre>

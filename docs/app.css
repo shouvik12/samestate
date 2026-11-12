@@ -131,3 +131,4 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 #skip{background:var(--raise);border-radius:7px;padding:5px 12px;color:var(--text);font-weight:600}
 #skip:hover{background:var(--line)}
 .tour p{margin:0;font-size:14px;line-height:1.45}
+.dev.unlinked .dev-head button[data-a=link]{color:var(--warn);opacity:1}.dev.unlinked .dev-body{opacity:.72}

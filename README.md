@@ -19,17 +19,14 @@ Click once. Every screen size follows to the same state, even when the layouts a
 
 ## What it does
 
-Samestate opens any page on a wall of devices (phones, tablets, laptops, desktops) and keeps them in the
-same **logical** state.
+Samestate opens a site in a wall of responsive previews for phones, tablets, laptops, and desktops.
 
-- **Logical sync.** Click "Products" in the desktop nav bar. The phones have no nav bar, so each one opens
-  its hamburger drawer, then the Products accordion. Actions are matched by meaning (label, role, link
-  target), not by pixel position or DOM path.
-- **Everything mirrors.** Clicks, typing, checkboxes, Enter and Escape, hover, navigation, and scrolling by
-  section, so devices with different page lengths stay on the same content.
+- **Click and scroll sync.** Samestate matches controls and scroll sections by their position in the page structure.
+  Enable **Match visible text** to help match controls and compare content when layouts use different markup.
+  The bundled demo also maps the desktop Products menu to the phone’s navigation drawer.
 - **Difference report.** Every device is measured against a reference device. Click a finding to outline
   the elements in the preview.
-- **Sync log.** Shows how each device reached the same state: `opened "Open navigation" → clicked "Products"`.
+- **Sync log.** Shows which devices matched, skipped, or could not reach a control.
 
 ### What the report catches
 
@@ -38,10 +35,10 @@ same **logical** state.
 | Layout | Page scrolls sideways, side-by-side blocks that stack, text touching the screen edge |
 | Navigation | Nav collapses behind a menu button, or items that vanish with no way to reach them |
 | Content | Text and controls hidden on smaller screens, cut-off text |
-| Images | Different source file per device, changed shape, stretched or broken images |
-| Typography | Type scale changes, font family changes, text under 12px |
+| Images | Changed shape, stretched or broken images |
+| Typography | Type scale changes, text under 12px |
 | Tables | Tables wider than the screen, tables that need a sideways swipe |
-| Input | Tap targets under 24px and 40px, hover-only interactions on touch devices |
+| Input | Tap targets under 24px and 40px |
 | Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
 
 ## Install
@@ -55,36 +52,35 @@ Samestate is a Chrome extension. No server and no terminal.
    (the one that contains `manifest.json`), not the repo's top-level folder.
 5. Pin the Samestate icon from the puzzle-piece menu.
 
-Then go to any page and click the icon. The page opens in a new tab on every device.
-The first run plays a short guided demo; **Skip demo** dismisses it.
+Click the Samestate icon to open the preview tab. Enter the site address and grant Chrome access to that site.
+The first run plays a short guided demo. **Skip demo** opens the address field for your own site.
+
+## Chrome extension privacy
+
+Samestate uses element structure, visibility, and layout measurements to produce its reports. **Match visible text**
+is off when you open a preview. When enabled, the preview reads rendered text locally and uses temporary
+fingerprints for comparison. Raw page text stays out of the report and sync log. Visible text can contain
+personal data. Mark elements with `data-samestate-private` to exclude their text from matching.
+
+Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
+and in-page navigation stay in the device where you use them. Samestate scopes inspection to the site you open
+in its preview tab. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
 
 ## How it works
 
 ```
 extension/
-  background.js   For Samestate tabs only: removes frame-blocking response headers on the
-                  device frames and injects the agent into each one.
-  agent.js        Runs inside every device frame. Describes each real interaction semantically,
-                  and on the other devices finds the equivalent control. If that control is
-                  hidden, it opens whatever reveals it first (aria-controls, details/summary,
-                  accordion buttons, the menu button), then acts.
+  background.js   Lets the selected origin load inside a Samestate tab and injects the agent
+                  into its preview frames.
+  agent.js        Measures layout and mirrors interactions using element positions and control types.
   app.html/js/css The device wall, the message router, the sync log and the difference engine.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 ```
 
-Matching a control across layouts is a score over id, test id, link target, accessible name, role
-and position. A control with the same job but a different design (a "Menu" button on one device, a
-hamburger icon on another) is matched by role.
-
-## How this differs from other multi-device previews
-
-Most multi-device browsers mirror the *same event on the same element*. That works when every
-breakpoint shares its markup. It stops working when the desktop has a nav bar and the phone has a
-drawer with separate markup. Samestate is built for that case, and adds a report of what differs.
-
 ## Known limits
 
+- Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
 - Device frames have the device's size but send your browser's own user-agent. Sites that pick a
   mobile layout on the server by user-agent will show desktop markup.
 - CSS `hover` / `pointer` media queries and device pixel ratio report your real computer.
