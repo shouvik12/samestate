@@ -155,6 +155,7 @@
 
   function canMirrorClick(el) {
     if (demo && el.matches('#signin .close')) return true;
+    if (el.closest(playerControl)) return false;
     if (el.closest('form,[contenteditable]') || el.matches('a, input, textarea, select, [role=link], [role=checkbox], [role=switch]')) return false;
     return el.matches('button,summary,[role=button],[role=tab],[aria-expanded]');
   }
@@ -228,31 +229,192 @@
 
   /* ------------------------- capturing user actions ------------------------- */
   let hovering = false, lastInput = 0, lastActive = 0, suppressUntil = 0, swallowClick = false;
+  let playbackGesture = -Infinity, playbackVersion = 0, lastVideo = null;
+  let pageGesture = -Infinity;
+  const playbackCommands = new WeakMap();
+  const playerControl = 'video,.ytp-play-button,.ytp-large-play-button,.ytp-cued-thumbnail-overlay';
   const act = (kind, data) => send('act', Object.assign({ kind }, data));
   function mark() { lastInput = now(); if (lastInput - lastActive > 400) { lastActive = lastInput; send('active'); } }
   const leading = () => now() > suppressUntil && (hovering || now() - lastInput < 1500);
   for (const ev of ['pointerdown', 'wheel', 'touchstart']) addEventListener(ev, e => e.isTrusted && mark(), { capture: true, passive: true });
+  for (const ev of ['pointerdown', 'click', 'keydown']) {
+    addEventListener(ev, event => { if (event.isTrusted) playbackGesture = now(); }, { capture: true, passive: true });
+  }
   document.addEventListener('mouseenter', () => { hovering = true; mark(); });
   document.addEventListener('mouseleave', () => { hovering = false; if (lastHover) { lastHover = null; act('unhover', {}); } });
 
   function mirrorClick(el) {
     const description = describe(el);
+    const version = playbackVersion;
     setTimeout(async () => {
-      if (!el.isConnected) return;
+      if (!el.isConnected || version !== playbackVersion) return;
       const expanded = el.matches('[aria-expanded=true]') ? true : el.matches('[aria-expanded=false]') ? false : null;
       const open = el.matches('details > summary') ? el.parentElement.open : null;
       const pressed = el.getAttribute('aria-pressed');
       const textKey = description.demoControl ? '' : await textFingerprint(el).catch(() => '');
-      if (el.isConnected) act('click', { d: { ...description, textKey }, expanded, open, pressed });
+      if (el.isConnected && version === playbackVersion) act('click', { d: { ...description, textKey }, expanded, open, pressed });
     }, 90);
+  }
+
+  function journeyControl(el) {
+    if (!(el instanceof HTMLElement) || el.form || el.closest(privateContent) || el.matches(':disabled,[aria-disabled=true]')) return false;
+    if (el.matches('details > summary')) return true;
+    if (el instanceof HTMLAnchorElement) {
+      if (!el.hasAttribute('href') || el.hasAttribute('download') || el.origin !== location.origin || el.pathname !== location.pathname || el.search !== location.search || /^#!?\//.test(el.hash)) return false;
+    } else if (!el.matches('button,[role=button],[role=tab]')) return false;
+    if (el.matches('[aria-expanded],[aria-haspopup=dialog],[aria-haspopup=menu],[aria-haspopup=true],[popovertarget],[command=show-modal],[role=tab]')) return true;
+    if (el.querySelector('[data-samestate-private]')) return false;
+    const label = (el.getAttribute('aria-label') || el.innerText || '').trim();
+    return /^(?:sign|log)\s*in$/i.test(label);
+  }
+
+  function sendPageStep(type, data) {
+    if (!cfg.pageSteps || (!demo && !port)) return false;
+    try { send(type, data); } catch { return false; }
+    return true;
+  }
+
+  function openPageInWall(address) {
+    let url;
+    try { url = new URL(address, location.href); } catch { return false; }
+    if (url.origin !== location.origin || url.username || url.password || url.href === location.href) return false;
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    if (samePage && !/^#!?\//.test(url.hash)) return false;
+    return sendPageStep('open-page', { url: url.href });
+  }
+
+  function stepTarget(action) {
+    return matchingControls(action).find(el => {
+      if (!visible(el) || !journeyControl(el)) return false;
+      if (action.demoControl) return true;
+      const saved = action.sig || {};
+      const current = signature(el);
+      const tier = ['id', 'label', 'shape'].find(key => saved[key]);
+      return !tier || saved[tier] === current[tier];
+    });
+  }
+
+  async function replayStep(actions) {
+    for (const [index, action] of actions.entries()) {
+      let control;
+      const deadline = now() + 2400;
+      do {
+        control = stepTarget(action);
+        if (control || now() >= deadline) break;
+        await sleep(80);
+      } while (true);
+      if (!control) { send('step-incomplete', { applied: index }); return; }
+      control.click();
+    }
   }
 
   addEventListener('click', e => {
     if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); return; }
     if (!e.isTrusted || replaying) return;
+    if (cfg.pageSteps) {
+      if (e.defaultPrevented || e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      const link = e.target.closest?.('a[href],area[href]');
+      const control = actionable(e.target);
+      const openLink = link && !link.hasAttribute('download') && openPageInWall(link.href);
+      const openState = !openLink && journeyControl(control) && sendPageStep('open-state', { url: location.href, action: describe(control) });
+      if (openLink || openState) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      } else {
+        const button = e.target.closest?.('button,[role=button],[role=link]');
+        if (button && !button.form && !button.closest('form,[contenteditable]')) pageGesture = now();
+      }
+      return;
+    }
+    if (e.target.closest?.(playerControl)) return;
     const el = actionable(e.target);
     if (el && canMirrorClick(el)) mirrorClick(el);
   }, true);
+
+  window.navigation?.addEventListener('navigate', event => {
+    if (!cfg.pageSteps || !event.isTrusted || !event.cancelable || !event.canIntercept || event.defaultPrevented) return;
+    const source = event.sourceElement;
+    if (event.navigationType !== 'push' || event.downloadRequest != null || event.formData || source?.form || source?.closest?.('form,[contenteditable]')) return;
+    if (now() - pageGesture < 700 && openPageInWall(event.destination.url)) {
+      pageGesture = -Infinity;
+      event.preventDefault();
+    }
+  });
+
+  function playbackChanged(event) {
+    const video = event.target;
+    if (!(video instanceof HTMLVideoElement)) return;
+    const playing = event.type === 'play';
+    if (playing === video.paused) return;
+
+    const command = playbackCommands.get(video);
+    if (command?.playing === playing && !command.observed) {
+      command.observed = true;
+      return;
+    }
+    if (replaying || now() - playbackGesture > 1500) return;
+    lastVideo = video;
+    playbackVersion++;
+    act('media', { playing, path: elementPath(video) });
+  }
+
+  document.addEventListener('play', playbackChanged, true);
+  document.addEventListener('pause', playbackChanged, true);
+
+  function mainVideo(path, playing) {
+    const match = locate(path);
+    if (match instanceof HTMLVideoElement && (visible(match) || !match.paused)) return match;
+    if (lastVideo?.isConnected && (playing ? visible(lastVideo) : !lastVideo.paused)) return lastVideo;
+
+    let main = null, largest = -1;
+    for (const video of document.querySelectorAll('video')) {
+      if (playing ? !visible(video) : video.paused && !visible(video)) continue;
+      const bounds = video.getBoundingClientRect();
+      const area = bounds.width * bounds.height;
+      if (!playing && main && main.paused !== video.paused) {
+        if (video.paused) continue;
+      } else if (area <= largest) continue;
+      largest = area;
+      main = video;
+    }
+    return main;
+  }
+
+  async function applyPlayback({ path, playing }) {
+    const video = mainVideo(path, playing);
+    if (!video) return { status: 'no-video' };
+    const command = { playing, observed: video.paused !== playing };
+    playbackCommands.set(video, command);
+    lastVideo = video;
+
+    if (!playing) {
+      video.pause();
+      return { status: 'paused' };
+    }
+    if (!video.paused) return { status: 'playing' };
+
+    try {
+      await video.play();
+      return { status: playbackCommands.get(video) === command ? 'playing' : 'skip' };
+    } catch (error) {
+      if (playbackCommands.get(video) !== command) return { status: 'skip' };
+      if (error.name !== 'NotAllowedError' || video.muted) {
+        playbackCommands.delete(video);
+        return { status: error.name === 'NotAllowedError' ? 'blocked' : 'unavailable' };
+      }
+    }
+
+    video.muted = true;
+    try {
+      await video.play();
+      return { status: playbackCommands.get(video) === command ? 'muted' : 'skip' };
+    } catch (error) {
+      if (playbackCommands.get(video) !== command) return { status: 'skip' };
+      video.muted = false;
+      playbackCommands.delete(video);
+      return { status: error.name === 'NotAllowedError' ? 'blocked' : 'unavailable' };
+    }
+  }
 
   let lastHover = null, hoverT = 0;
   addEventListener('mouseover', e => {
@@ -373,6 +535,7 @@
   /* --------------------------- replaying remote acts --------------------------- */
   let hoverEl = null;
   const handlers = {
+    media: applyPlayback,
     async click(m) {
       const { el, status } = await findTarget(m.d);
       if (!el) return { status };
@@ -513,6 +676,7 @@
     if (!m?.__samestateShell) return;
     if (m.type === 'config') {
       cfg.touch = m.touch === true;
+      cfg.pageSteps = m.pageSteps === true;
       if (cfg.textSalt !== m.textSalt) {
         cfg.textSalt = m.textSalt;
         cfg.textKey = typeof m.textSalt === 'string' && crypto.subtle
@@ -521,6 +685,7 @@
       }
       applyTouchMode();
     }
+    else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') location.reload();
     else if (m.type === 'state') send('state', { rid: m.rid, url: location.href, scroll: scrollState() });
     else if (m.type === 'align') {
@@ -545,7 +710,7 @@
       setTimeout(() => els.filter(visible).slice(0, 40).forEach(el => ring(el, '#ffb020', 2600)), 60);
     } else if (m.type === 'act' && Object.hasOwn(handlers, m.kind)) {
       const runIt = async () => { let r = null; try { r = await handlers[m.kind](m); } catch { r = { status: 'none' }; } if (r && m.aid) send('result', Object.assign({ aid: m.aid }, r)); };
-      if (/hover|scroll/.test(m.kind)) runIt(); else queue = queue.then(runIt);
+      if (m.kind === 'media' || /hover|scroll/.test(m.kind)) runIt(); else queue = queue.then(runIt);
     }
   }
 

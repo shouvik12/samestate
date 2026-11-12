@@ -22,12 +22,15 @@ Click once. Every screen size follows to the same state, even when the layouts a
 
 Samestate opens a site in a wall of responsive previews for phones, tablets, laptops, and desktops.
 
+- **Device presets.** Choose from 83 built-in viewports or save a custom size.
 - **Click and scroll sync.** Samestate matches controls and scroll sections by their position in the page structure.
   Enable **Match visible text** to help match controls and compare content when layouts use different markup.
   The bundled demo also maps the desktop Products menu to the phone’s navigation drawer.
+- **Video playback.** Play or pause the main video across the wall from the **Sync** drawer.
 - **Difference report.** Every device is measured against a reference device. Click a finding to outline
   the elements in the preview.
 - **Sync log.** Shows which devices matched, skipped, or could not reach a control.
+- **Screenshots and recordings.** Save the visible device wall as a PNG or a silent WebM video.
 
 ### What the report catches
 
@@ -56,6 +59,38 @@ Samestate is a Chrome extension. No server and no terminal.
 Click the Samestate icon to open the preview tab. It starts with `claude.com` on every screen. To preview
 another site, enter its address and grant Chrome access to that site. The **Demo** button plays a short guided demo.
 
+## Choose devices and options
+
+Open **Devices** to browse Android phones, Apple phones, tablets, and specials such as foldables, watches, and TVs. Search by model or dimensions, or turn on **Selected only** to edit the current wall. Under **My custom devices**, enter a name, width, height, and frame type to save a preset in this browser.
+
+Click **×** in a preview’s title bar to close it. Select the device again in **Devices** to reopen it.
+
+**Capture**, **Views**, **Layout**, **Sync**, and **Compare** each open and close independently. Use the toolbar’s sidebar button to hide or reopen the panel.
+
+Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog uses the [Mobile FIRST viewport reference](https://www.webmobilefirst.com/en/devices/) and [Apple’s display guidance](https://developer.apple.com/cn/design/human-interface-guidelines/layout), including the [iPhone 18 Pro specifications](https://www.apple.com/iphone-18-pro/specs/).
+
+## Compare devices and page steps
+
+- In **Views → Device sizes**, choose **Different devices** to use the selected presets or **Same device on every screen** to give those previews one shared size. Select **Device for all previews** to resize them in place.
+- Turn on **Views → Page steps** to start a row with the page you originally opened. Follow a same-origin link or use a supported control, such as **Sign in**, to open the next state beside the current screen. Dialogs, menus and tabs can become steps even when the address stays the same. In the extension, you can also enter a path such as `/pricing` in the address bar. Close a step with **×** in its header.
+- To switch sites, enter a domain or full URL in the address bar. After Chrome grants access, the new site opens at Step 1 with the selected device size.
+- To see the same steps at laptop size, select a preset such as **MacBook Air** under **Device for all previews**. Turn **Page steps** off to return to the device wall. Your open previews are kept when you switch between the two views.
+- Drag a preview by its title bar to place it anywhere on the wall. In **Layout**, use **Lock layout** to keep previews in place or choose **Row** or **Grid** to restore automatic placement. Each view keeps its own arrangement.
+
+When previews extend beyond the visible wall, drag the scrollbar at the bottom to move left or right. The bar is available with the sidebar closed.
+
+## Capture the device wall
+
+With a preview open in desktop Chrome, click **Screenshot** or **Record**, then share the current Samestate tab in Chrome’s picker. **Screenshot** starts a PNG download. **Record** starts a silent video, and **Stop** downloads it as WebM. You can take screenshots while recording.
+
+Capture follows the visible part of the wall as you scroll or zoom. Chrome crops the tab capture to the wall, and Samestate saves files locally.
+
+## Sync video playback
+
+Open the video’s page directly in Samestate, then open **Sync** and click **Play all** or **Pause all**. With **Video playback** checked, playing or pausing in one linked preview also updates the other linked previews.
+
+If Chrome blocks playback with sound, Samestate tries again muted. The Sync log shows the result for each preview. Players embedded from a different site need to be opened on their own page for Samestate to control them.
+
 ## Chrome extension privacy
 
 Samestate uses element structure, visibility, and layout measurements to produce its reports. **Match visible text**
@@ -64,7 +99,8 @@ fingerprints for comparison. Raw page text stays out of the report and sync log.
 personal data. Mark elements with `data-samestate-private` to exclude their text from matching.
 
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
-and in-page navigation stay in the device where you use them. Samestate scopes inspection to the site you open
+and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
+or the structure of a supported control to open the next preview. Samestate scopes inspection to the site you open
 in its preview tab. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
 
 ## How it works
@@ -75,6 +111,8 @@ extension/
                   into its preview frames.
   agent.js        Measures layout and mirrors interactions using element positions and control types.
   app.html/js/css The device wall, the message router, the sync log and the difference engine.
+  devices.js      Device presets, search, and custom device settings.
+  capture.js      Local screenshots and recordings of the device wall.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 ```
@@ -90,31 +128,39 @@ docs/             The same app as a static page for the live demo (GitHub Pages)
 
 ## Roadmap
 
-- Screenshot all devices in one click
 - Chrome Web Store listing
 - Per-device user-agent in the extension
 - Group identical findings across devices
 
 ## Release Notes
 
-Each change has a file in [`changelogs/`](changelogs/) with the details.
+Each change has a file in [`changelogs/`](changelogs/) with the details. Commit times include the UTC offset recorded by Git.
 
-| Date | Commits | Feature / Update |
-|------|---------|-----------------:|
-| **2026-11-12** | `82deac7` | **Free placement** — drag a screen by its title bar to any spot on the wall, such as a phone between two laptops; Grid or Row returns to the automatic layout, and Lock layout keeps the arrangement ([details](changelogs/CHANGELOG-free-placement.md)) |
-| **2026-11-12** | `86b6a1d` | **Default site** — Samestate opens `claude.com` on every screen at start-up, with access built into the manifest; the guided demo moves to the Demo button ([details](changelogs/CHANGELOG-default-site.md)) |
-| **2026-11-12** | `d14d868` | **Arrange screens** — drag a screen by its title bar onto another to move it, and lock the layout so it stays put; the arrangement resets when the Samestate tab is reopened ([details](changelogs/CHANGELOG-arrange-screens.md)) |
-| **2026-11-12** | `d14d868` | **Device pointers** — phone and tablet screens show a fingertip circle instead of the mouse arrow; desktop and MacBook screens show a white mouse arrow ([details](changelogs/CHANGELOG-touch-pointer.md)) |
-| **2026-11-12** | `0185838` | **Changelog setup** — one `changelogs/CHANGELOG-<topic>.md` per change, a pre-commit hook and a CI check that require one for code changes, and this table ([details](changelogs/CHANGELOG-changelog-setup.md)) |
-| **2026-11-12** | `f631c39` | **Demo sandbox warning** — the bundled demo frame loads without a sandbox, which Chrome warned could not isolate a same-origin page; real sites keep it ([details](changelogs/CHANGELOG-demo-sandbox.md)) |
-| **2026-11-12** | `f631c39` | **Twin control matching** — a control the site renders twice (desktop bar and mobile bar) is paired by its attributes, so a day/night toggle clicked on a phone reaches the desktops; toggles already in the target state are skipped ([details](changelogs/CHANGELOG-twin-control-matching.md)) |
-| **2026-11-12** | `f631c39` | **Align screens** — one button brings every linked screen to the page and scroll position of the screen used last; a link toggle on each screen chooses which screens move together ([details](changelogs/CHANGELOG-align-screens.md)) |
-| **2026-11-12** | `f631c39` | **Redirect follow** — a site that redirects to another hostname (`example.com` → `www.example.com`) reopens there instead of showing blank frames ([details](changelogs/CHANGELOG-redirect-follow.md)) |
-| **2026-11-12** | `f631c39` | **Per-site access** — the extension asks Chrome for one site at a time instead of all sites, limits header removal and inspection to that site, and matches controls by page structure with optional visible-text matching ([details](changelogs/CHANGELOG-per-site-access.md)) |
-| **2026-11-12** | `35d7207` | **Node server removed** — dropped the optional local proxy, whose `/api/open` endpoint accepted requests from any web page ([details](changelogs/CHANGELOG-remove-node-server.md)) |
-| **2026-11-12** | `42fc89c` | **Contributing guide** added |
-| **2026-11-12** | `a264396` | **README** — screenshots, and which folder to load in Chrome |
-| **2026-11-11** | `63cb071` | **First release** |
+| Date | Commit time | Commits | Feature / Update |
+|------|-------------|---------|------------------|
+| **2026-11-12** | — | — | **Close device previews** — close individual screens from the device wall ([details](changelogs/CHANGELOG-close-device-previews.md)) |
+| **2026-11-12** | — | — | **Preview borders** — each preview and its title-bar controls share a visible border ([details](changelogs/CHANGELOG-preview-borders.md)) |
+| **2026-11-12** | — | — | **Switch sites in Page steps** — enter another domain or URL to start a new journey ([details](changelogs/CHANGELOG-switch-preview-site.md)) |
+| **2026-11-12** | — | — | **Page step placement** — drag steps by their title bars while keeping their page states and step numbers ([details](changelogs/CHANGELOG-page-step-placement.md)) |
+| **2026-11-12** | — | — | **Wall scrollbar** — drag the bottom bar to reach previews on either side ([details](changelogs/CHANGELOG-wall-scrollbar.md)) |
+| **2026-11-12** | — | — | **Views and page steps** — use one shared device size across the wall or open successive pages and supported interaction states side by side ([details](changelogs/CHANGELOG-page-views.md)) |
+| **2026-11-12** | — | — | **Video playback sync** — play and pause the main video across previews, with per-device results ([details](changelogs/CHANGELOG-video-playback.md)) |
+| **2026-11-12** | — | — | **Device drawers** — reorganized the sidebar and added 83 searchable presets plus locally saved custom devices ([details](changelogs/CHANGELOG-device-drawers.md)) |
+| **2026-11-12** | — | — | **Wall capture** — save the visible device wall as a PNG screenshot or a silent WebM recording ([details](changelogs/CHANGELOG-wall-capture.md)) |
+| **2026-11-12** | 18:05:50 +09:00 | `82deac7` | **Free placement** — drag a screen by its title bar to any spot on the wall, such as a phone between two laptops; Grid or Row returns to the automatic layout, and Lock layout keeps the arrangement ([details](changelogs/CHANGELOG-free-placement.md)) |
+| **2026-11-12** | 17:36:29 +09:00 | `86b6a1d` | **Default site** — Samestate opens `claude.com` on every screen at start-up, with access built into the manifest; the guided demo moves to the Demo button ([details](changelogs/CHANGELOG-default-site.md)) |
+| **2026-11-12** | 17:32:12 +09:00 | `d14d868` | **Arrange screens** — drag a screen by its title bar onto another to move it, and lock the layout so it stays put; the arrangement resets when the Samestate tab is reopened ([details](changelogs/CHANGELOG-arrange-screens.md)) |
+| **2026-11-12** | 17:32:12 +09:00 | `d14d868` | **Device pointers** — phone and tablet screens show a fingertip circle instead of the mouse arrow; desktop and MacBook screens show a white mouse arrow ([details](changelogs/CHANGELOG-touch-pointer.md)) |
+| **2026-11-12** | 17:24:58 +09:00 | `0185838` | **Changelog setup** — one `changelogs/CHANGELOG-<topic>.md` per change, a pre-commit hook and a CI check that require one for code changes, and this table ([details](changelogs/CHANGELOG-changelog-setup.md)) |
+| **2026-11-12** | 17:19:19 +09:00 | `f631c39` | **Demo sandbox warning** — the bundled demo frame loads without a sandbox, which Chrome warned could not isolate a same-origin page; real sites keep it ([details](changelogs/CHANGELOG-demo-sandbox.md)) |
+| **2026-11-12** | 17:19:19 +09:00 | `f631c39` | **Twin control matching** — a control the site renders twice (desktop bar and mobile bar) is paired by its attributes, so a day/night toggle clicked on a phone reaches the desktops; toggles already in the target state are skipped ([details](changelogs/CHANGELOG-twin-control-matching.md)) |
+| **2026-11-12** | 17:19:19 +09:00 | `f631c39` | **Align screens** — one button brings every linked screen to the page and scroll position of the screen used last; a link toggle on each screen chooses which screens move together ([details](changelogs/CHANGELOG-align-screens.md)) |
+| **2026-11-12** | 17:19:19 +09:00 | `f631c39` | **Redirect follow** — a site that redirects to another hostname (`example.com` → `www.example.com`) reopens there instead of showing blank frames ([details](changelogs/CHANGELOG-redirect-follow.md)) |
+| **2026-11-12** | 17:19:19 +09:00 | `f631c39` | **Per-site access** — the extension asks Chrome for one site at a time instead of all sites, limits header removal and inspection to that site, and matches controls by page structure with optional visible-text matching ([details](changelogs/CHANGELOG-per-site-access.md)) |
+| **2026-11-12** | 16:47:15 +09:00 | `35d7207` | **Node server removed** — dropped the optional local proxy, whose `/api/open` endpoint accepted requests from any web page ([details](changelogs/CHANGELOG-remove-node-server.md)) |
+| **2026-11-12** | 08:50:47 +05:30 | `42fc89c` | **Contributing guide** added |
+| **2026-11-12** | 00:12:48 +05:30 | `a264396` | **README** — screenshots, and which folder to load in Chrome |
+| **2026-11-11** | 23:59:55 +05:30 | `63cb071` | **First release** |
 
 ## License
 

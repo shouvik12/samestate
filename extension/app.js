@@ -1,29 +1,23 @@
 'use strict';
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-const IPAD = 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
-
-const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
-const ANDROID_TAB = 'Mozilla/5.0 (Linux; Android 13; Nexus 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-// kind: desktop | tablet | phone · os picks the chrome drawn around the page
-const DEVICES = [
-  { id: 'iphone', name: 'iPhone 11 Pro', w: 375, h: 812, scale: .62, kind: 'phone', os: 'ios', notch: true, ua: IPHONE },
-  { id: 'nexus7', name: 'Nexus 7', w: 600, h: 960, scale: .5, kind: 'tablet', os: 'android', ua: ANDROID_TAB },
-  { id: 'desktop', name: 'Desktop', w: 1920, h: 1080, scale: .3, kind: 'desktop', ua: '' },
-  { id: 'macbook', name: 'MacBook Air', w: 1440, h: 900, scale: .3, kind: 'desktop', ua: '' },
-  { id: 'android', name: 'Android', w: 420, h: 680, scale: .62, kind: 'phone', os: 'android', ua: ANDROID },
-  { id: 'pixel', name: 'Pixel 3XL', w: 412, h: 847, scale: .62, kind: 'phone', os: 'android', ua: ANDROID },
-  { id: 'ipad', name: 'iPad Pro 11"', w: 834, h: 1194, scale: .42, kind: 'tablet', os: 'ios', ua: IPAD },
-  { id: 'small', name: 'Small mobile', w: 320, h: 568, scale: .62, kind: 'phone', os: 'ios', ua: IPHONE, on: false },
-  { id: 'large', name: 'Large display', w: 2560, h: 1440, scale: .22, kind: 'desktop', ua: '', on: false }
-].map((d, i) => Object.assign({ on: true }, d, { slot: i, touch: d.kind !== 'desktop', ready: false, rot: false, linked: true, x: null, y: null }));
-const SYNC = { click: ['Clicks & menus', true], scroll: ['Scrolling', true], hover: ['Hover', true] };
-const KIND_SYNC = { click: 'click', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover' };
+function previewDevice(preset, slot) {
+  return { ...preset, slot, touch: preset.kind !== 'desktop', on: !!preset.starter, ready: false, rot: false, linked: true, x: null, y: null };
+}
+const DEVICES = [...DEVICE_PRESETS, ...loadCustomDevices()].map(previewDevice);
+let nextDeviceSlot = DEVICES.length;
+const pageScreens = [];
+let pageSteps = false, sameDevice = false, sharedDeviceId = 'iphone', nextPage = 1, deviceWallMode = 'grid';
+const allScreens = () => [...DEVICES, ...pageScreens];
+const viewScreens = () => pageSteps ? pageScreens : DEVICES.filter(d => d.on);
+const presetFor = d => (sameDevice || d.step) ? DEVICES.find(device => device.id === sharedDeviceId) || d : d;
+const SYNC = { click: ['Clicks & menus', true], scroll: ['Scrolling', true], hover: ['Hover', true], media: ['Video playback', true] };
+const KIND_SYNC = { click: 'click', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover', media: 'media' };
 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
-let textSalt = null;
-const active = () => DEVICES.filter(d => d.on && d.el);
+let textSalt = null, wallRevision = 0;
+let videoRequest = null;
+const active = () => viewScreens().filter(d => d.el);
 function post(device, type, data) {
   if (!device?.iframe || !target) return;
   const message = { __samestateShell: 1, type, ...data };
@@ -32,84 +26,288 @@ function post(device, type, data) {
 }
 
 /* ------------------------------- left panel ------------------------------- */
-function renderLeft() {
-  $('#devlist').innerHTML = DEVICES.map(d => `<label class="row"><input type="checkbox" data-dev="${d.id}" ${d.on ? 'checked' : ''}>${d.name}<small>${d.w}×${d.h}</small></label>`).join('');
-  $('#synclist').innerHTML = Object.keys(SYNC).map(k => `<label class="row"><input type="checkbox" data-sync="${k}" ${SYNC[k][1] ? 'checked' : ''}>${SYNC[k][0]}</label>`).join('');
-  $('#ref').innerHTML = DEVICES.map(d => `<option value="${d.id}">${d.name}</option>`).join(''); $('#ref').value = 'desktop';
+function updateReference() {
+  const reference = $('#ref');
+  const selection = reference.value;
+  const selected = viewScreens();
+  reference.replaceChildren(...selected.map(d => new Option(screenName(d), d.id)));
+  reference.disabled = selected.length === 0;
+  if (selected.some(d => d.id === selection)) reference.value = selection;
+  else if (selected.some(d => d.id === 'desktop')) reference.value = 'desktop';
 }
-document.addEventListener('change', e => {
-  const t = e.target;
-  if (t.dataset.dev) { DEVICES.find(d => d.id === t.dataset.dev).on = t.checked; buildFrames(); }
-  if (t.dataset.sync) SYNC[t.dataset.sync][1] = t.checked;
+
+function renderLeft() {
+  refreshDevicePicker();
+  $('#synclist').innerHTML = Object.keys(SYNC).map(k => `<label class="row"><input type="checkbox" data-sync="${k}" ${SYNC[k][1] ? 'checked' : ''}>${SYNC[k][0]}</label>`).join('');
+  updateReference();
+}
+$('#synclist').addEventListener('change', e => {
+  if (e.target.dataset.sync) SYNC[e.target.dataset.sync][1] = e.target.checked;
 });
 
 /* --------------------------------- frames --------------------------------- */
 const IC = { link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', rot: '<svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="14" rx="2"/><path d="M4 17a8 8 0 0 0 8 4M20 7a8 8 0 0 0-5-4"/></svg>', rel: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>', foc: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>' };
 const NAVIC = '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg><svg viewBox="0 0 24 24"><path d="M12 15V4m-4 4 4-4 4 4M6 12v8h12v-8"/></svg><svg viewBox="0 0 24 24"><rect x="5" y="5" width="11" height="11" rx="2"/><path d="M9 19h8a2 2 0 0 0 2-2V9"/></svg>';
 const ANDIC = '<svg viewBox="0 0 24 24"><path d="M15 6l-7 6 7 6z"/></svg><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>';
-function deviceChrome(d) { // { top, bottom, extra px }
-  if (d.kind === 'desktop') return { top: '<div class="c-win"><s></s><s></s><s></s><span class="addr"></span></div>', bottom: '', extra: 38 };
-  const status = '<div class="c-status"><span>9:41</span><span><u></u><i></i></span></div>', url = '<div class="c-url"><span class="addr"></span><em></em></div>';
-  if (d.kind === 'tablet' || d.rot) return { top: status + url, bottom: '', extra: 74 };
-  return d.os === 'ios' ? { top: status + url, bottom: `<div class="c-bottom">${NAVIC}</div>`, extra: 120 } : { top: status + url, bottom: `<div class="c-bottom">${ANDIC}</div>`, extra: 114 };
+function deviceChrome(preset, landscape) {
+  if (preset.frame) return { top: '', bottom: '', extra: 0 };
+  if (preset.kind === 'desktop') return { top: '<div class="c-win"><s></s><s></s><s></s><span class="addr"></span></div>', bottom: '', extra: 38 };
+  const status = '<div class="c-status"><span>9:41</span><span><u></u><i></i></span></div>';
+  const url = '<div class="c-url"><span class="addr"></span><em></em></div>';
+  if (preset.kind === 'tablet') return { top: status + url, bottom: '', extra: 74 };
+  const ios = preset.os === 'ios';
+  return { top: status + url, bottom: '<div class="c-bottom">' + (ios ? NAVIC : ANDIC) + '</div>', extra: landscape ? 74 : ios ? 120 : 114 };
 }
-function size(d) { return d.rot ? { w: d.h, h: d.w } : { w: d.w, h: d.h }; }
+
+function screenName(d) {
+  if (d.step) return 'Step ' + d.step + ' · ' + presetFor(d).name;
+  if (sameDevice) return 'Screen ' + (viewScreens().indexOf(d) + 1) + ' · ' + presetFor(d).name;
+  return d.name;
+}
+
+function size(d) {
+  const { w, h, kind } = presetFor(d);
+  return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
+}
+
 function layout(d) {
-  const { w, h } = size(d), c = deviceChrome(d), H = h + c.extra;
-  let s = d.scale * zoom;
-  if (mode === 'focus') { const cv = $('#canvas'); s = Math.min((cv.clientWidth - 80) / w, (cv.clientHeight - 90) / H, 1.2); }
-  d.body.style.width = w * s + 'px'; d.body.style.height = H * s + 'px'; d.body.style.boxSizing = 'content-box';
-  d.scaled.style.width = w + 'px'; d.scaled.style.transform = `scale(${s})`;
-  d.iframe.style.width = w + 'px'; d.iframe.style.height = h + 'px';
-  d.el.querySelector('.dims').textContent = `(${w} × ${h}) ${Math.round(s * 100)}%`;
+  const preset = presetFor(d);
+  const { w, h } = size(d);
+  const chrome = deviceChrome(preset, w > h);
+  if (d.chromeId !== preset.id) {
+    const classes = ['phone', 'tablet', 'desktop', 'ios', 'android', 'watch', 'display', 'notch'];
+    d.el.classList.remove(...classes);
+    d.el.classList.add(...[preset.kind, preset.os, preset.frame, preset.notch && 'notch'].filter(Boolean));
+    d.top.innerHTML = chrome.top;
+    d.bottom.innerHTML = chrome.bottom;
+    const address = d.top.querySelector('.addr');
+    if (address) address.textContent = d.step ? new URL(d.pageUrl).pathname : target === EXT ? 'tidepool.demo' : new URL(target).host;
+    d.touch = preset.kind !== 'desktop';
+    d.el.querySelector('[data-a=rot]').hidden = !d.touch;
+    d.chromeId = preset.id;
+    if (d.ready) configure(d);
+  }
+  d.el.querySelector('.dev-name').textContent = screenName(d);
+  d.iframe.title = screenName(d) + ' preview';
+  d.el.classList.toggle('landscape', w > h);
+  let scale = preset.scale * zoom;
+  const height = h + chrome.extra;
+  if (mode === 'focus') {
+    const canvas = $('#canvas');
+    scale = Math.min(Math.max(1, canvas.clientWidth - 80) / w, Math.max(1, canvas.clientHeight - 90) / height, 1.2);
+  }
+  d.body.style.width = w * scale + 'px';
+  d.body.style.height = height * scale + 'px';
+  d.body.style.boxSizing = 'content-box';
+  d.scaled.style.width = w + 'px';
+  d.scaled.style.transform = 'scale(' + scale + ')';
+  d.iframe.style.width = w + 'px';
+  d.iframe.style.height = h + 'px';
+  d.el.querySelector('.dims').textContent = '(' + w + ' × ' + h + ') ' + Math.round(scale * 100) + '%';
 }
+
 function relayout() {
   if (typeof cvAllow !== 'undefined') cvAllow = Date.now() + 300;
-  const f = $('#frames'); f.className = 'frames ' + mode;
-  if (mode === 'focus' && (!focusDev || !focusDev.el)) focusDev = leader || active()[0];
-  for (const d of active()) { d.el.classList.toggle('focused', d === focusDev); layout(d); }
+  const f = $('#frames');
+  f.className = 'frames ' + mode;
+  const visible = new Set(active());
+  if (mode === 'focus' && !visible.has(focusDev)) focusDev = visible.has(leader) ? leader : active()[0];
+  for (const d of allScreens()) {
+    if (!d.el) continue;
+    d.el.hidden = !visible.has(d);
+    if (!d.el.hidden) {
+      d.el.classList.toggle('focused', d === focusDev);
+      layout(d);
+    }
+  }
   applyArrangement();
 }
-function buildFrames() {
-  const wrap = $('#frames');
-  $('#match-text').disabled = !target;
-  wrap.innerHTML = ''; leader = null; pendingAlign.clear(); lastAlign = null;
-  $('#empty').style.display = target ? 'none' : '';
-  for (const d of DEVICES) {
-    d.port?.disconnect();
-    d.el = d.iframe = d.port = null;
-    d.ready = false;
-    if (!d.on || !target) continue;
-    const el = document.createElement('div'), c = deviceChrome(d);
-    el.className = `dev ${d.kind} ${d.os || ''} ${d.notch ? 'notch' : ''} ${d.linked ? '' : 'unlinked'}`;
-    el.innerHTML = `<div class="dev-head"><i class="dot"></i><b>${d.name}</b><span class="dims"></span><span class="sp"></span><button data-a="link" title="Linked: this screen follows the others. Click to unlink.">${IC.link}</button>${d.touch ? `<button data-a="rot" title="Rotate">${IC.rot}</button>` : ''}<button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button></div><div class="dev-body"><div class="scaled">${c.top}<iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads" allow="clipboard-write"></iframe>${c.bottom}</div></div>`;
-    d.el = el; d.body = el.querySelector('.dev-body'); d.scaled = el.querySelector('.scaled'); d.iframe = el.querySelector('iframe');
-    el.querySelector('.dev-head').addEventListener('click', e => {
-      const b = e.target.closest('button'), a = b && b.dataset.a;
-      if (a === 'rot') { d.rot = !d.rot; layout(d); }
-      if (a === 'rel') post(d, 'reload');
-      if (a === 'link') { d.linked = !d.linked; el.classList.toggle('unlinked', !d.linked); b.title = d.linked ? 'Linked: this screen follows the others. Click to unlink.' : 'Unlinked: this screen moves on its own. Click to link.'; }
-      if (a === 'foc') { focusDev = d; setMode(mode === 'focus' ? 'grid' : 'focus'); }
-    });
-    arrangeable(d);
-    d.token = crypto.randomUUID();
-    if (target !== EXT) d.iframe.credentialless = true;
-    // The bundled demo shares this page's origin, where a sandbox with scripts cannot isolate anything
-    // and Chrome logs a warning. Real sites are another origin and keep the sandbox.
-    else d.iframe.removeAttribute('sandbox');
-    d.iframe.src = previewUrl;
-    wrap.appendChild(el);
-    d.el.querySelector('.addr').textContent = target === EXT ? 'tidepool.demo' : new URL(target).host;
-  }
-  relayout();
+
+function addFrame(d) {
+  const el = document.createElement('div');
+  const closeLabel = d.step ? 'Close this step' : 'Close this preview';
+  el.className = 'dev' + (d.linked ? '' : ' unlinked');
+  el.innerHTML = `<div class="dev-head"><i class="dot"></i><b class="dev-name"></b><span class="dims"></span><span class="sp"></span><button data-a="link" title="Toggle screen link"${d.step ? ' hidden' : ''}>${IC.link}</button><button data-a="rot" title="Rotate">${IC.rot}</button><button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button><button type="button" data-a="close" title="${closeLabel}" aria-label="${closeLabel}">×</button></div><div class="dev-body"><div class="scaled"><div class="device-top"></div><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads" allow="autoplay; clipboard-write"></iframe><div class="device-bottom"></div></div></div>`;
+  d.el = el;
+  d.body = el.querySelector('.dev-body');
+  d.scaled = el.querySelector('.scaled');
+  d.iframe = el.querySelector('iframe');
+  d.top = el.querySelector('.device-top');
+  d.bottom = el.querySelector('.device-bottom');
+  d.chromeId = null;
+  el.querySelector('.dev-head').addEventListener('click', event => {
+    const button = event.target.closest('button');
+    const action = button?.dataset.a;
+    if (action === 'rot') { d.rot = !d.rot; layout(d); fitWall(); }
+    if (action === 'rel') post(d, 'reload');
+    if (action === 'link') {
+      d.linked = !d.linked;
+      el.classList.toggle('unlinked', !d.linked);
+      button.title = d.linked ? 'Linked: this screen follows the others. Click to unlink.' : 'Unlinked: this screen moves on its own. Click to link.';
+    }
+    if (action === 'foc') { focusDev = d; setMode(mode === 'focus' ? 'grid' : 'focus'); }
+    if (action === 'close') {
+      if (d.step) closePage(d);
+      else {
+        selectDevice(d, false);
+        refreshDevicePicker();
+      }
+    }
+  });
+  arrangeable(d);
+  d.token = crypto.randomUUID();
+  if (target !== EXT) d.iframe.credentialless = true;
+  else d.iframe.removeAttribute('sandbox');
+  d.iframe.src = d.pageUrl || previewUrl;
+  const next = allScreens().find(item => item.slot > d.slot && item.el);
+  $('#frames').insertBefore(el, next?.el || null);
 }
+
+function removeFrame(d) {
+  pendingAlign.delete(d);
+  const port = d.port;
+  d.port = null;
+  port?.disconnect();
+  d.el?.remove();
+  d.el = d.iframe = null;
+  d.ready = false;
+}
+
+function updateWall() {
+  wallRevision++;
+  videoRequest = null;
+  $('#video-status').textContent = '';
+  $('#match-text').disabled = !target;
+  $('#empty').style.display = target ? 'none' : '';
+  $('#wall-empty').textContent = pageSteps ? 'Enter a page address to add a step.' : 'Select devices in the sidebar to preview this site.';
+  $('#wall-empty').hidden = !target || active().length > 0;
+  if (IS_EXT) $('#src').placeholder = pageSteps && target ? 'Enter a site or /path' : 'https://your-site.com   ·   localhost:3000';
+  $('#detect span').textContent = 'Detect differences';
+  relayout();
+  $('#frames').dispatchEvent(new Event('wall-view-changed'));
+}
+
+function buildFrames() {
+  for (const d of allScreens()) removeFrame(d);
+  pageScreens.length = 0;
+  freePlacement.steps = false;
+  nextPage = 1;
+  leader = null;
+  lastAlign = null;
+  if (target) {
+    DEVICES.filter(d => d.on).forEach(addFrame);
+    if (pageSteps) addPage(previewUrl);
+  }
+  updateReference();
+  updateWall();
+}
+
+function selectDevice(d, selected) {
+  d.on = selected;
+  if (target && selected) addFrame(d);
+  else removeFrame(d);
+  if (leader === d && !d.el) setLeader(active().find(item => item.ready) || null);
+  updateReference();
+  findings = [];
+  renderFindings();
+  updateWall();
+}
+
+function fillSharedDevices() {
+  const picker = $('#shared-device');
+  const groups = Object.entries(DEVICE_GROUPS).map(([id, label]) => {
+    const group = document.createElement('optgroup');
+    group.label = label;
+    group.append(...DEVICES.filter(d => d.group === id).map(d => new Option(d.name, d.id)));
+    return group;
+  });
+  picker.replaceChildren(...groups.filter(group => group.childElementCount));
+  if (!DEVICES.some(d => d.id === sharedDeviceId)) sharedDeviceId = 'iphone';
+  picker.value = sharedDeviceId;
+}
+
+function addPage(url, actions = []) {
+  const preset = DEVICES.find(d => d.id === sharedDeviceId);
+  const step = nextPage++;
+  const d = previewDevice({ ...preset, id: 'step-' + step, step, pageUrl: url, actions, replayPending: actions.length > 0 }, nextDeviceSlot++);
+  pageScreens.push(d);
+  addFrame(d);
+  return d;
+}
+
+function refreshViews() {
+  $('#device-sizes').value = sameDevice ? 'same' : 'different';
+  $('#device-sizes').disabled = pageSteps;
+  if (pageSteps) $('#device-sizes').value = 'same';
+  $('#shared-device-row').hidden = !sameDevice && !pageSteps;
+  $('#page-steps').checked = pageSteps;
+  $('#page-steps-help').hidden = !pageSteps;
+  $('#alignall').disabled = pageSteps;
+  document.querySelectorAll('#synclist input').forEach(input => { input.disabled = pageSteps; });
+  if (!active().includes(leader)) setLeader(active().find(d => d.ready) || null);
+  updateReference();
+  findings = [];
+  renderFindings();
+  updateWall();
+}
+
+function setPageSteps(enabled) {
+  if (pageSteps === enabled) return;
+  if (enabled) deviceWallMode = mode;
+  pageSteps = enabled;
+  $('#page-steps-status').textContent = '';
+  if (pageSteps && target && !pageScreens.length) addPage(previewUrl);
+  updateMode(pageSteps ? 'row' : deviceWallMode);
+  refreshViews();
+  for (const d of pageScreens) if (d.ready) configure(d);
+}
+
+function openPage(address, source, action) {
+  const status = $('#page-steps-status');
+  let url;
+  try { url = new URL(address, previewUrl); } catch { url = null; }
+  const demoPath = new URL('./demo/', location.href).pathname;
+  if (!url || url.origin !== target || url.username || url.password || (target === EXT && !url.pathname.startsWith(demoPath))) {
+    status.textContent = 'Choose a page on the current site.';
+    return;
+  }
+  const actions = action ? [...(source.pageUrl === url.href ? source.actions : []), action] : [];
+  const d = addPage(url.href, actions);
+  refreshViews();
+  status.textContent = 'Added step ' + d.step + '.';
+  if (mode === 'focus') { focusDev = d; relayout(); }
+  cvAllow = Date.now() + 900;
+  d.el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+
+function closePage(d) {
+  removeFrame(d);
+  pageScreens.splice(pageScreens.indexOf(d), 1);
+  $('#page-steps-status').textContent = 'Closed step ' + d.step + '.';
+  refreshViews();
+}
+
+$('#device-sizes').addEventListener('change', event => {
+  sameDevice = event.target.value === 'same';
+  refreshViews();
+});
+$('#shared-device').addEventListener('change', event => {
+  sharedDeviceId = event.target.value;
+  for (const d of allScreens()) if (sameDevice || d.step) d.rot = false;
+  refreshViews();
+});
+$('#page-steps').addEventListener('change', event => setPageSteps(event.target.checked));
+
 /* ---------------------------- arranging the wall ---------------------------- */
 // Screens can be dragged by their title bar to any place on the wall. The first drag pins every screen where
 // it is, then each one moves freely. Screens are positioned with CSS, never moved in the page, because moving
 // an iframe would reload it. Choosing Grid or Row again returns to the automatic layout. The arrangement
 // lasts until the Samestate tab is closed or reloaded.
 const SNAP = 10, WALL_PAD = 40;
-let layoutLocked = false, freeLayout = false, drag = null, topZ = 1;
+const freePlacement = { devices: false, steps: false };
+let layoutLocked = false, drag = null, topZ = 1;
+const currentWall = () => pageSteps ? 'steps' : 'devices';
+const freelyPlaced = () => freePlacement[currentWall()] && mode !== 'focus';
 const snap = v => Math.max(0, Math.round(v / SNAP) * SNAP);
 // Where a dragged screen lands: its start position plus the pointer movement, snapped and kept on the wall.
 function dragTarget(start, from, to) {
@@ -128,15 +326,16 @@ function nextFreeSpot(boxes) {
 const boxOf = d => ({ x: d.x, y: d.y, w: d.el.offsetWidth, h: d.el.offsetHeight });
 function fitWall() {
   const f = $('#frames');
-  if (!freeLayout || mode === 'focus') { f.style.width = f.style.height = ''; return; }
+  if (!freelyPlaced()) { f.style.width = f.style.height = ''; return; }
   const placed = active().filter(d => d.x != null), { w, h } = wallSize(placed.map(boxOf));
   f.style.width = w + 'px'; f.style.height = h + 'px';
 }
 function placeScreens() {
+  const free = freelyPlaced();
   for (const d of active()) {
-    if (freeLayout && d.x == null) Object.assign(d, nextFreeSpot(active().filter(o => o.x != null).map(boxOf)));
-    d.el.style.left = freeLayout ? d.x + 'px' : '';
-    d.el.style.top = freeLayout ? d.y + 'px' : '';
+    if (free && d.x == null) Object.assign(d, nextFreeSpot(active().filter(o => o.x != null).map(boxOf)));
+    d.el.style.left = free ? d.x + 'px' : '';
+    d.el.style.top = free ? d.y + 'px' : '';
   }
   fitWall();
 }
@@ -146,19 +345,18 @@ function pinScreens() { // switch from the automatic layout to free placement, k
     const r = d.el.getBoundingClientRect();
     d.x = Math.round(r.left - origin.left); d.y = Math.round(r.top - origin.top);
   }
-  freeLayout = true;
+  freePlacement[currentWall()] = true;
   f.classList.add('free');
   placeScreens();
 }
 function unpinScreens() {
-  freeLayout = false;
-  DEVICES.forEach(d => { d.x = d.y = null; if (d.el) d.el.style.zIndex = ''; });
-  $('#frames').classList.remove('free');
-  placeScreens();
+  freePlacement[currentWall()] = false;
+  const screens = pageSteps ? pageScreens : DEVICES;
+  screens.forEach(d => { d.x = d.y = null; if (d.el) d.el.style.zIndex = ''; });
 }
 function applyArrangement() {
   $('#frames').classList.toggle('locked', layoutLocked);
-  $('#frames').classList.toggle('free', freeLayout);
+  $('#frames').classList.toggle('free', freelyPlaced());
   placeScreens();
   const lock = $('#lock');
   lock.classList.toggle('on', layoutLocked);
@@ -170,7 +368,7 @@ function arrangeable(d) {
   head.addEventListener('pointerdown', e => {
     if (layoutLocked || mode === 'focus' || e.button !== 0 || e.target.closest('button')) return;
     e.preventDefault();
-    if (!freeLayout) pinScreens();
+    if (!freelyPlaced()) pinScreens();
     drag = { d, id: e.pointerId, from: { x: e.clientX, y: e.clientY }, start: { x: d.x, y: d.y } };
     head.setPointerCapture(e.pointerId);
     d.el.style.zIndex = ++topZ; // the screen being moved stays on top of the ones it passes
@@ -194,30 +392,92 @@ function arrangeable(d) {
 }
 $('#lock').onclick = () => { layoutLocked = !layoutLocked; applyArrangement(); };
 
-function setMode(m) { mode = m; document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); relayout(); }
-function setZoom(v) { zoom = v / 100; $('#zoom').value = v; $('#zoomv').textContent = v + '%'; active().forEach(layout); }
+function updateMode(m) { mode = m; document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); }
+function setMode(m) { updateMode(m); relayout(); }
+function setZoom(v) {
+  zoom = v / 100;
+  $('#zoom').value = v;
+  $('#zoomv').textContent = v + '%';
+  active().forEach(layout);
+  fitWall();
+}
 $('#zoom').addEventListener('input', e => setZoom(+e.target.value));
-$('#mode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (freeLayout && b.dataset.v !== 'focus') unpinScreens(); setMode(b.dataset.v); });
+$('#mode').addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  if (freePlacement[currentWall()] && button.dataset.v !== 'focus') unpinScreens();
+  setMode(button.dataset.v);
+});
 $('#align').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#align button').forEach(x => x.classList.toggle('on', x === b)); $('#frames').style.alignItems = b.dataset.v; });
-$('#filters').onclick = () => $('#devlist').classList.toggle('closed');
-$('#land').onclick = () => { active().forEach(d => { if (d.touch) d.rot = true; }); relayout(); };
-$('#port').onclick = () => { active().forEach(d => { d.rot = false; }); relayout(); };
+function setOrientation(landscape) {
+  for (const d of active()) {
+    const { w, h, kind } = presetFor(d);
+    if (kind !== 'desktop') d.rot = landscape ? w < h : w > h;
+  }
+  relayout();
+}
+$('#land').onclick = () => setOrientation(true);
+$('#port').onclick = () => setOrientation(false);
 $('#rz').onclick = () => setZoom(100);
+$('#toggle-sidebar').addEventListener('click', event => {
+  const sidebar = $('#sidebar');
+  sidebar.hidden = !sidebar.hidden;
+  const label = sidebar.hidden ? 'Show sidebar' : 'Hide sidebar';
+  event.currentTarget.setAttribute('aria-expanded', String(!sidebar.hidden));
+  event.currentTarget.setAttribute('aria-label', label);
+  event.currentTarget.title = label;
+  relayout();
+});
 $('#alignall').onclick = () => alignScreens();
+$('#play-videos').onclick = () => requestPlayback(true);
+$('#pause-videos').onclick = () => requestPlayback(false);
 window.addEventListener('resize', () => mode === 'focus' && relayout());
 // Keep the canvas where the user left it: a device frame taking focus (dialogs, synced typing) must not scroll the wall.
 const cv = $('#canvas'); let cvPos = [0, 0], cvUser = 0, cvDrag = false, cvAllow = 0;
+const wallScroll = $('#wall-scroll');
+
+function updateWallScroll() {
+  const { clientWidth, scrollWidth, scrollLeft } = cv;
+  const max = scrollWidth - clientWidth;
+  wallScroll.disabled = max <= 0;
+  wallScroll.max = Math.max(0, max);
+  wallScroll.value = scrollLeft;
+  wallScroll.style.setProperty('--thumb-width', (scrollWidth ? 100 * clientWidth / scrollWidth : 100) + '%');
+}
+
+function scrollFromBar() {
+  cvUser = Date.now();
+  cv.scrollLeft = wallScroll.valueAsNumber;
+  cvPos[0] = cv.scrollLeft;
+}
+
+wallScroll.addEventListener('input', scrollFromBar);
+wallScroll.addEventListener('keydown', event => {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+  event.preventDefault();
+  wallScroll.valueAsNumber += event.key === 'ArrowLeft' ? -48 : 48;
+  scrollFromBar();
+});
+const wallSizeObserver = new ResizeObserver(updateWallScroll);
+wallSizeObserver.observe(cv);
+wallSizeObserver.observe($('#frames'));
+
 for (const ev of ['wheel', 'keydown', 'touchstart']) cv.addEventListener(ev, () => { cvUser = Date.now(); }, { passive: true, capture: true });
 cv.addEventListener('pointerdown', () => { cvDrag = true; }, true); window.addEventListener('pointerup', () => { cvDrag = false; cvUser = Date.now(); }, true);
-cv.addEventListener('scroll', () => { if (cvDrag || Date.now() - cvUser < 700 || Date.now() < cvAllow) cvPos = [cv.scrollLeft, cv.scrollTop]; else { cv.scrollLeft = cvPos[0]; cv.scrollTop = cvPos[1]; } });
+cv.addEventListener('scroll', () => {
+  if (cvDrag || Date.now() - cvUser < 700 || Date.now() < cvAllow) cvPos = [cv.scrollLeft, cv.scrollTop];
+  else { cv.scrollLeft = cvPos[0]; cv.scrollTop = cvPos[1]; }
+  wallScroll.value = cv.scrollLeft;
+});
 
 
 /* ------------------------------ opening a page ------------------------------ */
 // The same files run as the Chrome extension and as the web demo (GitHub Pages), where only the bundled sample site is available.
 const IS_EXT = typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id);
 const EXT = location.origin;
+const DEMO_URL = new URL('./demo/index.html', location.href);
 const REPO = 'https://github.com/shouvik12/samestate';
-let openId = 0;
+let openId = 0, openingId = 0;
 let registration = Promise.resolve();
 
 function register(origin) {
@@ -229,41 +489,33 @@ function register(origin) {
   return registration;
 }
 
-async function open(source, alreadyAllowed = false) {
-  const id = ++openId;
+function parseAddress(source, base) {
+  const relative = /^(?:\/|\.{1,2}\/|[?#])/.test(source);
+  if (relative && !base) return null;
+  const hasScheme = /^[a-z][a-z\d+.-]*:\/\//i.test(source);
+  const local = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])(?=[:/?#]|$)/i.test(source);
+  const address = relative || hasScheme ? source : (local ? 'http://' : 'https://') + source;
   let url;
-  const isDemo = source === 'demo';
+  try { url = new URL(address, base); } catch { return null; }
+  const demoPage = base && target === EXT && url.origin === EXT;
+  if ((!demoPage && !/^https?:$/.test(url.protocol)) || url.username || url.password) return null;
+  return url;
+}
 
-  if (isDemo) {
-    url = new URL('./demo/index.html', location.href);
-  } else {
-    if (!IS_EXT) return;
-    try {
-      const hasScheme = /^https?:\/\//i.test(source);
-      const local = /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1\])(?=[:/]|$)/i.test(source);
-      url = new URL(hasScheme ? source : (local ? 'http://' : 'https://') + source);
-      if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error();
-    } catch {
-      $('#joblog').textContent = 'Enter an HTTP or HTTPS address without credentials.';
-      return;
-    }
-  }
-
-  target = previewUrl = textSalt = null;
-  $('#match-text').checked = false;
-  buildFrames();
-  findings = [];
-  renderFindings();
+async function open(url, alreadyAllowed = false) {
+  const isDemo = url === DEMO_URL;
+  if (!isDemo && !IS_EXT) return;
+  const id = ++openId;
+  openingId = id;
   $('#joblog').textContent = '';
-  $('#src').value = '';
 
   try {
     if (!isDemo && !alreadyAllowed) {
+      $('#joblog').textContent = 'Waiting for Chrome site access…';
       const granted = await chrome.permissions.request({ origins: [`${url.protocol}//${url.hostname}/*`] });
       if (id !== openId) return;
       if (!granted) {
-        await register(null);
-        if (id === openId) $('#joblog').textContent = 'Allow access to the site in Chrome to open a preview.';
+        $('#joblog').textContent = 'Allow access to the site in Chrome to open a preview.';
         return;
       }
     }
@@ -271,29 +523,54 @@ async function open(source, alreadyAllowed = false) {
   } catch {
     if (id === openId) $('#joblog').textContent = 'Could not open the preview. Try opening the site again.';
     return;
+  } finally {
+    if (openingId === id) openingId = 0;
   }
 
   if (id !== openId) return;
   target = url.origin;
   previewUrl = url.href;
+  textSalt = null;
+  $('#match-text').checked = false;
+  $('#page-steps-status').textContent = '';
+  $('#joblog').textContent = '';
+  $('#src').value = '';
   buildFrames();
+  findings = [];
+  renderFindings();
   setTimeout(() => { if (id === openId) detect(true); }, 3500);
 }
 
+$('#src').addEventListener('input', () => { $('#joblog').textContent = ''; });
 $('#open').addEventListener('submit', e => {
   e.preventDefault();
   const source = $('#src').value.trim();
   if (!source) return;
+  const url = parseAddress(source, pageSteps && target ? previewUrl : undefined);
+  if (!url) {
+    $('#joblog').textContent = 'Enter an HTTP or HTTPS address without credentials.';
+    return;
+  }
   endTour(false);
+  $('#joblog').textContent = '';
+  if (pageSteps && url.origin === target) {
+    openPage(url.href);
+    $('#src').value = '';
+    return;
+  }
+  if (!IS_EXT) {
+    $('#joblog').textContent = 'Use the Chrome extension to open another site.';
+    return;
+  }
   redirects = 0;
-  open(source);
+  open(url);
 });
 
 // The site sent the preview to another origin (example.com → www.example.com). Chrome access, header
 // handling and the agent are all tied to one origin, so the preview is reopened on the new one.
 let redirects = 0, redirectHandled = 0, appTabId = null;
 async function followRedirect(message) {
-  if (message.tabId !== appTabId || !target || target === EXT || message.from !== previewUrl) return;
+  if (openingId || message.tabId !== appTabId || !target || target === EXT || message.from !== previewUrl) return;
   if (redirectHandled === openId) return; // every device frame reports the same redirect
   const id = redirectHandled = openId;
   let url;
@@ -302,7 +579,7 @@ async function followRedirect(message) {
   let allowed = false;
   try { allowed = await chrome.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] }); } catch {}
   if (id !== openId) return;
-  if (allowed && ++redirects <= 3) return open(url.href, true);
+  if (allowed && ++redirects <= 3) return open(url, true);
 
   // Chrome only shows its access prompt after a click or key press, so the address is filled in for the user.
   openId++;
@@ -332,10 +609,13 @@ const STEPS = [
 ];
 let tour = 0;
 async function startTour() {
+  setPageSteps(false);
+  sameDevice = false;
+  refreshViews();
   const id = ++tour; $('#tour').hidden = false; $('#skip').textContent = 'Skip demo';
   $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join(''); $('#tourtext').textContent = 'Loading the demo site on every device…';
-  DEVICES.forEach(d => { d.on = !/small|large/.test(d.id); d.rot = false; }); renderLeft(); setMode('grid'); $('#panel').hidden = true;
-  $('#src').value = ''; await open('demo');
+  DEVICES.forEach(d => { d.on = !!d.starter; d.rot = false; }); renderLeft(); setMode('grid'); $('#panel').hidden = true;
+  $('#src').value = ''; await open(DEMO_URL);
   for (let i = 0; i < 60 && id === tour && !(target && active().length && active().every(d => d.ready)); i++) await sleep(250);
   await sleep(1400);
   for (let i = 0; i < STEPS.length; i++) {
@@ -361,7 +641,7 @@ $('#match-text').onchange = event => {
 
 /* ------------------------------ message routing ------------------------------ */
 const pendingSnap = new Map(), entries = new Map();
-const configure = device => post(device, 'config', { touch: device.touch, textSalt });
+const configure = device => post(device, 'config', { touch: device.touch, textSalt, pageSteps: pageSteps && !!device.step });
 
 function handleMessage(device, message) {
   if (!message?.__samestate) return;
@@ -370,7 +650,11 @@ function handleMessage(device, message) {
       device.ready = true;
       device.el.classList.add('ready');
       configure(device);
-      if (!leader) setLeader(device);
+      if (device.replayPending) {
+        device.replayPending = false;
+        post(device, 'replay-step', { actions: device.actions });
+      }
+      if (!leader && active().includes(device)) setLeader(device);
       const align = pendingAlign.get(device);
       pendingAlign.delete(device);
       // The screen was sent to the leading screen's page; now that it has loaded, match the scroll position.
@@ -384,19 +668,35 @@ function handleMessage(device, message) {
       if (lastAlign) pendingAlign.set(device, lastAlign);
       break;
     case 'active':
-      setLeader(device);
+      if (active().includes(device)) setLeader(device);
+      break;
+    case 'open-page':
+      if (pageSteps && device.step && active().includes(device) && typeof message.url === 'string') openPage(message.url);
+      break;
+    case 'open-state':
+      if (pageSteps && device.step && active().includes(device) && typeof message.url === 'string' && typeof message.action?.path === 'string') {
+        openPage(message.url, device, message.action);
+      }
+      break;
+    case 'step-incomplete':
+      if (device.step && Number.isInteger(message.applied) && message.applied >= 0 && message.applied < device.actions.length) {
+        device.actions.length = message.applied;
+        if (pageSteps) $('#page-steps-status').textContent = `Step ${device.step} opened. Continue the interaction there.`;
+      }
       break;
     case 'snapshot':
       pendingSnap.get(message.rid)?.(device, message.data);
       break;
     case 'result':
       addResult(message, device);
+      playbackResult(message, device);
       break;
     case 'act': {
+      if (pageSteps || !active().includes(device)) return;
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;
       setLeader(device);
       if (!device.linked) return; // an unlinked screen moves on its own
-      const id = ['click', 'swipe'].includes(message.kind) ? ++aid : 0;
+      const id = ['click', 'swipe', 'media'].includes(message.kind) ? ++aid : 0;
       if (id) startEntry(id, device, message);
       const { type, __samestate, ...action } = message;
       for (const other of active()) {
@@ -432,12 +732,12 @@ async function alignScreens() {
 function setLeader(device) {
   if (leader === device) return;
   leader = device;
-  DEVICES.forEach(d => d.el?.classList.toggle('leader', d === device));
+  allScreens().forEach(d => d.el?.classList.toggle('leader', d === device));
 }
 
 window.addEventListener('message', event => {
   if (!target || event.origin !== target) return;
-  const device = active().find(d => d.iframe.contentWindow === event.source);
+  const device = allScreens().find(d => d.iframe?.contentWindow === event.source);
   if (!device) return;
   if (target === EXT) handleMessage(device, event.data);
   else if (event.data?.__samestateReady === true) {
@@ -456,7 +756,7 @@ if (IS_EXT) {
     async function identify(message) {
       port.onMessage.removeListener(identify);
       const tab = await appTab;
-      const device = active().find(d => d.token === message.token);
+      const device = allScreens().find(d => d.el && d.token === message.token);
       if (!device || tab?.id !== port.sender.tab?.id || port.sender.origin !== target) {
         port.disconnect();
         return;
@@ -477,6 +777,41 @@ if (IS_EXT) {
 }
 
 /* --------------------------------- sync log --------------------------------- */
+function requestPlayback(playing) {
+  const devices = active().filter(d => d.ready);
+  if (!devices.length) {
+    $('#video-status').textContent = 'Open a video page and wait for the previews to connect.';
+    return;
+  }
+
+  const id = ++aid;
+  const request = { id, playing, remaining: new Set(devices), total: devices.length, applied: 0, muted: 0 };
+  videoRequest = request;
+  startEntry(id, null, { kind: 'media', playing });
+  $('#video-status').textContent = playing ? 'Starting videos…' : 'Pausing videos…';
+  for (const device of devices) {
+    try {
+      post(device, 'act', { kind: 'media', playing, aid: id });
+    } catch {
+      const result = { aid: id, status: 'unavailable' };
+      addResult(result, device);
+      playbackResult(result, device);
+    }
+  }
+}
+
+function playbackResult(message, device) {
+  const request = videoRequest;
+  if (!request || message.aid !== request.id || !request.remaining.delete(device)) return;
+  if (['playing', 'paused', 'muted'].includes(message.status)) request.applied++;
+  if (message.status === 'muted') request.muted++;
+  const verb = request.playing ? 'Playing' : 'Paused';
+  const muted = request.muted ? ` · ${request.muted} muted` : '';
+  const pending = request.remaining.size;
+  const detail = pending ? ` · ${pending} pending` : request.applied < request.total ? ' · See Sync log' : '';
+  $('#video-status').textContent = `${verb} on ${request.applied}/${request.total}${muted}${detail}`;
+}
+
 function startEntry(id, device, message) {
   const box = $('#log');
   box.querySelector('.muted')?.remove();
@@ -485,7 +820,12 @@ function startEntry(id, device, message) {
   const heading = document.createElement('div');
   heading.className = 'h';
   const name = message.d?.demoControl || message.d?.kind || 'control';
-  heading.textContent = message.kind === 'swipe' ? device.name + ' · swipe' : device.name + ' · click ' + name;
+  if (message.kind === 'media') {
+    const action = message.playing ? 'play video' : 'pause video';
+    heading.textContent = device ? screenName(device) + ' · ' + action : (message.playing ? 'Play all videos' : 'Pause all videos');
+  } else {
+    heading.textContent = message.kind === 'swipe' ? screenName(device) + ' · swipe' : screenName(device) + ' · click ' + name;
+  }
   entry.appendChild(heading);
   box.prepend(entry);
   entries.set(id, entry);
@@ -498,12 +838,15 @@ function startEntry(id, device, message) {
 
 function addResult(message, device) {
   const entry = entries.get(message.aid);
-  const labels = { direct: 'same', semantic: 'matched', revealed: 'revealed', skip: 'skipped', none: 'no match', hidden: 'unreachable' };
+  const labels = {
+    direct: 'same', semantic: 'matched', revealed: 'revealed', skip: 'skipped', none: 'no match', hidden: 'unreachable',
+    playing: 'playing', paused: 'paused', muted: 'playing muted', blocked: 'blocked by Chrome', 'no-video': 'no video', unavailable: 'unavailable'
+  };
   if (!entry || !Object.hasOwn(labels, message.status)) return;
   const row = document.createElement('div');
   row.className = 'r';
   const name = document.createElement('b');
-  name.textContent = device.name;
+  name.textContent = screenName(device);
   const label = document.createElement('span');
   label.className = 'tag ' + message.status;
   label.textContent = labels[message.status];
@@ -560,7 +903,7 @@ function analyze(snaps, refId) {
   const R = index(ref.data);
   for (const { dev, data } of snaps) {
     referenceKeys.clear();
-    const I = index(data), vis = [...I.values()].filter(i => i.visible), n = dev.name;
+    const I = index(data), vis = [...I.values()].filter(i => i.visible), n = screenName(dev);
     // ---- per-device checks
     if (data.docW > data.vw + 2) add('issue', 'Layout', dev, `Page scrolls sideways (+${data.docW - data.vw}px)`, data.overflow.length ? 'Pushed out by ' + data.overflow.map(o => q(o.name) + ' +' + o.by + 'px').join(', ') : 'Content is wider than the viewport.', data.overflow.map(o => o.key));
     if (dev.touch && !data.metaViewport) add('issue', 'Usability', dev, 'No viewport meta tag', 'The page renders at desktop width and gets shrunk on phones.');
@@ -588,7 +931,7 @@ function analyze(snaps, refId) {
     }
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
-    const rn = ref.dev.name;
+    const rn = screenName(ref.dev);
     const matches = matchItems(R, I);
     for (const [referenceItem, item] of matches) referenceKeys.set(item.key, referenceItem.key);
     const both = [...matches].filter(([r, i]) => r.visible && i.visible);
@@ -649,12 +992,13 @@ async function detect(quiet) {
   const rid = crypto.randomUUID(), snaps = [];
   const scanSalt = textSalt;
   const scanPreview = openId;
+  const scanWall = wallRevision;
   await new Promise(done => {
     pendingSnap.set(rid, (d, data) => { if (data) snaps.push({ dev: d, data }); if (snaps.length === devs.length) done(); });
     devs.forEach(d => post(d, 'snapshot', { rid })); setTimeout(done, 4000);
   });
   pendingSnap.delete(rid);
-  if (scanSalt !== textSalt || scanPreview !== openId) return;
+  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision) return;
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   findings = snaps.length ? analyze(snaps, $('#ref').value) : [];
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
@@ -667,10 +1011,10 @@ function renderFindings() {
   const shown = findings.map((f, i) => Object.assign(f, { i })).filter(f => !catFilter || f.cat === catFilter);
   if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
   let html = '';
-  for (const d of DEVICES) {
+  for (const d of viewScreens()) {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
-    html += `<div class="group">${d.name}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
+    html += `<div class="group">${esc(screenName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
       fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div></div>`).join('');
   }
   $('#findings').innerHTML = html;
@@ -692,6 +1036,22 @@ $('#closepanel').onclick = () => { $('#panel').hidden = true; if (mode === 'focu
 document.querySelector('.right-tools').addEventListener('click', e => { const b = e.target.closest('[data-panel]'); if (!b) return; const t = b.dataset.panel, open = !$('#panel').hidden && !$('#pane-' + t).hidden; if (open) $('#closepanel').onclick(); else showTab(t); });
 
 /* ----------------------------------- boot ----------------------------------- */
+const refreshDevicePicker = mountDevicePicker(DEVICES, {
+  toggle: selectDevice,
+  add(preset) {
+    const d = previewDevice(preset, nextDeviceSlot++);
+    DEVICES.push(d);
+    selectDevice(d, true);
+    fillSharedDevices();
+  },
+  remove(d) {
+    selectDevice(d, false);
+    DEVICES.splice(DEVICES.indexOf(d), 1);
+    fillSharedDevices();
+    refreshViews();
+  }
+});
+fillSharedDevices();
 renderLeft();
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the default site, which the manifest already has access to, so no prompt is
@@ -702,7 +1062,7 @@ async function openDefault() {
   let allowed = false;
   try { allowed = await chrome.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] }); } catch {}
   if (target || openId) return; // the user already opened something
-  if (allowed) return open(DEFAULT_SITE, true);
+  if (allowed) return open(url, true);
   $('#src').value = DEFAULT_SITE;
   $('#joblog').textContent = `Press Enter to open ${url.host}.`;
 }
