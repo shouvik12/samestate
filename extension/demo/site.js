@@ -14,3 +14,7 @@ $$('[role=tab]').forEach(t => t.addEventListener('click', () => { $$('[role=tab]
 $$('form[role=search]').forEach(f => f.addEventListener('submit', e => { e.preventDefault(); const r = document.getElementById('search-result'); if (r) { r.hidden = false; r.textContent = 'Results for “' + f.q.value + '”: 3 articles'; } }));
 const ck = document.querySelector('#cookies button'); if (ck) ck.addEventListener('click', () => ck.parentElement.remove());
 document.addEventListener('keydown', e => { if (e.key === 'Escape') setDrawer(false); });
+// The day/night toggle is drawn twice, once in the desktop bar and once in the mobile bar.
+const modeToggles = $$('.mode-toggle');
+function setDark(on) { document.documentElement.classList.toggle('dark', on); modeToggles.forEach(b => { b.setAttribute('aria-pressed', on); b.textContent = on ? '☀' : '☾'; }); }
+modeToggles.forEach(b => b.addEventListener('click', () => setDark(b.getAttribute('aria-pressed') !== 'true')));

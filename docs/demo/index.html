@@ -23,7 +23,9 @@
   </nav>
   <form class="search desk-search" role="search"><input type="search" name="q" placeholder="Search docs" aria-label="Search docs"></form>
   <button class="btn ghost signin desk-only">Sign in</button>
+  <span class="desk-only"><button class="mode-toggle" type="button" aria-label="Dark mode" title="Dark mode" aria-pressed="false">☾</button></span>
   <button class="icon search-toggle" aria-label="Search" aria-controls="m-search" aria-expanded="false"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+  <span class="mob-only"><button class="mode-toggle" type="button" aria-label="Dark mode" title="Dark mode" aria-pressed="false">☾</button></span>
   <button class="icon hamburger" aria-label="Open navigation" aria-controls="drawer" aria-expanded="false"><span></span><span></span><span></span></button>
 </header>
 <div id="m-search" class="m-search" hidden><form role="search"><input type="search" name="q" placeholder="Search docs" aria-label="Search docs"></form></div>
@@ -51,6 +53,11 @@
     <div class="cta"><a class="btn" href="pricing.html">Start free</a><a class="btn ghost" href="#features">See features</a><a class="btn ghost call" href="#stories">Talk to us</a></div>
   </div>
   <picture><source media="(max-width: 700px)" srcset="hero-tall.svg"><img src="hero-wide.svg" alt="Dashboard preview" width="640" height="400"></picture>
+</section>
+
+<section id="tour-video">
+  <h2>Two-minute tour</h2>
+  <video src="tour.webm" controls muted loop playsinline preload="metadata" width="640" height="360" aria-label="Tidepool product tour"></video>
 </section>
 
 <section id="features">

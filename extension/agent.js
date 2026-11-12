@@ -669,6 +669,11 @@
     const el = m.sel && document.querySelector(m.sel); if (!el) return; send('active');
     if (m.do === 'click' && canMirrorClick(el)) { flash(el); press(el); mirrorClick(el); }
     else if (m.do === 'scroll') { const y0 = scrollY, y = el.getBoundingClientRect().top + scrollY - 90; for (let i = 1; i <= 28; i++) { window.scrollTo({ top: y0 + (y - y0) * i / 28, behavior: 'instant' }); act('scroll', scrollState()); await sleep(28); } }
+    else if (m.do === 'step' && cfg.pageSteps) { // the tour's clicks are synthetic, so Page steps is told directly what a real click would open
+      flash(el);
+      const link = el.closest('a[href]');
+      if (!(link && openPageInWall(link.href)) && journeyControl(el)) sendPageStep('open-state', { url: location.href, action: describe(el) });
+    }
   }
 
   /* ------------------------------ shell messages ------------------------------ */

@@ -409,6 +409,7 @@ $('#shared-device').addEventListener('change', event => {
 });
 $('#page-steps').addEventListener('change', event => {
   const enabled = event.target.checked;
+  endTour(false);
   if (sitesMode) setSitesMode(false);
   setPageSteps(enabled);
 });
@@ -977,13 +978,10 @@ function setSitesMode(enabled) {
   refreshViews();
   refreshDevicePicker();
   workspaceScreens().filter(d => d.ready).forEach(configure);
-  if (enabled) {
-    endTour(false);
-    if (!sitePanels.length) { addSite(initialSite()); addSite(initialSite()); }
-  }
+  if (enabled && !sitePanels.length) { addSite(initialSite()); addSite(initialSite()); }
 }
 
-$('#sites-toggle').addEventListener('click', () => setSitesMode(!sitesMode));
+$('#sites-toggle').addEventListener('click', () => { endTour(false); setSitesMode(!sitesMode); });
 $('#add-site').addEventListener('click', () => addSite(sitePanels[0]?.url || initialSite()).input.focus());
 
 /* ------------------------------ preview themes ------------------------------ */
@@ -1110,35 +1108,181 @@ $('#reset-theme').addEventListener('click', () => { clearThemePreset(); changeTh
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const dev = id => DEVICES.find(d => d.id === id);
 const play = (id, m) => post(dev(id), 'demo', m);
+let tour = 0;
+const touring = id => id === tour;
+async function until(id, ready, ms = 8000) {
+  for (const end = Date.now() + ms; touring(id) && !ready() && Date.now() < end;) await sleep(150);
+  return touring(id) && !!ready();
+}
+
+// Points at the control a step is talking about, opening its sidebar drawer when needed.
+function spotlight(spot) {
+  document.querySelectorAll('.tour-spot').forEach(el => el.classList.remove('tour-spot'));
+  const found = typeof spot === 'function' ? [spot()] : spot ? Array.from(document.querySelectorAll(spot)) : [];
+  for (const el of found.filter(Boolean)) {
+    el.classList.add('tour-spot');
+    const drawer = el.closest('details.sidebar-drawer');
+    if (drawer) drawer.open = true;
+    if (el.closest('#sidebar')) el.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function setDeviceLink(d, linked) {
+  if (d?.el && d.linked !== linked) d.el.querySelector('[data-a=link]').click();
+}
+
+function searchDevices(text) {
+  const search = $('#device-search');
+  if (search.value === text) return;
+  search.value = text;
+  search.dispatchEvent(new Event('input'));
+}
+
+function tourAnnotate() {
+  const notes = dev('iphone').annotations;
+  if (!notes) return;
+  notes.setTool('arrow');
+  notes.draw('arrow', [{ x: .22, y: .16 }, { x: .5, y: .36 }]);
+  notes.note({ x: .06, y: .05 }, 'Plans table needs a sideways swipe');
+}
+
+// Moves the iPhone between the Desktop and the MacBook, the way a title-bar drag would.
+async function tourPlace(id) {
+  $('#panel').hidden = true;
+  setMode('row');
+  await sleep(500);
+  if (!touring(id)) return;
+  pinScreens();
+  const row = active().filter(d => !d.el.hidden).sort((a, b) => a.x - b.x);
+  const phone = dev('iphone'), desk = dev('desktop');
+  const next = row[row.indexOf(phone) + 1];
+  if (!next || !row.includes(desk) || phone.x > desk.x) return;
+  const gap = next.x - (phone.x + phone.el.offsetWidth), shift = phone.el.offsetWidth + gap;
+  for (const d of row) if (d !== phone && d.x > phone.x && d.x <= desk.x) d.x -= shift;
+  Object.assign(phone, { x: desk.x + desk.el.offsetWidth + gap, y: desk.y });
+  const frames = $('#frames');
+  frames.classList.add('tour-glide');
+  placeScreens();
+  phone.el.style.zIndex = ++topZ;
+  cvAllow = Date.now() + 1500;
+  cv.scrollTo({ left: Math.max(0, phone.x + phone.el.offsetWidth / 2 - cv.clientWidth / 2), behavior: 'smooth' });
+  setTimeout(() => frames.classList.remove('tour-glide'), 900);
+}
+
+// A small tweakcn-style palette, used when the tweakcn registry cannot be reached.
+const TOUR_THEME = ':root{--background:#f6e6ee;--foreground:#5b5b5b;--primary:#d04f99;--primary-foreground:#ffffff;--input:#e4c4d6;--radius:0.4rem}';
+async function tourTheme() {
+  themeTarget.value = 'all';
+  $('#theme-palette').value = 'light';
+  $('#theme-basic').checked = true;
+  themePreset.value = 'bubblegum';
+  updateThemeControls();
+  await changeTheme();
+  if (themePreviews().some(d => d.themeCss)) return;
+  themePreset.value = customTheme;
+  $('#theme-css').value = TOUR_THEME;
+  updateThemeControls();
+  await changeTheme();
+}
+
+async function tourPageSteps(id) {
+  clearThemePreset();
+  await changeTheme(true);
+  setPageSteps(true);
+  if (!await until(id, () => pageScreens[0]?.ready)) return;
+  await sleep(700);
+  if (touring(id)) post(pageScreens[0], 'demo', { do: 'step', sel: '.hamburger' });
+}
+
+async function tourStepLink(id) {
+  if (!await until(id, () => pageScreens[1]?.ready)) return;
+  await sleep(1000); // step 2 replays the menu click after it connects
+  if (touring(id)) post(pageScreens[1], 'demo', { do: 'step', sel: '.drawer a[href="pricing.html"]' });
+}
+
+function tourCompare() {
+  setPageSteps(false);
+  setSitesMode(true);
+  while (sitePanels.length < 2) addSite(DEMO_URL);
+  if (sitePanels[0].url?.href !== DEMO_URL.href) openSite(sitePanels[0], DEMO_URL, true);
+  openSite(sitePanels[1], new URL('pricing.html', DEMO_URL), true);
+}
+
 const STEPS = [
   { t: 'Clicking <b>Products</b> on the Desktop. Phones and tablets have no nav bar, so each opens its own menu and then Products.', run: () => play('desktop', { do: 'click', sel: '.dd-btn' }), wait: 5200 },
   { t: 'Clicking <b>Sign in</b> on the Desktop. On phones that button lives inside the drawer, and the same dialog opens everywhere.', run: () => play('desktop', { do: 'click', sel: '.signin.desk-only' }), wait: 4600 },
-  { t: 'Closing the dialog on a phone this time. Any device can lead.', run: () => play('iphone', { do: 'click', sel: '#signin .close' }), wait: 3200 },
+  { t: 'Closing the dialog on a phone this time. Any device can lead. Phones and tablets show a fingertip circle as the pointer, desktops a white arrow.', run: () => play('iphone', { do: 'click', sel: '#signin .close' }), wait: 3800 },
+  { t: 'Turning on <b>dark mode</b> from the iPhone. The site draws this toggle twice, in the phone bar and in the desktop bar, so Samestate pairs the twin by its attributes and the desktops follow.', run: () => play('iphone', { do: 'click', sel: '.mob-only .mode-toggle' }), wait: 5000 },
+  { t: 'Switching it off from the Desktop. Screens whose toggle is already in that state are skipped.', run: () => play('desktop', { do: 'click', sel: '.desk-only .mode-toggle' }), wait: 3400 },
   { t: 'Scrolling to <b>Compare plans</b>. Devices line up on the same section even though their pages are different lengths.', run: () => play('desktop', { do: 'scroll', sel: '#plans' }), wait: 4200 },
-  { t: 'Measuring every device against the Desktop. The report lists what changed, such as the table that is too wide for phones.', run: () => detect(), wait: 6000 },
-  { t: IS_EXT ? 'That is the tour. Keep exploring the demo, or type your own URL in the address bar.' : 'That is the tour. Click around the devices yourself, or install the Chrome extension to open any page.', run: () => { $('#skip').textContent = IS_EXT ? 'Use my own site' : 'Close'; }, wait: 0 }
+  { t: 'Measuring every device against the Desktop. The report lists what changed, such as the table that is too wide for phones.', run: () => detect(), wait: 6000, spot: '#detect' },
+  { t: 'Marking up the iPhone with the <b>✎</b> tools: freehand, lines, arrows and notes. Marks stay on their own preview and show up in screenshots.', run: tourAnnotate, wait: 5200, spot: () => dev('iphone').el?.querySelector('.annotation-toggle') },
+  {
+    t: 'Scrolling to the product video and pressing <b>Play all</b>. Each screen plays its own copy, and the Sync log lists the result per device.',
+    run: async () => {
+      dev('iphone').annotations?.clear();
+      play('desktop', { do: 'scroll', sel: '#tour-video' });
+      await sleep(1300);
+      requestPlayback(true);
+      showTab('log');
+    },
+    wait: 5600, spot: '#play-videos'
+  },
+  {
+    t: 'Unlinking the iPhone with its chain icon, then scrolling the Desktop to <b>Customer stories</b>. The unlinked iPhone stays where it was.',
+    run: () => { requestPlayback(false); setDeviceLink(dev('iphone'), false); play('desktop', { do: 'scroll', sel: '#stories' }); },
+    wait: 5000, spot: () => dev('iphone').el?.querySelector('[data-a=link]')
+  },
+  { t: 'Linking it again and pressing <b>Align screens</b>. Every linked screen moves to the page and position of the screen used last.', run: () => { setDeviceLink(dev('iphone'), true); alignScreens(); }, wait: 4400, spot: '#alignall' },
+  { t: 'Screens can go anywhere on the wall. Dragging the iPhone by its title bar puts it between the Desktop and the MacBook. The bar under the wall scrolls to screens off to the side.', run: tourPlace, wait: 5200, spot: () => dev('iphone').el },
+  { t: 'Clicking a preview’s percentage sets its own scale. The iPhone is now at 100% of its CSS pixels. <b>Physical size</b> in the same dialog matches a real phone on your monitor.', run: () => { dev('iphone').scaleOverride = 1; relayout(); }, wait: 4800, spot: () => dev('iphone').el?.querySelector('[data-a=scale]') },
+  {
+    t: '<b>Grid</b> puts every screen back in the automatic layout, and <b>Lock layout</b> keeps an arrangement in place.',
+    run: () => { dev('iphone').scaleOverride = null; $('#mode [data-v=grid]').click(); cvAllow = Date.now() + 900; cv.scrollTo({ left: 0, behavior: 'smooth' }); },
+    wait: 3600, spot: '#mode [data-v=grid], #lock'
+  },
+  { t: 'The <b>Devices</b> drawer has 83 presets. Searching for “fold” finds the foldables, <b>+ Add custom device</b> saves your own sizes, and <b>×</b> on a preview closes it.', run: () => searchDevices('fold'), wait: 5000, spot: '#device-search' },
+  { t: 'Applying the <b>Bubblegum</b> preset from tweakcn in the <b>Theme</b> drawer. A theme can go on every preview, one preview, or one comparison column.', run: () => { searchDevices(''); return tourTheme(); }, wait: 5400, spot: '#theme-drawer' },
+  { t: '<b>Page steps</b> lays a journey out side by side at one device size. Opening the menu adds Step 2 with the menu open, and Step 1 keeps its own state.', run: tourPageSteps, wait: 5200, spot: '#page-steps' },
+  { t: 'Following <b>Pricing</b> in the menu adds Step 3. Steps can be dragged, rescaled and closed one by one.', run: tourStepLink, wait: 4800 },
+  { t: '<b>Compare sites</b> puts whole device walls side by side, here the overview next to the pricing page. Their scrolling is linked, and the sidebar controls work on both.', run: tourCompare, wait: 6400, spot: '#sites-toggle, #add-site' },
+  { t: '<b>Screenshot</b> and <b>Record</b> save what is on the wall, comparison columns included, as a PNG or a silent WebM.', wait: 4400, spot: '#screenshot, #record' },
+  {
+    t: IS_EXT ? 'That is the tour. Keep exploring the demo, or type your own URL in the address bar.' : 'That is the tour. Click around the devices yourself, or install the Chrome extension to open any page.',
+    run: () => { setSitesMode(false); $('#skip').textContent = IS_EXT ? 'Use my own site' : 'Close'; }, wait: 0
+  }
 ];
-let tour = 0;
+
 async function startTour() {
   setSitesMode(false);
   setPageSteps(false);
   sameDevice = false;
+  layoutLocked = false;
+  clearThemePreset();
+  searchDevices('');
+  if ($('#sidebar').hidden) $('#toggle-sidebar').click();
+  unpinScreens();
+  DEVICES.forEach(d => Object.assign(d, { on: !!d.starter, rot: false, linked: true, scaleOverride: null, physicalScale: null }));
   refreshViews();
   const id = ++tour; $('#tour').hidden = false; $('#skip').textContent = 'Skip demo';
   $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join(''); $('#tourtext').textContent = 'Loading the demo site on every device…';
-  DEVICES.forEach(d => { d.on = !!d.starter; d.rot = false; }); renderLeft(); setMode('grid'); $('#panel').hidden = true;
+  renderLeft(); setMode('grid'); $('#panel').hidden = true;
   $('#src').value = ''; await open(DEMO_URL);
-  for (let i = 0; i < 60 && id === tour && !(target && active().length && active().every(d => d.ready)); i++) await sleep(250);
+  await until(id, () => target && active().length && active().every(d => d.ready), 15000);
   await sleep(1400);
   for (let i = 0; i < STEPS.length; i++) {
-    if (id !== tour) return;
+    if (!touring(id)) return;
     $('#tourtext').innerHTML = STEPS[i].t; document.querySelectorAll('#tourdots i').forEach((x, k) => x.classList.toggle('on', k <= i));
-    await sleep(900); if (id !== tour) return;
-    STEPS[i].run(); await sleep(STEPS[i].wait);
+    spotlight(STEPS[i].spot);
+    await sleep(900); if (!touring(id)) return;
+    await STEPS[i].run?.(id);
+    if (!touring(id)) return;
+    await sleep(STEPS[i].wait);
   }
+  spotlight(null);
 }
 function endTour(clear) {
-  tour++; $('#tour').hidden = true;
+  tour++; $('#tour').hidden = true; spotlight(null);
   if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
 }
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with

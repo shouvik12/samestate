@@ -140,24 +140,26 @@ function mountPreviewAnnotations(iframe, triggerHost, toolbarHost, onToggle) {
   }
 
   function addNote(point) {
-    editAnnotationNote('', text => {
-      if (!text || !surface.isConnected) return;
-      const node = document.createElement('button');
-      node.type = 'button';
-      node.className = 'preview-note';
-      node.textContent = text;
-      node.tabIndex = tool === 'note' ? 0 : -1;
-      node.style.left = point.x * 100 + '%';
-      node.style.top = point.y * 100 + '%';
-      node.classList.toggle('from-right', point.x > 0.5);
-      node.classList.toggle('from-bottom', point.y > 0.5);
-      node.addEventListener('click', () => {
-        if (tool === 'note') editAnnotationNote(node.textContent, value => { if (value) node.textContent = value; });
-      });
-      marks.push({ node });
-      layer.append(node);
-      redraw();
+    editAnnotationNote('', text => placeNote(point, text));
+  }
+
+  function placeNote(point, text) {
+    if (!text || !surface.isConnected) return;
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'preview-note';
+    node.textContent = text;
+    node.tabIndex = tool === 'note' ? 0 : -1;
+    node.style.left = point.x * 100 + '%';
+    node.style.top = point.y * 100 + '%';
+    node.classList.toggle('from-right', point.x > 0.5);
+    node.classList.toggle('from-bottom', point.y > 0.5);
+    node.addEventListener('click', () => {
+      if (tool === 'note') editAnnotationNote(node.textContent, value => { if (value) node.textContent = value; });
     });
+    marks.push({ node });
+    layer.append(node);
+    redraw();
   }
 
   toggle.addEventListener('click', () => setTool(tool ? '' : 'draw'));
@@ -201,7 +203,10 @@ function mountPreviewAnnotations(iframe, triggerHost, toolbarHost, onToggle) {
   layer.addEventListener('lostpointercapture', () => { gesture = null; redraw(); });
   canvas.width = canvas.height = 0;
   return {
-    surface, redraw,
+    surface, redraw, setTool,
+    // Used by the guided demo. Points are fractions of the preview's width and height.
+    draw(markTool, points) { marks.push({ tool: markTool, points }); redraw(); },
+    note: placeNote,
     clear() {
       for (const mark of marks) mark.node?.remove();
       marks.length = 0;
