@@ -283,7 +283,7 @@ function updateWall() {
   $('#empty').style.display = target ? 'none' : '';
   $('#wall-empty').textContent = pageSteps ? 'Enter a page address to add a step.' : 'Select devices in the sidebar to preview this site.';
   $('#wall-empty').hidden = !target || active().length > 0;
-  if (IS_EXT) $('#src').placeholder = pageSteps && target ? 'Enter a site or /path' : 'https://your-site.com   ·   localhost:3000';
+  if (IS_EXT) $('#src').placeholder = pageSteps && target ? 'Enter a site or /path' : 'https://your-site.com';
   $('#detect span').textContent = 'Detect differences';
   relayout();
   if (sitesMode) {
