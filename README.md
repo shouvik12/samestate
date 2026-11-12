@@ -1,15 +1,46 @@
 <h1 align="center">Samestate</h1>
-<p align="center"><b>One interaction, every device.</b><br>
-Click once. Every screen size follows to the same state, even when the layouts are completely different.</p>
+<p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
+Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
 <p align="center">
   <a href="https://shouvik12.github.io/samestate/"><b>▶ Live demo</b></a> ·
+  <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
   <a href="#install">Install the Chrome extension</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
 
+<p align="center">
+  <img alt="Free" src="https://img.shields.io/badge/price-free-5eead4">
+  <img alt="Chrome extension" src="https://img.shields.io/badge/Chrome-extension-4285F4">
+  <img alt="No server" src="https://img.shields.io/badge/server-none-111827">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
+
+## Why Samestate
+
+Responsive testing usually means resizing one window, or clicking through the same flow again on every device.
+Samestate puts every screen size side by side and keeps them in the **same logical state**. A desktop
+**Products** click opens the phone's hamburger menu first, then Products. Then it measures every device
+against the desktop and tells you what broke: sideways scroll, tables wider than the screen, tap targets
+that are too small, text that disappears.
+
+**One interaction, every device. Then a report of what's different.**
+
+### Highlights
+
+| | |
+|---|---|
+| 🔁 **Logical sync** | Clicks, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
+| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input and usability, per device. |
+| 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
+| 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
+| 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
+| ✏️ **Annotations** | Draw, arrow and note on any preview; marks appear in captures. |
+| 🎬 **Capture** | Save the wall as a PNG or a WebM recording. |
+| 📱 **83 devices** | Phones, tablets, foldables, watches, TVs, plus your own custom sizes. |
 
 ## Screenshots
 
@@ -157,6 +188,7 @@ docs/             The same app as a static page for the live demo (GitHub Pages)
 
 ## Roadmap
 
+- **v2: suggested fixes** for findings in the difference report, not just detection
 - Chrome Web Store listing
 - Per-device user-agent in the extension
 - Group identical findings across devices
