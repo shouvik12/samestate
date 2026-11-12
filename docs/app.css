@@ -65,6 +65,15 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .page-steps-option{padding-left:0}
 #page-steps-help,#page-steps-status{margin:4px 0 0;color:var(--mute);font-size:11.5px}
 #page-steps-status:empty{display:none}
+#theme-custom>a{display:inline-block;margin-top:6px;color:var(--acc);text-underline-offset:2px}
+.theme-controls label:not(.row){display:block;margin:4px 0;color:var(--mute);font-size:11.5px}
+.theme-controls textarea,.theme-controls select{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--side);padding:5px 6px;color:var(--text)}
+.theme-controls textarea{min-height:82px;resize:vertical;font:11px/1.4 ui-monospace,monospace}
+.theme-controls .row{padding:6px 0;white-space:normal;font-size:11.5px}
+.theme-actions{display:flex;gap:6px}
+.theme-actions .pill{border:1px solid var(--line);color:var(--text)}
+#theme-status{margin:5px 0 0;color:var(--mute);font-size:11.5px}
+#theme-status:empty{display:none}
 .drawer-count{margin-left:auto;min-width:20px;padding:0 5px;border-radius:8px;background:var(--raise);color:var(--text);text-align:center;font-size:10px;font-variant-numeric:tabular-nums}
 .drawer-count:empty{display:none}
 .device-search,#custom-device-form input,#custom-device-form select{width:100%;min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--side);padding:5px 7px;color:var(--text)}

@@ -114,6 +114,35 @@
       </div>
     </details>
 
+    <details class="sidebar-drawer" id="theme-drawer">
+      <summary>Theme</summary>
+      <div class="drawer-body theme-controls">
+        <label for="theme-target">Apply to</label>
+        <select id="theme-target"><option value="all">All visible previews</option></select>
+        <label for="theme-preset">tweakcn preset</label>
+        <select id="theme-preset"><option value="">Choose a theme</option></select>
+        <div id="theme-custom" hidden>
+          <a href="https://tweakcn.com/editor/theme" target="_blank" rel="noopener noreferrer">Open tweakcn editor</a>
+          <label for="theme-css">Theme CSS</label>
+          <textarea id="theme-css" spellcheck="false" maxlength="64000" placeholder="Paste the CSS export from tweakcn"></textarea>
+        </div>
+        <label for="theme-palette">Palette</label>
+        <select id="theme-palette">
+          <option value="site">Follow site</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <label class="row" title="Apply background, text, and button colors on sites with hard-coded styles">
+          <input type="checkbox" id="theme-basic" checked>Recolor basic elements
+        </label>
+        <div class="theme-actions">
+          <button type="button" class="pill" id="apply-theme">Apply theme</button>
+          <button type="button" class="pill" id="reset-theme">Reset</button>
+        </div>
+        <p id="theme-status" role="status"></p>
+      </div>
+    </details>
+
     <details class="sidebar-drawer">
       <summary>Layout</summary>
       <div class="drawer-body">
@@ -259,6 +288,7 @@
 </dialog>
 <script src="devices.js"></script>
 <script src="annotations.js"></script>
+<script src="themes.js"></script>
 <script src="app.js"></script>
 <script src="capture.js"></script>
 </body>

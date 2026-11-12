@@ -7,7 +7,7 @@
   if (!EXT || window.__samestate || window.parent === window || window.parent !== window.top) return;
   if (!location.ancestorOrigins || location.ancestorOrigins[0] !== EXT) return; // only inside a Samestate device frame
   window.__samestate = true;
-  const cfg = { touch: false };
+  const cfg = { touch: false, inspect: false };
   const privateContent = 'form,input,textarea,select,option,[contenteditable],[hidden],[aria-hidden=true],[data-samestate-private],script,style,noscript,template';
   const encoder = new TextEncoder();
   let port;
@@ -234,8 +234,8 @@
   const playbackCommands = new WeakMap();
   const playerControl = 'video,.ytp-play-button,.ytp-large-play-button,.ytp-cued-thumbnail-overlay';
   const act = (kind, data) => send('act', Object.assign({ kind }, data));
-  function mark() { lastInput = now(); if (lastInput - lastActive > 400) { lastActive = lastInput; send('active'); } }
-  const leading = () => now() > suppressUntil && (hovering || now() - lastInput < 1500);
+  function mark() { if (!cfg.inspect) return; lastInput = now(); if (lastInput - lastActive > 400) { lastActive = lastInput; send('active'); } }
+  const leading = () => cfg.inspect && now() > suppressUntil && (hovering || now() - lastInput < 1500);
   for (const ev of ['pointerdown', 'wheel', 'touchstart']) addEventListener(ev, e => e.isTrusted && mark(), { capture: true, passive: true });
   for (const ev of ['pointerdown', 'click', 'keydown']) {
     addEventListener(ev, event => { if (event.isTrusted) playbackGesture = now(); }, { capture: true, passive: true });
@@ -310,7 +310,7 @@
 
   addEventListener('click', e => {
     if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); return; }
-    if (!e.isTrusted || replaying) return;
+    if (!cfg.inspect || !e.isTrusted || replaying) return;
     if (cfg.pageSteps) {
       if (e.defaultPrevented || e.button !== 0 || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       const link = e.target.closest?.('a[href],area[href]');
@@ -342,6 +342,7 @@
   });
 
   function playbackChanged(event) {
+    if (!cfg.inspect) return;
     const video = event.target;
     if (!(video instanceof HTMLVideoElement)) return;
     const playing = event.type === 'play';
@@ -418,7 +419,7 @@
 
   let lastHover = null, hoverT = 0;
   addEventListener('mouseover', e => {
-    if (!e.isTrusted || cfg.touch) return;
+    if (!cfg.inspect || !e.isTrusted || cfg.touch) return;
     const el = actionable(e.target);
     if (el === lastHover) return; lastHover = el;
     clearTimeout(hoverT); hoverT = setTimeout(() => el && el.isConnected ? act('hover', { d: describe(el) }) : act('unhover', {}), 50);
@@ -671,10 +672,22 @@
   }
 
   /* ------------------------------ shell messages ------------------------------ */
+  let themeStyle;
+  function applyPreviewTheme(css) {
+    if (!css) {
+      themeStyle?.remove();
+      return;
+    }
+    themeStyle ??= document.createElement('style');
+    if (themeStyle.textContent !== css) themeStyle.textContent = css;
+    if (!themeStyle.isConnected) document.documentElement.append(themeStyle);
+  }
+
   let queue = Promise.resolve();
   async function receive(m) {
     if (!m?.__samestateShell) return;
     if (m.type === 'config') {
+      cfg.inspect = m.inspect !== false;
       cfg.touch = m.touch === true;
       cfg.pageSteps = m.pageSteps === true;
       if (cfg.textSalt !== m.textSalt) {
@@ -684,6 +697,7 @@
           : null;
       }
       applyTouchMode();
+      applyPreviewTheme(m.themeCss);
     }
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') location.reload();

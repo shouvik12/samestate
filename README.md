@@ -97,6 +97,14 @@ Click the pencil in a preview’s title bar. Choose **Draw**, **Line**, or **Arr
 
 Click the pencil again to interact with the webpage while keeping the marks visible. Annotations belong to the individual preview in the current tab, including in **Page steps** and **Compare sites**. They follow the preview when it moves or resizes and appear in wall captures.
 
+## Preview a color theme
+
+Open **Theme** in the sidebar. Under **Apply to**, choose a preview, a **Compare sites** column, or all visible previews. Pick a **tweakcn preset** by name to load and apply it automatically. Use **Light**, **Dark**, or **Follow site** to switch palettes.
+
+Sites that use shadcn color and radius variables can pick up the theme directly. **Recolor basic elements** also changes the page background, text, links, buttons, and input borders on sites with hard-coded styles. In **Compare sites**, apply the theme to one column to see it beside the original.
+
+For your own design, choose **Custom CSS…**, paste the CSS export, and click **Apply theme**. Themes use supported color and radius values and stay in the current Samestate tab. Click **Reset** to restore the selected previews. [tweakcn editor](https://tweakcn.com/editor/theme)
+
 ## Capture the device wall
 
 With a preview open in desktop Chrome, click **Screenshot** or **Record**, then share the current Samestate tab in Chrome’s picker. **Screenshot** starts a PNG download. **Record** starts a silent video, and **Stop** downloads it as WebM. You can take screenshots while recording.
@@ -130,6 +138,7 @@ extension/
   app.html/js/css The device wall, site comparison, message router, sync log, and difference engine.
   devices.js      Device presets, search, and custom device settings.
   annotations.js  Notes, strokes, lines, and arrows on individual previews.
+  themes.js       Loads tweakcn presets, parses custom CSS, and builds preview styles.
   capture.js      Local screenshots and recordings of the device wall.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
@@ -156,6 +165,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-12** | — | — | **Preview themes** — pick a named tweakcn preset to apply it automatically to previews ([details](changelogs/CHANGELOG-preview-themes.md)) |
 | **2026-11-12** | 23:13:07 +09:00 | `628629b` | **Preview annotations** — add notes, drawings, lines, and arrows to any preview ([details](changelogs/CHANGELOG-preview-annotations.md)) |
 | **2026-11-12** | 22:51:33 +09:00 | `aca3c1e` | **Compare sites controls** — linked wall scrolling, sidebar controls, screenshots, and recordings ([details](changelogs/CHANGELOG-compare-sites-controls.md)) |
 | **2026-11-12** | 22:51:33 +09:00 | `aca3c1e` | **Compare sites** — open several websites on side-by-side device walls ([details](changelogs/CHANGELOG-compare-sites.md)) |

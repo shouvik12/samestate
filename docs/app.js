@@ -20,7 +20,7 @@ let videoRequest = null;
 const active = () => viewScreens().filter(d => d.el);
 const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
 const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
-const connectedScreens = () => [...allScreens(), ...sitePanels.flatMap(site => site.devices)];
+const connectedScreens = () => [...allScreens(), ...sitePanels.flatMap(site => [site.singleDevice, ...site.devices])];
 const previewOrigin = device => device.site ? device.site.url?.origin : target;
 const CALIBRATION_WIDTH = 160;
 const PREVIEW_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
@@ -141,7 +141,7 @@ function layout(d) {
 }
 
 function relayout() {
-  if (sitesMode) { sitePanels.forEach(fitSite); return; }
+  if (sitesMode) { sitePanels.forEach(fitSite); refreshThemeTargets(); return; }
   if (typeof cvAllow !== 'undefined') cvAllow = Date.now() + 300;
   const f = $('#frames');
   f.className = 'frames ' + mode;
@@ -156,6 +156,7 @@ function relayout() {
     }
   }
   applyArrangement();
+  refreshThemeTargets();
 }
 
 function setPreviewSource(frame, url) {
@@ -207,7 +208,7 @@ function addFrame(d) {
     }
   });
   arrangeable(d);
-  d.token = crypto.randomUUID();
+  d.themeTargetId = d.token = crypto.randomUUID();
   if (d.site) {
     setPreviewSource(d.iframe, d.site.url);
     d.site.frames.append(el);
@@ -271,6 +272,7 @@ function removeFrame(d) {
   d.el = d.iframe = null;
   d.annotations = null;
   d.ready = false;
+  d.themeCss = '';
 }
 
 function updateWall() {
@@ -364,6 +366,7 @@ function setPageSteps(enabled) {
   if (pageSteps === enabled) return;
   if (enabled) deviceWallMode = mode;
   pageSteps = enabled;
+  clearThemePreset();
   $('#page-steps-status').textContent = '';
   if (pageSteps && target && !pageScreens.length) addPage(previewUrl);
   updateMode(pageSteps ? 'row' : deviceWallMode);
@@ -773,6 +776,7 @@ function updateSiteTools() {
   renderFindings();
   $('#detect span').textContent = 'Detect differences';
   $('#match-text').disabled = !workspaceScreens().length;
+  refreshThemeTargets();
   $('#frames').dispatchEvent(new Event('wall-view-changed'));
 }
 
@@ -869,18 +873,20 @@ async function openSite(site, url, alreadyAllowed = false) {
       site.annotations.clear();
       for (const d of site.devices) d.annotations?.clear();
     }
+    const sameOrigin = site.url?.origin === url.origin;
     site.url = url;
     site.redirectSource = null;
     site.input.value = bundled ? url.pathname : url.href;
     site.frame.title = 'Preview of ' + (bundled ? url.pathname : url.host);
-    if (site.frame.hasAttribute('src')) setPreviewSource(site.frame, url);
     site.leader = null;
     site.lastAlign = null;
-    for (const d of site.devices) {
-      if (!d.iframe) continue;
+    for (const d of [site.singleDevice, ...site.devices]) {
+      if (!sameOrigin) d.themeCss = '';
+      if (!d.iframe?.hasAttribute('src')) continue;
       pendingAlign.delete(d);
-      d.port?.disconnect();
+      const port = d.port;
       d.port = null;
+      port?.disconnect();
       d.ready = false;
       d.token = crypto.randomUUID();
       d.el.classList.remove('ready', 'leader');
@@ -904,8 +910,10 @@ function addSite(url) {
     frames: el.querySelector('.site-frames'), single: el.querySelector('.site-single'),
     annotationControls: el.querySelector('.site-annotation-controls'),
     size: el.querySelector('.site-size'), frame: el.querySelector('iframe'),
-    revision: 0, redirects: 0
+    revision: 0, redirects: 0, themeTargetId: crypto.randomUUID()
   };
+  const token = crypto.randomUUID();
+  site.singleDevice = { site, el: site.single, iframe: site.frame, token, themeTargetId: token, ready: false };
   site.annotations = mountPreviewAnnotations(site.frame, site.annotationControls, site.annotationControls);
   const selected = DEVICES.filter(d => sitePanels.length ? selectedDevice(d) : d.on);
   site.devices = (selected.length || sitePanels.length ? selected : DEVICES.filter(d => d.starter)).map(d => copySiteDevice(d, site));
@@ -921,7 +929,7 @@ function addSite(url) {
   el.querySelector('.site-close').addEventListener('click', () => {
     site.revision++;
     site.observer.disconnect();
-    site.devices.forEach(removeFrame);
+    [site.singleDevice, ...site.devices].forEach(removeFrame);
     el.remove();
     sitePanels.splice(sitePanels.indexOf(site), 1);
     register(null, site).catch(() => {});
@@ -959,6 +967,7 @@ function setSitesMode(enabled) {
   if (enabled) { wallModeBeforeSites = mode; updateMode(siteLayoutMode); }
   else { siteLayoutMode = mode; updateMode(wallModeBeforeSites); }
   sitesMode = enabled;
+  clearThemePreset();
   $('#sites-toggle').setAttribute('aria-pressed', String(enabled));
   $('#site-workspace').hidden = !enabled;
   $('#add-site').hidden = !enabled;
@@ -976,6 +985,127 @@ function setSitesMode(enabled) {
 
 $('#sites-toggle').addEventListener('click', () => setSitesMode(!sitesMode));
 $('#add-site').addEventListener('click', () => addSite(sitePanels[0]?.url || initialSite()).input.focus());
+
+/* ------------------------------ preview themes ------------------------------ */
+const themeTarget = $('#theme-target');
+const themeStatus = $('#theme-status');
+const themePreset = $('#theme-preset');
+const customTheme = ':custom';
+let themeRequest = 0;
+
+function fillThemePresets() {
+  const selection = themePreset.value;
+  const presets = [...tweakcnPresets].sort((a, b) => a[1].localeCompare(b[1]));
+  themePreset.replaceChildren(
+    new Option('Choose a theme', ''),
+    ...presets.map(([name, label]) => new Option(label, name)),
+    new Option('Custom CSS…', customTheme)
+  );
+  themePreset.value = selection;
+}
+
+function themePreviews() {
+  if (!sitesMode) return active().filter(d => mode !== 'focus' || d === focusDev);
+  return sitePanels.flatMap(site => {
+    if (site.picker.value === 'wall') return siteScreens(site);
+    return site.frame.hasAttribute('src') ? [site.singleDevice] : [];
+  });
+}
+
+function refreshThemeTargets() {
+  const selection = themeTarget.value;
+  const previews = themePreviews();
+  themeTarget.replaceChildren(new Option('All visible previews', 'all'));
+  for (const [index, site] of sitePanels.entries()) {
+    if (previews.some(d => d.site === site)) {
+      themeTarget.add(new Option(`Site ${index + 1} · ${site.url.origin === EXT ? 'Demo' : site.url.host}`, site.themeTargetId));
+    }
+  }
+  for (const d of previews) {
+    const name = d === d.site?.singleDevice ? d.site.picker.selectedOptions[0].textContent : screenName(d);
+    const suffix = d.site ? ' · Site ' + (sitePanels.indexOf(d.site) + 1) : '';
+    themeTarget.add(new Option(name + suffix, d.themeTargetId));
+  }
+  if (Array.from(themeTarget.options).some(option => option.value === selection)) themeTarget.value = selection;
+  else clearThemePreset();
+  updateThemeControls(previews.length > 0);
+}
+
+function updateThemeControls(hasPreviews = themePreviews().length > 0) {
+  themePreset.disabled = $('#reset-theme').disabled = !hasPreviews;
+  $('#apply-theme').disabled = !hasPreviews || !themePreset.value;
+  $('#theme-custom').hidden = themePreset.value !== customTheme;
+}
+
+function clearThemePreset() {
+  themeRequest++;
+  themePreset.value = '';
+  themeStatus.textContent = '';
+  updateThemeControls();
+}
+
+async function changeTheme(reset = false) {
+  const request = ++themeRequest;
+  const name = themePreset.value;
+  if (!reset && !name) return;
+  const selection = themeTarget.value;
+  const targets = themePreviews()
+    .filter(d => selection === 'all' || d.themeTargetId === selection || d.site?.themeTargetId === selection)
+    .map(d => ({ d, iframe: d.iframe, origin: previewOrigin(d) }));
+  if (!targets.length) return;
+  let css = '';
+  const label = tweakcnPresets.get(name);
+  if (!reset) {
+    const palette = $('#theme-palette').value;
+    const basicColors = $('#theme-basic').checked;
+    try {
+      if (name === customTheme) {
+        css = buildPreviewTheme($('#theme-css').value, palette, basicColors);
+      } else {
+        themeStatus.textContent = `Loading ${label} from tweakcn…`;
+        css = renderPreviewTheme(await loadTweakcnTheme(name), palette, basicColors);
+      }
+    } catch (error) {
+      if (request === themeRequest) {
+        themeStatus.textContent = label ? `Could not load ${label}. Click Apply theme to retry.` : error.message;
+      }
+      return;
+    }
+  }
+  if (request !== themeRequest || themeTarget.value !== selection) return;
+  const visible = new Set(themePreviews());
+  const previews = targets.filter(({ d, iframe, origin }) => visible.has(d) && d.iframe === iframe && previewOrigin(d) === origin).map(({ d }) => d);
+  if (!previews.length) { themeStatus.textContent = ''; return; }
+  for (const d of previews) {
+    d.themeCss = css;
+    if (d.ready) configure(d);
+  }
+  const waiting = previews.filter(d => !d.ready).length;
+  const count = previews.length === 1 ? '1 preview' : previews.length + ' previews';
+  themeStatus.textContent = (reset ? 'Theme reset for ' : `${label || 'Theme'} set for `) + count + '.'
+    + (!reset && waiting ? ` Waiting for ${waiting} to connect.` : '');
+}
+
+function applyNamedTheme() {
+  if (themePreset.value && themePreset.value !== customTheme) changeTheme();
+}
+
+fillThemePresets();
+$('#theme-drawer').addEventListener('toggle', () => {
+  refreshTweakcnPresets().then(fillThemePresets).catch(() => {});
+}, { once: true });
+themeTarget.addEventListener('change', clearThemePreset);
+themePreset.addEventListener('change', () => {
+  themeRequest++;
+  themeStatus.textContent = '';
+  updateThemeControls();
+  applyNamedTheme();
+});
+$('#theme-palette').addEventListener('change', applyNamedTheme);
+$('#theme-basic').addEventListener('change', applyNamedTheme);
+$('#apply-theme').addEventListener('click', () => changeTheme());
+$('#reset-theme').addEventListener('click', () => { clearThemePreset(); changeTheme(true); });
+
 /* -------------------------------- guided demo -------------------------------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const dev = id => DEVICES.find(d => d.id === id);
@@ -1023,11 +1153,18 @@ $('#match-text').onchange = event => {
 
 /* ------------------------------ message routing ------------------------------ */
 const pendingSnap = new Map(), entries = new Map();
-const configure = device => post(device, 'config', { touch: device.touch, textSalt, pageSteps: pageSteps && !!device.step });
+function configure(device) {
+  const inspect = device !== device.site?.singleDevice;
+  post(device, 'config', {
+    touch: device.touch, inspect, textSalt: inspect ? textSalt : null,
+    pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || ''
+  });
+}
 const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
 
 function handleMessage(device, message) {
   if (!message?.__samestate) return;
+  if (device === device.site?.singleDevice && message.type !== 'hello') return;
   switch (message.type) {
     case 'hello': {
       device.ready = true;
@@ -1469,6 +1606,7 @@ const refreshDevicePicker = mountDevicePicker(DEVICES, {
 });
 fillSharedDevices();
 renderLeft();
+refreshThemeTargets();
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the default site, which the manifest already has access to, so no prompt is
 // needed. The web demo can only show the bundled sample site, so it starts with the tour.
