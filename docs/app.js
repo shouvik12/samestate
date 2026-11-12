@@ -17,7 +17,7 @@ const DEVICES = [
   { id: 'ipad', name: 'iPad Pro 11"', w: 834, h: 1194, scale: .42, kind: 'tablet', os: 'ios', ua: IPAD },
   { id: 'small', name: 'Small mobile', w: 320, h: 568, scale: .62, kind: 'phone', os: 'ios', ua: IPHONE, on: false },
   { id: 'large', name: 'Large display', w: 2560, h: 1440, scale: .22, kind: 'desktop', ua: '', on: false }
-].map((d, i) => Object.assign({ on: true }, d, { slot: i, touch: d.kind !== 'desktop', ready: false, rot: false, linked: true }));
+].map((d, i) => Object.assign({ on: true }, d, { slot: i, touch: d.kind !== 'desktop', ready: false, rot: false, linked: true, pos: i }));
 const SYNC = { click: ['Clicks & menus', true], scroll: ['Scrolling', true], hover: ['Hover', true] };
 const KIND_SYNC = { click: 'click', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover' };
 
@@ -68,6 +68,7 @@ function relayout() {
   const f = $('#frames'); f.className = 'frames ' + mode;
   if (mode === 'focus' && (!focusDev || !focusDev.el)) focusDev = leader || active()[0];
   for (const d of active()) { d.el.classList.toggle('focused', d === focusDev); layout(d); }
+  applyArrangement();
 }
 function buildFrames() {
   const wrap = $('#frames');
@@ -90,6 +91,7 @@ function buildFrames() {
       if (a === 'link') { d.linked = !d.linked; el.classList.toggle('unlinked', !d.linked); b.title = d.linked ? 'Linked: this screen follows the others. Click to unlink.' : 'Unlinked: this screen moves on its own. Click to link.'; }
       if (a === 'foc') { focusDev = d; setMode(mode === 'focus' ? 'grid' : 'focus'); }
     });
+    arrangeable(d);
     d.token = crypto.randomUUID();
     if (target !== EXT) d.iframe.credentialless = true;
     // The bundled demo shares this page's origin, where a sandbox with scripts cannot isolate anything
@@ -101,6 +103,64 @@ function buildFrames() {
   }
   relayout();
 }
+/* ---------------------------- arranging the wall ---------------------------- */
+// Screens are reordered with the CSS order property: moving an iframe in the page would reload it.
+// The arrangement lasts until the Samestate tab is closed or reloaded.
+let layoutLocked = false, dragDev = null;
+function moveScreen(list, moved, onto) { // "moved" takes the place of "onto"; returns the new order
+  const order = [...list].sort((a, b) => a.pos - b.pos);
+  const from = order.indexOf(moved), to = order.indexOf(onto);
+  if (from < 0 || to < 0 || from === to) return order;
+  order.splice(from, 1);
+  order.splice(to, 0, moved);
+  order.forEach((d, i) => { d.pos = i; });
+  return order;
+}
+function applyArrangement() {
+  for (const d of DEVICES) {
+    if (!d.el) continue;
+    d.el.style.order = d.pos;
+    d.el.querySelector('.dev-head').draggable = !layoutLocked;
+  }
+  $('#frames').classList.toggle('locked', layoutLocked);
+  const lock = $('#lock');
+  lock.classList.toggle('on', layoutLocked);
+  lock.querySelector('span').textContent = layoutLocked ? 'Unlock layout' : 'Lock layout';
+  lock.title = layoutLocked ? 'Screens are fixed in place. Click to allow dragging.' : 'Drag a screen by its title to move it. Click to fix screens in place.';
+}
+function endArrange() {
+  dragDev = null;
+  $('#frames').classList.remove('arranging');
+  document.querySelectorAll('.dev.dragging,.dev.drop-target').forEach(el => el.classList.remove('dragging', 'drop-target'));
+}
+function arrangeable(d) {
+  const el = d.el, head = el.querySelector('.dev-head');
+  head.addEventListener('dragstart', e => {
+    if (layoutLocked || mode === 'focus' || e.target.closest?.('button')) { e.preventDefault(); return; }
+    dragDev = d;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', d.name);
+    // Changing the page inside dragstart cancels the drag in Chrome, so mark it just after.
+    setTimeout(() => { if (dragDev === d) { el.classList.add('dragging'); $('#frames').classList.add('arranging'); } }, 0);
+  });
+  head.addEventListener('dragend', endArrange);
+  el.addEventListener('dragover', e => {
+    if (!dragDev || dragDev === d) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drop-target');
+  });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drop-target'); });
+  el.addEventListener('drop', e => {
+    if (!dragDev || dragDev === d) return;
+    e.preventDefault();
+    moveScreen(DEVICES, dragDev, d);
+    endArrange();
+    applyArrangement();
+  });
+}
+$('#lock').onclick = () => { layoutLocked = !layoutLocked; endArrange(); applyArrangement(); };
+
 function setMode(m) { mode = m; document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); relayout(); }
 function setZoom(v) { zoom = v / 100; $('#zoom').value = v; $('#zoomv').textContent = v + '%'; active().forEach(layout); }
 $('#zoom').addEventListener('input', e => setZoom(+e.target.value));

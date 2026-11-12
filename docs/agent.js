@@ -356,13 +356,18 @@
   };
   addEventListener('pointerup', endDrag, true); addEventListener('pointercancel', endDrag, true);
   addEventListener('dragstart', e => { if (cfg.touch) e.preventDefault(); }, true);
+  // Each screen shows the pointer its device would: a fingertip-sized circle on phones and tablets (as browser
+  // device modes do), and a white arrow on desktops and laptops.
+  const FINGER = "url(\"data:image/svg+xml,%%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%%3E%%3Ccircle cx='14' cy='14' r='12.5' fill='none' stroke='%%23000' stroke-opacity='.35'/%%3E%%3Ccircle cx='14' cy='14' r='11' fill='%%23808080' fill-opacity='.45' stroke='%%23fff' stroke-opacity='.85' stroke-width='1.5'/%%3E%%3C/svg%%3E\") 14 14, default";
+  const ARROW = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 2v17.5l4.6-4.3 3.1 7 2.8-1.2-3.1-6.9H18z' fill='%23fff' stroke='%23000' stroke-width='1.3' stroke-linejoin='round'/%3E%3C/svg%3E\") 4 2, default";
   function applyTouchMode() {
     let st = document.getElementById('__samestate_touch');
-    if (cfg.touch && !st) {
-      st = document.createElement('style'); st.id = '__samestate_touch';
-      st.textContent = 'html{-webkit-user-select:none;user-select:none}input,textarea{-webkit-user-select:text;user-select:text}';
-      document.documentElement.appendChild(st);
-    } else if (!cfg.touch && st) st.remove();
+    if (!st) { st = document.createElement('style'); st.id = '__samestate_touch'; document.documentElement.appendChild(st); }
+    // Touch: the circle everywhere, as a finger has no hover states. Mouse: only the plain arrow is replaced,
+    // so links keep the hand and form fields keep the I-beam.
+    st.textContent = cfg.touch
+      ? 'html{-webkit-user-select:none;user-select:none}input,textarea{-webkit-user-select:text;user-select:text}html,html *,html *::before,html *::after{cursor:' + FINGER + ' !important}'
+      : 'html{cursor:' + ARROW + '}';
   }
 
   /* --------------------------- replaying remote acts --------------------------- */
