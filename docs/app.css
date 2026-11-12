@@ -265,18 +265,49 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .cta:hover{filter:brightness(1.08)}
 .cta.ghost{background:var(--raise);color:var(--text);font-weight:600}
 .hero-card pre{margin:14px 0 0;max-height:120px}.hero-card pre:empty{display:none}
-.tour{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);width:min(560px,calc(100vw - 40px));background:#18223d;border:1px solid var(--acc);border-radius:14px;padding:12px 16px 14px;box-shadow:0 18px 50px #0b1124aa;z-index:50}
-.tour[hidden]{display:none}
-.tour-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.tour{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);width:min(500px,calc(100vw - 40px));background:#18223d;border:1px solid var(--line);border-radius:12px;padding:9px 12px 11px;box-shadow:0 18px 50px #0b1124aa;z-index:54}
+.tour[hidden],.tour-callout[hidden],.tour-ring[hidden],.tour-cursor[hidden],.tour button[hidden]{display:none}
+.tour-top{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .tour-tag{background:var(--acc);color:#10203f;font-weight:700;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;border-radius:5px;padding:1px 7px}
-.dots{display:flex;gap:4px;flex:1;min-width:0}.dots i{flex:0 1 18px;min-width:4px;height:3px;border-radius:2px;background:var(--line)}.dots i.on{background:var(--acc)}
-.tour-spot{outline:2px solid var(--acc)!important;outline-offset:2px;animation:tour-spot 1.4s ease-in-out infinite}
-@keyframes tour-spot{50%{outline-color:transparent}}
-.frames.tour-glide .dev{transition:left .7s ease,top .7s ease}
-@media (prefers-reduced-motion:reduce){.tour-spot{animation:none}.frames.tour-glide .dev{transition:none}}
-#skip{background:var(--raise);border-radius:7px;padding:5px 12px;color:var(--text);font-weight:600}
-#skip:hover{background:var(--line)}
-.tour p{margin:0;font-size:14px;line-height:1.45}
+#tourcount{color:var(--mute);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+#tourname{flex:1;min-width:0;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tour button{background:var(--raise);border-radius:7px;padding:5px 12px;color:var(--text);font-weight:600;white-space:nowrap}
+.tour button:hover{background:var(--line)}
+.tour button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.tour.paused #tourpause{background:var(--acc);color:#10203f}
+.dots{display:flex;gap:3px}.dots i{flex:1 1 0;height:3px;border-radius:2px;background:var(--line)}.dots i.on{background:var(--acc)}.dots i.now{background:#fff}
+/* The message beside the control a demo step is using, with a corner that points at it. */
+.tour-callout{position:fixed;left:0;top:0;z-index:52;width:max-content;max-width:min(310px,calc(100vw - 24px));padding:11px 14px 12px;background:#101a33;border:1px solid var(--acc);border-radius:11px;box-shadow:0 14px 40px #070c1acc;pointer-events:none;transition:transform .4s ease}
+#tourtitle{display:block;margin-bottom:3px;color:var(--acc);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase}
+.tour-callout p{margin:0;font-size:13.5px;line-height:1.45}
+.tour-callout p b{color:#fff}
+.tour-callout::before{content:"";position:absolute;width:12px;height:12px;background:inherit;border:solid var(--acc);border-width:1px 0 0 1px}
+.tour-callout[data-side=none]::before{display:none}
+.tour-callout[data-side=below]::before{top:-7px;left:calc(var(--arrow) - 6px);transform:rotate(45deg)}
+.tour-callout[data-side=above]::before{bottom:-7px;left:calc(var(--arrow) - 6px);transform:rotate(225deg)}
+.tour-callout[data-side=right]::before{left:-7px;top:calc(var(--arrow) - 6px);transform:rotate(-45deg)}
+.tour-callout[data-side=left]::before{right:-7px;top:calc(var(--arrow) - 6px);transform:rotate(135deg)}
+.tour-ring{position:fixed;left:0;top:0;z-index:51;border:2px solid var(--acc);border-radius:8px;box-shadow:0 0 0 4px #6ea8ff38,0 0 18px #6ea8ff66;pointer-events:none;transition:transform .4s ease,width .4s ease,height .4s ease;animation:tour-ring 1.5s ease-in-out infinite}
+@keyframes tour-ring{50%{box-shadow:0 0 0 8px #6ea8ff1f,0 0 26px #6ea8ff40}}
+/* The demo's own pointer: an arrow, or a fingertip circle over touch screens. */
+.tour-cursor{position:fixed;left:0;top:0;z-index:53;width:0;height:0;pointer-events:none}
+.tour-cursor svg{position:absolute;left:-4px;top:-2px;width:26px;height:26px;stroke:none;filter:drop-shadow(0 2px 3px #000a);transition:transform .12s}
+.tour-cursor.down svg{transform:scale(.84)}
+.tour-cursor .tap{display:none;position:absolute;left:-15px;top:-15px;width:30px;height:30px;border-radius:50%;background:#ffffff59;border:2px solid #fff;box-shadow:0 0 0 1px #10182b88,0 2px 6px #0008}
+.tour-cursor.touch svg{display:none}.tour-cursor.touch .tap{display:block}
+.tour-cursor .ripple{position:absolute;left:-21px;top:-21px;width:42px;height:42px;border-radius:50%;border:3px solid var(--warn);opacity:0}
+.tour-cursor.click .ripple{animation:tour-click .55s ease-out}
+@keyframes tour-click{from{opacity:1;transform:scale(.25)}to{opacity:0;transform:scale(1.25)}}
+.tour-cursor .wheel{display:none;position:absolute;left:22px;top:8px;width:14px;height:22px;border:2px solid #fff;border-radius:8px;background:#10182bcc}
+.tour-cursor .wheel::after{content:"";position:absolute;left:3px;top:3px;width:4px;height:5px;border-radius:2px;background:#fff;animation:tour-wheel .7s ease-in-out infinite}
+.tour-cursor.wheel .wheel{display:block}
+@keyframes tour-wheel{to{transform:translateY(8px);opacity:.2}}
+/* What a demo action did on one preview. */
+.tour-badge{position:absolute;z-index:3;left:50%;bottom:10px;transform:translateX(-50%);max-width:calc(100% - 12px);overflow:hidden;text-overflow:ellipsis;padding:3px 10px;border-radius:999px;background:#101a33f2;border:1px solid var(--ok);color:var(--ok);font:600 11.5px/1.5 ui-sans-serif,system-ui,sans-serif;white-space:nowrap;pointer-events:none;animation:tour-badge 3.2s ease both}
+.tour-badge.lead{border-color:var(--acc);color:var(--acc)}.tour-badge.miss{border-color:var(--warn);color:var(--warn)}
+@keyframes tour-badge{0%{opacity:0;transform:translate(-50%,8px)}7%,82%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,0)}}
+.frames.tour-glide .dev{transition:left .9s ease,top .9s ease}
+@media (prefers-reduced-motion:reduce){.tour-ring,.tour-badge,.tour-cursor .wheel::after{animation:none}.tour-callout,.tour-ring,.frames.tour-glide .dev{transition:none}}
 .dev.unlinked .dev-head button[data-a=link]{color:var(--warn);opacity:1}.dev.unlinked .dev-body{opacity:.72}
 :is(.frames,.site-frames):not(.locked):not(.focus) .dev-head{cursor:grab;touch-action:none;user-select:none}:is(.frames,.site-frames).arranging,:is(.frames,.site-frames).arranging .dev-head{cursor:grabbing}:is(.frames,.site-frames).arranging iframe{pointer-events:none}
 :is(.frames,.site-frames).free:not(.focus){display:block;position:relative;padding:0;min-width:100%;min-height:100%;box-sizing:border-box}:is(.frames,.site-frames).free:not(.focus) .dev{position:absolute;margin:0}

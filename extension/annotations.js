@@ -205,7 +205,12 @@ function mountPreviewAnnotations(iframe, triggerHost, toolbarHost, onToggle) {
   return {
     surface, redraw, setTool,
     // Used by the guided demo. Points are fractions of the preview's width and height.
-    draw(markTool, points) { marks.push({ tool: markTool, points }); redraw(); },
+    draw(markTool, points) { // returns the mark so its points can be moved while it is drawn
+      const mark = { tool: markTool, points };
+      marks.push(mark);
+      redraw();
+      return mark;
+    },
     note: placeNote,
     clear() {
       for (const mark of marks) mark.node?.remove();

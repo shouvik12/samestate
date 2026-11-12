@@ -1105,26 +1105,190 @@ $('#apply-theme').addEventListener('click', () => changeTheme());
 $('#reset-theme').addEventListener('click', () => { clearThemePreset(); changeTheme(true); });
 
 /* -------------------------------- guided demo -------------------------------- */
+// The demo plays itself. A pointer moves to each control and uses it, a ring marks that control, and a
+// message sits beside it. All three are drawn on top of the page; the actions run the same code a person's
+// clicks would.
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const dev = id => DEVICES.find(d => d.id === id);
 const play = (id, m) => post(dev(id), 'demo', m);
-let tour = 0;
+const calmMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const tourPointer = $('#tour-cursor');
+const within = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+let tour = 0, tourRunning = false, tourPaused = false, tourAnchor = null, tourSide = null, tourWatch = 0;
 const touring = id => id === tour;
+
+// Waits that stop when the demo is skipped and hold while it is paused. Both answer whether the demo is still on.
+async function nap(id, ms) {
+  for (let t = 0; t < ms || tourPaused; t += tourPaused ? 0 : 100) {
+    if (!touring(id)) return false;
+    await sleep(100);
+  }
+  return touring(id);
+}
 async function until(id, ready, ms = 8000) {
-  for (const end = Date.now() + ms; touring(id) && !ready() && Date.now() < end;) await sleep(150);
+  for (let t = 0; touring(id) && !ready() && t < ms; t += 150) await sleep(150);
   return touring(id) && !!ready();
 }
 
-// Points at the control a step is talking about, opening its sidebar drawer when needed.
-function spotlight(spot) {
-  document.querySelectorAll('.tour-spot').forEach(el => el.classList.remove('tour-spot'));
-  const found = typeof spot === 'function' ? [spot()] : spot ? Array.from(document.querySelectorAll(spot)) : [];
-  for (const el of found.filter(Boolean)) {
-    el.classList.add('tour-spot');
-    const drawer = el.closest('details.sidebar-drawer');
-    if (drawer) drawer.open = true;
-    if (el.closest('#sidebar')) el.scrollIntoView({ block: 'nearest' });
+// A target is a selector or element of this page, [screen, selector] for something inside a preview, a
+// rectangle, or a function that returns one of those.
+const tourTarget = target => typeof target === 'function' ? target() : typeof target === 'string' ? document.querySelector(target) : target;
+const inScreen = (id, selector) => () => [dev(id), selector];
+function tourRect(target) {
+  target = tourTarget(target);
+  if (Array.isArray(target)) {
+    const [d, selector] = target;
+    if (!d?.iframe) return null;
+    const frame = d.iframe.getBoundingClientRect();
+    let el = null;
+    try { el = selector && d.iframe.contentDocument?.querySelector(selector); } catch {}
+    if (!el) return frame;
+    const k = frame.width / d.iframe.offsetWidth, r = el.getBoundingClientRect();
+    const left = Math.max(frame.left, frame.left + r.left * k), top = Math.max(frame.top, frame.top + r.top * k);
+    const right = Math.min(frame.right, frame.left + r.right * k), bottom = Math.min(frame.bottom, frame.top + r.bottom * k);
+    return right > left && bottom > top ? new DOMRect(left, top, right - left, bottom - top) : frame;
   }
+  if (target instanceof Element) {
+    const r = target.getBoundingClientRect();
+    return r.width || r.height ? r : null;
+  }
+  return target || null;
+}
+
+// Opens the drawer a control sits in and scrolls the sidebar or the wall just far enough to show it.
+async function tourReveal(id, target) {
+  target = tourTarget(target);
+  const el = Array.isArray(target) ? target[0]?.el : target instanceof Element ? target : null;
+  if (!el) return;
+  const drawer = el.closest('details.sidebar-drawer');
+  if (drawer) drawer.open = true;
+  if (el.closest('#sidebar')) { el.scrollIntoView({ block: 'nearest' }); return; }
+  let r = cv.contains(el) && tourRect(target);
+  if (!r) return;
+  const view = cv.getBoundingClientRect(), pad = 30;
+  const bottom = Math.min(view.bottom, innerHeight - $('#tour').offsetHeight - 40);
+  const card = el.closest('.dev');
+  if (card) { // show the whole screen around a control wherever the wall has room for it
+    const whole = card.getBoundingClientRect();
+    const wide = whole.width <= view.width - 2 * pad, tall = whole.height <= bottom - view.top - 2 * pad;
+    r = new DOMRect(wide ? whole.left : r.left, tall ? whole.top : r.top, wide ? whole.width : r.width, tall ? whole.height : r.height);
+  }
+  const dx = r.left < view.left + pad ? r.left - view.left - pad : r.right > view.right - pad ? Math.min(r.right - view.right + pad, r.left - view.left - pad) : 0;
+  const dy = r.top < view.top + pad ? r.top - view.top - pad : r.bottom > bottom - pad ? Math.min(r.bottom - bottom + pad, r.top - view.top - pad) : 0;
+  if (Math.abs(dx) >= 2 || Math.abs(dy) >= 2) await scrollWall(cv.scrollLeft + dx, cv.scrollTop + dy);
+}
+// Scrolls the wall step by step, so it is where the demo expects by the time the pointer moves.
+async function scrollWall(left, top, ms = 450) {
+  const from = [cv.scrollLeft, cv.scrollTop];
+  cvAllow = Date.now() + ms + 500;
+  await glide(ms, t => { cv.scrollLeft = from[0] + (left - from[0]) * t; cv.scrollTop = from[1] + (top - from[1]) * t; });
+  cvPos = [cv.scrollLeft, cv.scrollTop];
+}
+
+// The ring goes around the target and the message beside it, on the first side with enough room.
+function tourFocus(target, side) {
+  tourAnchor = target || null;
+  tourSide = side || null;
+  placeTour();
+}
+function placeTour() {
+  const ring = $('#tour-ring'), box = $('#tour-callout');
+  if (box.hidden) return;
+  const W = innerWidth, H = innerHeight, floor = H - $('#tour').offsetHeight - 34;
+  let r = tourAnchor ? tourRect(tourAnchor) : null;
+  if (r && (r.right < 4 || r.left > W - 4 || r.bottom < 4 || r.top > H - 4)) r = null;
+  ring.hidden = !r;
+  const bw = box.offsetWidth, bh = box.offsetHeight, gap = 16;
+  let side = 'none', x = (W - bw) / 2, y = floor - bh;
+  if (r) {
+    ring.style.transform = `translate(${Math.round(r.left - 4)}px,${Math.round(r.top - 4)}px)`;
+    ring.style.width = Math.round(r.width + 8) + 'px';
+    ring.style.height = Math.round(r.height + 8) + 'px';
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const beside = within(cy - bh / 2, 8, Math.max(8, floor - bh)), inline = within(cx - bw / 2, 8, Math.max(8, W - bw - 8));
+    const places = {
+      right: () => r.right + gap + bw <= W - 8 && [r.right + gap, beside],
+      left: () => r.left - gap - bw >= 8 && [r.left - gap - bw, beside],
+      below: () => r.bottom + gap + bh <= floor && [inline, r.bottom + gap],
+      above: () => r.top - gap - bh >= 8 && [inline, r.top - gap - bh]
+    };
+    for (const name of [tourSide, 'right', 'left', 'below', 'above']) {
+      const spot = name && places[name]();
+      if (spot) { side = name; [x, y] = spot; break; }
+    }
+    const arrow = side === 'right' || side === 'left' ? within(cy - y, 16, bh - 16) : within(cx - x, 16, bw - 16);
+    box.style.setProperty('--arrow', Math.round(arrow) + 'px');
+  }
+  box.dataset.side = side;
+  box.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
+}
+
+// Runs frame(0…1) over ms. Finishes at once for reduced motion, and on a timer where animation frames do not run.
+function glide(ms, frame) {
+  return new Promise(done => {
+    let over = false;
+    const finish = () => { if (!over) { over = true; frame(1); done(); } };
+    if (calmMotion.matches || ms <= 0) { finish(); return; }
+    const start = performance.now();
+    const tick = now => {
+      if (over) return;
+      const t = (now - start) / ms;
+      if (t >= 1) { finish(); return; }
+      frame(t * t * (3 - 2 * t));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    setTimeout(finish, ms + 150);
+  });
+}
+
+const pointerAt = { x: 0, y: 0 };
+function setPointer(x, y) {
+  pointerAt.x = x; pointerAt.y = y;
+  tourPointer.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
+}
+async function tourPoint(id, target) {
+  await tourReveal(id, target);
+  const resolved = tourTarget(target), r = tourRect(resolved);
+  if (!r || !touring(id)) return false;
+  if (tourPointer.hidden) { tourPointer.hidden = false; setPointer(innerWidth / 2, innerHeight * .6); }
+  const touch = Array.isArray(resolved) && !!resolved[0].touch; // previews of touch devices show a fingertip
+  if (!touch) tourPointer.classList.remove('touch');
+  const from = { ...pointerAt }, to = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  await glide(within(Math.hypot(to.x - from.x, to.y - from.y) * 1.2 + 260, 380, 1050), t => setPointer(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t));
+  tourPointer.classList.toggle('touch', touch);
+  return touring(id);
+}
+async function tourClick(id, target) {
+  if (!await tourPoint(id, target)) return false;
+  tourPointer.classList.remove('click');
+  void tourPointer.offsetWidth; // restart the ripple
+  tourPointer.classList.add('click');
+  return nap(id, 280);
+}
+async function tourScroll(t, id, section) { // the pointer rests on the preview and shows a turning wheel while it scrolls
+  if (!await t.point(inScreen(id, ''))) return false;
+  tourPointer.classList.add('wheel');
+  tourBadge(dev(id), 'scrolling here', 'lead');
+  play(id, { do: 'scroll', sel: section });
+  const on = await t.nap(1300);
+  tourPointer.classList.remove('wheel');
+  return on;
+}
+
+// A short label on a preview saying what just happened there.
+const TOUR_BADGES = {
+  direct: '✓ same control', semantic: '✓ matched', revealed: '✓ opened its menu first', skip: 'already there',
+  playing: '▶ playing', paused: 'paused', muted: '▶ playing muted'
+};
+function tourBadge(device, text, kind = '') {
+  if (!tourRunning || !device?.el || !device.body) return;
+  device.body.querySelector('.tour-badge')?.remove();
+  const badge = document.createElement('span');
+  badge.className = 'tour-badge ' + kind;
+  badge.textContent = text;
+  device.body.append(badge);
+  setTimeout(() => badge.remove(), 3200);
 }
 
 function setDeviceLink(d, linked) {
@@ -1138,35 +1302,61 @@ function searchDevices(text) {
   search.dispatchEvent(new Event('input'));
 }
 
-function tourAnnotate() {
-  const notes = dev('iphone').annotations;
+async function tourAnnotate(t) {
+  $('#panel').hidden = true;
+  const phone = dev('iphone'), notes = phone.annotations;
   if (!notes) return;
+  const tool = name => () => phone.el.querySelector(`.annotation-tools [data-tool=${name}]`);
+  const spot = (x, y) => () => { const r = phone.iframe.getBoundingClientRect(); return new DOMRect(r.left + x * r.width, r.top + y * r.height, 0, 0); };
+  if (!await t.click(() => phone.el.querySelector('.annotation-toggle'))) return;
+  notes.setTool('draw');
+  if (!await t.click(tool('arrow'))) return;
   notes.setTool('arrow');
-  notes.draw('arrow', [{ x: .22, y: .16 }, { x: .5, y: .36 }]);
+  const a = { x: .24, y: .17 }, b = { x: .5, y: .36 };
+  if (!await t.point(spot(a.x, a.y))) return;
+  tourPointer.classList.add('down');
+  const mark = notes.draw('arrow', [a, { ...a }]);
+  await glide(750, k => {
+    const tip = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }, r = spot(tip.x, tip.y)();
+    mark.points[1] = tip;
+    notes.redraw();
+    setPointer(r.x, r.y);
+  });
+  tourPointer.classList.remove('down');
+  if (!await t.click(tool('note'))) return;
+  notes.setTool('note');
+  if (!await t.click(spot(.06, .05))) return;
   notes.note({ x: .06, y: .05 }, 'Plans table needs a sideways swipe');
 }
 
-// Moves the iPhone between the Desktop and the MacBook, the way a title-bar drag would.
-async function tourPlace(id) {
+// Drags the iPhone by its title bar to a place between the Desktop and the MacBook.
+async function tourPlace(t) {
   $('#panel').hidden = true;
   setMode('row');
-  await sleep(500);
-  if (!touring(id)) return;
+  if (!await t.nap(500)) return;
   pinScreens();
   const row = active().filter(d => !d.el.hidden).sort((a, b) => a.x - b.x);
   const phone = dev('iphone'), desk = dev('desktop');
   const next = row[row.indexOf(phone) + 1];
   if (!next || !row.includes(desk) || phone.x > desk.x) return;
-  const gap = next.x - (phone.x + phone.el.offsetWidth), shift = phone.el.offsetWidth + gap;
-  for (const d of row) if (d !== phone && d.x > phone.x && d.x <= desk.x) d.x -= shift;
-  Object.assign(phone, { x: desk.x + desk.el.offsetWidth + gap, y: desk.y });
-  const frames = $('#frames');
-  frames.classList.add('tour-glide');
-  placeScreens();
+  if (!await t.point(() => phone.el.querySelector('.dev-name'))) return;
+  const frames = $('#frames'), box = phone.el.getBoundingClientRect();
+  const grip = { x: pointerAt.x - box.left, y: pointerAt.y - box.top };
+  tourPointer.classList.add('down');
+  phone.el.classList.add('dragging');
   phone.el.style.zIndex = ++topZ;
-  cvAllow = Date.now() + 1500;
-  cv.scrollTo({ left: Math.max(0, phone.x + phone.el.offsetWidth / 2 - cv.clientWidth / 2), behavior: 'smooth' });
-  setTimeout(() => frames.classList.remove('tour-glide'), 900);
+  if (await t.nap(300)) {
+    const gap = next.x - (phone.x + phone.el.offsetWidth), shift = phone.el.offsetWidth + gap;
+    for (const d of row) if (d !== phone && d.x > phone.x && d.x <= desk.x) d.x -= shift;
+    Object.assign(phone, { x: desk.x + desk.el.offsetWidth + gap, y: desk.y });
+    frames.classList.add('tour-glide');
+    placeScreens();
+    scrollWall(Math.max(0, phone.x + phone.el.offsetWidth / 2 - cv.clientWidth / 2), cv.scrollTop, 900);
+    await glide(1000,() => { const r = phone.el.getBoundingClientRect(); setPointer(r.left + grip.x, r.top + grip.y); });
+  }
+  frames.classList.remove('tour-glide');
+  phone.el.classList.remove('dragging');
+  tourPointer.classList.remove('down');
 }
 
 // A small tweakcn-style palette, used when the tweakcn registry cannot be reached.
@@ -1185,19 +1375,24 @@ async function tourTheme() {
   await changeTheme();
 }
 
-async function tourPageSteps(id) {
+async function tourPageSteps(t) {
   clearThemePreset();
   await changeTheme(true);
+  if (!await t.click('.page-steps-option')) return;
   setPageSteps(true);
-  if (!await until(id, () => pageScreens[0]?.ready)) return;
-  await sleep(700);
-  if (touring(id)) post(pageScreens[0], 'demo', { do: 'step', sel: '.hamburger' });
+  if (!await t.until(() => pageScreens[0]?.ready) || !await t.nap(700)) return;
+  t.focus(() => pageScreens[0]?.el);
+  if (!await t.click(() => [pageScreens[0], '.hamburger'])) return;
+  post(pageScreens[0], 'demo', { do: 'step', sel: '.hamburger' });
+  if (await t.until(() => pageScreens[1]?.el)) t.focus(() => pageScreens[1]?.el);
 }
 
-async function tourStepLink(id) {
-  if (!await until(id, () => pageScreens[1]?.ready)) return;
-  await sleep(1000); // step 2 replays the menu click after it connects
-  if (touring(id)) post(pageScreens[1], 'demo', { do: 'step', sel: '.drawer a[href="pricing.html"]' });
+async function tourStepLink(t) {
+  const link = '.drawer a[href="pricing.html"]';
+  if (!await t.until(() => pageScreens[1]?.ready) || !await t.nap(1000)) return; // step 2 replays the menu click after it connects
+  if (!await t.click(() => [pageScreens[1], link])) return;
+  post(pageScreens[1], 'demo', { do: 'step', sel: link });
+  if (await t.until(() => pageScreens[2]?.el)) t.focus(() => pageScreens[2]?.el);
 }
 
 function tourCompare() {
@@ -1208,50 +1403,188 @@ function tourCompare() {
   openSite(sitePanels[1], new URL('pricing.html', DEMO_URL), true);
 }
 
+// One step: `at` is what the ring and the message attach to, `run` moves the pointer and does the work.
+const demoClick = (id, sel) => async t => { if (await t.click(inScreen(id, sel))) play(id, { do: 'click', sel }); };
 const STEPS = [
-  { t: 'Clicking <b>Products</b> on the Desktop. Phones and tablets have no nav bar, so each opens its own menu and then Products.', run: () => play('desktop', { do: 'click', sel: '.dd-btn' }), wait: 5200 },
-  { t: 'Clicking <b>Sign in</b> on the Desktop. On phones that button lives inside the drawer, and the same dialog opens everywhere.', run: () => play('desktop', { do: 'click', sel: '.signin.desk-only' }), wait: 4600 },
-  { t: 'Closing the dialog on a phone this time. Any device can lead. Phones and tablets show a fingertip circle as the pointer, desktops a white arrow.', run: () => play('iphone', { do: 'click', sel: '#signin .close' }), wait: 3800 },
-  { t: 'Turning on <b>dark mode</b> from the iPhone. The site draws this toggle twice, in the phone bar and in the desktop bar, so Samestate pairs the twin by its attributes and the desktops follow.', run: () => play('iphone', { do: 'click', sel: '.mob-only .mode-toggle' }), wait: 5000 },
-  { t: 'Switching it off from the Desktop. Screens whose toggle is already in that state are skipped.', run: () => play('desktop', { do: 'click', sel: '.desk-only .mode-toggle' }), wait: 3400 },
-  { t: 'Scrolling to <b>Compare plans</b>. Devices line up on the same section even though their pages are different lengths.', run: () => play('desktop', { do: 'scroll', sel: '#plans' }), wait: 4200 },
-  { t: 'Measuring every device against the Desktop. The report lists what changed, such as the table that is too wide for phones.', run: () => detect(), wait: 6000, spot: '#detect' },
-  { t: 'Marking up the iPhone with the <b>✎</b> tools: freehand, lines, arrows and notes. Marks stay on their own preview and show up in screenshots.', run: tourAnnotate, wait: 5200, spot: () => dev('iphone').el?.querySelector('.annotation-toggle') },
   {
-    t: 'Scrolling to the product video and pressing <b>Play all</b>. Each screen plays its own copy, and the Sync log lists the result per device.',
-    run: async () => {
+    title: 'Click sync', at: inScreen('desktop', '.dd-btn'), wait: 4400,
+    text: 'The Desktop clicks <b>Products</b>. Phones and tablets have no nav bar, so each one opens its own menu first, then Products.',
+    run: demoClick('desktop', '.dd-btn')
+  },
+  {
+    title: 'Same state, different layout', at: inScreen('desktop', '.signin.desk-only'), side: 'left', wait: 4000,
+    text: '<b>Sign in</b> sits in the bar on desktops and inside the menu on phones. One click opens the same dialog everywhere.',
+    run: demoClick('desktop', '.signin.desk-only')
+  },
+  {
+    title: 'Any screen can lead', at: inScreen('iphone', '#signin .close'), wait: 3400,
+    text: 'The iPhone closes the dialog this time. Touch screens show a fingertip circle as the pointer, desktops a white arrow.',
+    run: demoClick('iphone', '#signin .close')
+  },
+  {
+    title: 'Twin controls', at: inScreen('iphone', '.mob-only .mode-toggle'), wait: 4200,
+    text: 'This site draws its <b>dark mode</b> button twice, once for phones and once for desktops. Samestate pairs the two by their attributes, so the desktops follow.',
+    run: demoClick('iphone', '.mob-only .mode-toggle')
+  },
+  {
+    title: 'Works both ways', at: inScreen('desktop', '.desk-only .mode-toggle'), side: 'left', wait: 3200,
+    text: 'The Desktop switches dark mode off again, and every phone and tablet follows.',
+    run: demoClick('desktop', '.desk-only .mode-toggle')
+  },
+  {
+    title: 'Scroll sync', at: inScreen('desktop', ''), wait: 2800,
+    text: 'Scrolling the Desktop to <b>Compare plans</b>. Screens stop at the same section even though their pages are different lengths.',
+    run: t => tourScroll(t, 'desktop', '#plans')
+  },
+  {
+    title: 'Difference report', at: '#detect', wait: 3600,
+    text: '<b>Detect differences</b> measures every screen against the Desktop. Clicking a finding outlines it in the preview, here the table that is too wide for the iPhone.',
+    run: async t => {
+      if (!await t.click('#detect')) return;
+      await detect();
+      if (!t.ok()) return;
+      t.focus('#panel', 'left');
+      const finding = () => Array.from(document.querySelectorAll('#findings .finding')).find(el => el.querySelector('.t')?.textContent.startsWith('Table'));
+      if (!await t.nap(1600) || !finding() || !await t.click(finding)) return;
+      finding()?.click();
+    }
+  },
+  {
+    title: 'Annotations', at: () => dev('iphone').el, wait: 3000,
+    text: 'The <b>✎</b> button on a preview opens drawing tools: freehand, lines, arrows and notes. Marks stay on their own preview and appear in screenshots.',
+    run: tourAnnotate
+  },
+  {
+    title: 'Video playback', at: '#play-videos', wait: 4200,
+    text: '<b>Play all</b> starts the main video on every screen at once. The Sync log lists the result for each one.',
+    run: async t => {
       dev('iphone').annotations?.clear();
-      play('desktop', { do: 'scroll', sel: '#tour-video' });
-      await sleep(1300);
+      if (!await tourScroll(t, 'desktop', '#tour-video') || !await t.click('#play-videos')) return;
       requestPlayback(true);
       showTab('log');
-    },
-    wait: 5600, spot: '#play-videos'
+    }
   },
   {
-    t: 'Unlinking the iPhone with its chain icon, then scrolling the Desktop to <b>Customer stories</b>. The unlinked iPhone stays where it was.',
-    run: () => { requestPlayback(false); setDeviceLink(dev('iphone'), false); play('desktop', { do: 'scroll', sel: '#stories' }); },
-    wait: 5000, spot: () => dev('iphone').el?.querySelector('[data-a=link]')
+    title: 'Unlink a screen', at: () => dev('iphone').el?.querySelector('[data-a=link]'), wait: 3000,
+    text: 'The chain icon unlinks a screen. The Desktop scrolls to <b>Customer stories</b> and the unlinked iPhone stays where it was.',
+    run: async t => {
+      requestPlayback(false);
+      $('#panel').hidden = true;
+      if (!await t.click(() => dev('iphone').el.querySelector('[data-a=link]'))) return;
+      setDeviceLink(dev('iphone'), false);
+      if (!await t.nap(500)) return;
+      t.focus(() => dev('iphone').el);
+      tourBadge(dev('iphone'), 'unlinked: stays put', 'miss');
+      await tourScroll(t, 'desktop', '#stories');
+    }
   },
-  { t: 'Linking it again and pressing <b>Align screens</b>. Every linked screen moves to the page and position of the screen used last.', run: () => { setDeviceLink(dev('iphone'), true); alignScreens(); }, wait: 4400, spot: '#alignall' },
-  { t: 'Screens can go anywhere on the wall. Dragging the iPhone by its title bar puts it between the Desktop and the MacBook. The bar under the wall scrolls to screens off to the side.', run: tourPlace, wait: 5200, spot: () => dev('iphone').el },
-  { t: 'Clicking a preview’s percentage sets its own scale. The iPhone is now at 100% of its CSS pixels. <b>Physical size</b> in the same dialog matches a real phone on your monitor.', run: () => { dev('iphone').scaleOverride = 1; relayout(); }, wait: 4800, spot: () => dev('iphone').el?.querySelector('[data-a=scale]') },
   {
-    t: '<b>Grid</b> puts every screen back in the automatic layout, and <b>Lock layout</b> keeps an arrangement in place.',
-    run: () => { dev('iphone').scaleOverride = null; $('#mode [data-v=grid]').click(); cvAllow = Date.now() + 900; cv.scrollTo({ left: 0, behavior: 'smooth' }); },
-    wait: 3600, spot: '#mode [data-v=grid], #lock'
+    title: 'Align screens', at: '#alignall', wait: 3600,
+    text: 'After linking the iPhone again, <b>Align screens</b> brings every linked screen to the page and position of the one used last.',
+    run: async t => {
+      if (!await t.click(() => dev('iphone').el.querySelector('[data-a=link]'))) return;
+      setDeviceLink(dev('iphone'), true);
+      if (!await t.click('#alignall')) return;
+      alignScreens();
+      tourBadge(dev('iphone'), 'aligned', '');
+    }
   },
-  { t: 'The <b>Devices</b> drawer has 83 presets. Searching for “fold” finds the foldables, <b>+ Add custom device</b> saves your own sizes, and <b>×</b> on a preview closes it.', run: () => searchDevices('fold'), wait: 5000, spot: '#device-search' },
-  { t: 'Applying the <b>Bubblegum</b> preset from tweakcn in the <b>Theme</b> drawer. A theme can go on every preview, one preview, or one comparison column.', run: () => { searchDevices(''); return tourTheme(); }, wait: 5400, spot: '#theme-drawer' },
-  { t: '<b>Page steps</b> lays a journey out side by side at one device size. Opening the menu adds Step 2 with the menu open, and Step 1 keeps its own state.', run: tourPageSteps, wait: 5200, spot: '#page-steps' },
-  { t: 'Following <b>Pricing</b> in the menu adds Step 3. Steps can be dragged, rescaled and closed one by one.', run: tourStepLink, wait: 4800 },
-  { t: '<b>Compare sites</b> puts whole device walls side by side, here the overview next to the pricing page. Their scrolling is linked, and the sidebar controls work on both.', run: tourCompare, wait: 6400, spot: '#sites-toggle, #add-site' },
-  { t: '<b>Screenshot</b> and <b>Record</b> save what is on the wall, comparison columns included, as a PNG or a silent WebM.', wait: 4400, spot: '#screenshot, #record' },
   {
-    t: IS_EXT ? 'That is the tour. Keep exploring the demo, or type your own URL in the address bar.' : 'That is the tour. Click around the devices yourself, or install the Chrome extension to open any page.',
-    run: () => { setSitesMode(false); $('#skip').textContent = IS_EXT ? 'Use my own site' : 'Close'; }, wait: 0
+    title: 'Free placement', at: () => dev('iphone').el, wait: 3200,
+    text: 'Drag a screen by its title bar to put it anywhere, here the iPhone between the Desktop and the MacBook. The bar under the wall scrolls sideways.',
+    run: tourPlace
+  },
+  {
+    title: 'Preview scale', at: () => dev('iphone').el?.querySelector('[data-a=scale]'), wait: 4000,
+    text: 'Click a preview’s percentage to set its own scale, here 100% of its CSS pixels. <b>Physical size</b> in the same dialog matches a real phone on your monitor.',
+    run: async t => {
+      if (!await t.click(() => dev('iphone').el.querySelector('[data-a=scale]'))) return;
+      dev('iphone').scaleOverride = 1;
+      relayout();
+    }
+  },
+  {
+    title: 'Back to the grid', at: '#mode', wait: 3000,
+    text: '<b>Grid</b> returns every screen to the automatic layout. <b>Lock layout</b>, lower in this drawer, keeps an arrangement in place.',
+    run: async t => {
+      if (!await t.click('#mode [data-v=grid]')) return;
+      dev('iphone').scaleOverride = null;
+      $('#mode [data-v=grid]').click();
+      await scrollWall(0, 0);
+    }
+  },
+  {
+    title: 'Device catalog', at: '#device-search', wait: 4000,
+    text: 'The <b>Devices</b> drawer holds 83 presets. Search by name or size, here “fold” for the foldables, or add a custom device of your own.',
+    run: async t => {
+      if (!await t.click('#device-search')) return;
+      for (const text of ['f', 'fo', 'fol', 'fold']) {
+        searchDevices(text);
+        if (!await t.nap(140)) return;
+      }
+    }
+  },
+  {
+    title: 'Themes', at: '#theme-preset', wait: 4600,
+    text: 'Pick a <b>tweakcn</b> preset and it is applied to the previews, here Bubblegum. A theme can go on every preview, one preview, or one comparison column.',
+    run: async t => {
+      searchDevices('');
+      if (!await t.click('#theme-preset')) return;
+      await tourTheme();
+    }
+  },
+  {
+    title: 'Page steps', at: '.page-steps-option', wait: 3600,
+    text: '<b>Page steps</b> lays a journey out side by side at one device size. Opening the menu in Step 1 adds Step 2 with the menu open.',
+    run: tourPageSteps
+  },
+  {
+    title: 'Follow a link', at: () => pageScreens[1]?.el, wait: 4000,
+    text: 'Following <b>Pricing</b> in Step 2 adds Step 3. Earlier steps keep their own state, and each step can be dragged, rescaled or closed.',
+    run: tourStepLink
+  },
+  {
+    title: 'Compare sites', at: '#sites-toggle', side: 'below', wait: 5200,
+    text: '<b>Compare sites</b> puts whole device walls side by side, each with its own address bar. Here the overview is next to the pricing page, with linked scrolling.',
+    run: async t => {
+      if (!await t.click('#sites-toggle')) return;
+      tourCompare();
+      if (await t.nap(900)) t.focus(() => sitePanels[1]?.el.querySelector('.site-address'), 'below');
+    }
+  },
+  {
+    title: 'Screenshot and Record', at: '.capture-actions', wait: 2600,
+    text: '<b>Screenshot</b> saves what is on the wall as a PNG, and <b>Record</b> as a silent video. Both include comparison columns and annotations.',
+    run: async t => { if (await t.point('#screenshot') && await t.nap(1100)) await t.point('#record'); }
+  },
+  {
+    title: 'That is the tour', wait: 0,
+    text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
+    run: () => {
+      setSitesMode(false);
+      scrollWall(0, 0);
+      tourPointer.hidden = true;
+      $('#tourpause').hidden = true;
+      $('#skip').textContent = IS_EXT ? 'Use my own site' : 'Close';
+    }
   }
 ];
+
+function showStep(i) {
+  const step = STEPS[i];
+  $('#tourcount').textContent = (i + 1) + ' / ' + STEPS.length;
+  $('#tourname').textContent = $('#tourtitle').textContent = step.title;
+  $('#tourtext').innerHTML = step.text;
+  document.querySelectorAll('#tourdots i').forEach((dot, k) => { dot.classList.toggle('on', k < i); dot.classList.toggle('now', k === i); });
+}
+
+function setTourPaused(paused) {
+  tourPaused = paused;
+  const button = $('#tourpause');
+  button.textContent = paused ? 'Resume' : 'Pause';
+  button.setAttribute('aria-pressed', String(paused));
+  $('#tour').classList.toggle('paused', paused);
+}
 
 async function startTour() {
   setSitesMode(false);
@@ -1264,27 +1597,54 @@ async function startTour() {
   unpinScreens();
   DEVICES.forEach(d => Object.assign(d, { on: !!d.starter, rot: false, linked: true, scaleOverride: null, physicalScale: null }));
   refreshViews();
-  const id = ++tour; $('#tour').hidden = false; $('#skip').textContent = 'Skip demo';
-  $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join(''); $('#tourtext').textContent = 'Loading the demo site on every device…';
+  const id = ++tour;
+  tourRunning = true;
+  setTourPaused(false);
+  tourPointer.hidden = true;
+  tourPointer.className = 'tour-cursor';
+  $('#tour').hidden = $('#tour-callout').hidden = $('#tourpause').hidden = false;
+  $('#skip').textContent = 'Skip demo';
+  $('#tourcount').textContent = '';
+  $('#tourname').textContent = $('#tourtitle').textContent = 'Guided demo';
+  $('#tourtext').textContent = 'Loading the sample site on every screen…';
+  $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join('');
+  tourFocus(null);
+  clearInterval(tourWatch);
+  tourWatch = setInterval(placeTour, 120); // the wall scrolls and screens move, so the ring and the message keep up
   renderLeft(); setMode('grid'); $('#panel').hidden = true;
   $('#src').value = ''; await open(DEMO_URL);
   await until(id, () => target && active().length && active().every(d => d.ready), 15000);
-  await sleep(1400);
+  if (!await nap(id, 1200)) return;
+  const t = {
+    ok: () => touring(id), nap: ms => nap(id, ms), until: (ready, ms) => until(id, ready, ms),
+    point: target => tourPoint(id, target), click: target => tourClick(id, target), focus: tourFocus
+  };
   for (let i = 0; i < STEPS.length; i++) {
+    const step = STEPS[i];
+    await tourReveal(id, step.at);
     if (!touring(id)) return;
-    $('#tourtext').innerHTML = STEPS[i].t; document.querySelectorAll('#tourdots i').forEach((x, k) => x.classList.toggle('on', k <= i));
-    spotlight(STEPS[i].spot);
-    await sleep(900); if (!touring(id)) return;
-    await STEPS[i].run?.(id);
-    if (!touring(id)) return;
-    await sleep(STEPS[i].wait);
+    showStep(i);
+    tourFocus(step.at, step.side);
+    // Time to read the message before the pointer moves.
+    if (!await nap(id, Math.min(3000, 900 + step.text.split(' ').length * 70))) return;
+    await step.run?.(t);
+    if (!await nap(id, step.wait)) return;
   }
-  spotlight(null);
+  tourFocus(null);
+  tourRunning = false;
 }
 function endTour(clear) {
-  tour++; $('#tour').hidden = true; spotlight(null);
+  tour++;
+  tourRunning = false;
+  setTourPaused(false);
+  clearInterval(tourWatch);
+  tourAnchor = null;
+  $('#tour').hidden = $('#tour-callout').hidden = $('#tour-ring').hidden = tourPointer.hidden = true;
+  $('#frames').classList.remove('tour-glide');
+  document.querySelectorAll('.tour-badge').forEach(badge => badge.remove());
   if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
 }
+$('#tourpause').onclick = () => setTourPaused(!tourPaused);
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with
 $('#demo').onclick = $('#watch').onclick = startTour;
 $('#own').onclick = () => { if (IS_EXT) $('#src').focus(); else window.open(REPO + '#install', '_blank', 'noopener'); };
@@ -1509,6 +1869,7 @@ function startEntry(id, device, message) {
     heading.textContent = message.kind === 'swipe' ? reportName(device) + ' · swipe' : reportName(device) + ' · click ' + name;
   }
   entry.appendChild(heading);
+  if (device && message.kind === 'click') tourBadge(device, device.touch ? 'tapped here' : 'clicked here', 'lead');
   box.prepend(entry);
   entries.set(id, entry);
   if (entries.size > 80) {
@@ -1525,6 +1886,7 @@ function addResult(message, device) {
     playing: 'playing', paused: 'paused', muted: 'playing muted', blocked: 'blocked by Chrome', 'no-video': 'no video', unavailable: 'unavailable'
   };
   if (!entry || !Object.hasOwn(labels, message.status)) return;
+  tourBadge(device, TOUR_BADGES[message.status] || labels[message.status], Object.hasOwn(TOUR_BADGES, message.status) ? '' : 'miss');
   const row = document.createElement('div');
   row.className = 'r';
   const name = document.createElement('b');

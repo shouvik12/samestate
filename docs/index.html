@@ -218,9 +218,12 @@
   </div>
 
   <div class="tour" id="tour" hidden>
-    <div class="tour-top"><span class="tour-tag">Demo</span><span class="dots" id="tourdots"></span><button id="skip">Skip demo</button></div>
-    <p id="tourtext"></p>
+    <div class="tour-top"><span class="tour-tag">Demo</span><span id="tourcount"></span><b id="tourname"></b><button id="tourpause" type="button" aria-pressed="false">Pause</button><button id="skip" type="button">Skip demo</button></div>
+    <div class="dots" id="tourdots"></div>
   </div>
+  <div class="tour-ring" id="tour-ring" hidden aria-hidden="true"></div>
+  <div class="tour-callout" id="tour-callout" role="status" hidden><b id="tourtitle"></b><p id="tourtext"></p></div>
+  <div class="tour-cursor" id="tour-cursor" hidden aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 2l14 11h-7.2l-2.9 7.5z" fill="#fff" stroke="#10182b" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="tap"></span><span class="ripple"></span><span class="wheel"></span></div>
   <aside class="right" id="panel" hidden>
     <div class="tabs"><button data-tab="diff" class="on">Differences</button><button data-tab="log">Sync log</button><button id="closepanel" title="Close">✕</button></div>
     <div class="pane" id="pane-diff">

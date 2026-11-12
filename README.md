@@ -59,7 +59,7 @@ Samestate is a Chrome extension. No server and no terminal.
 Click the Samestate icon to open the preview tab. It starts with `claude.com` on every screen. To preview
 another site, enter its address and grant Chrome access to that site. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
-Page steps and Compare sites.
+Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.
 
 ## Choose devices and options
 
@@ -167,6 +167,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Demo tour pointer** — a pointer performs each demo action, with the explanation beside the control and a result label on every preview ([details](changelogs/CHANGELOG-demo-tour-pointer.md)) |
 | **2026-11-13** | 00:48:00 +09:00 | `4fc0889` | **Demo tour features** — the guided demo now shows every feature added since the first release, pointing at each control it uses ([details](changelogs/CHANGELOG-demo-tour-features.md)) |
 | **2026-11-12** | 23:50:19 +09:00 | `af3e2d3` | **Preview themes** — pick a named tweakcn preset to apply it automatically to previews ([details](changelogs/CHANGELOG-preview-themes.md)) |
 | **2026-11-12** | 23:13:07 +09:00 | `628629b` | **Preview annotations** — add notes, drawings, lines, and arrows to any preview ([details](changelogs/CHANGELOG-preview-annotations.md)) |
