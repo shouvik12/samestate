@@ -1,4 +1,4 @@
-// Only the origin selected in a Samestate tab can be framed and inspected.
+// Only explicitly opened origins can be framed and connect preview agents in a Samestate tab.
 const APP = chrome.runtime.getURL('app.html');
 const previewKey = tabId => 'preview-origin-' + tabId;
 const HEADERS = ['x-frame-options', 'content-security-policy', 'content-security-policy-report-only', 'cross-origin-opener-policy', 'cross-origin-embedder-policy', 'cross-origin-resource-policy'];
@@ -8,17 +8,19 @@ async function unregister(tabId) {
   await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
 }
 
-async function register(tabId, origin) {
-  await unregister(tabId);
-  if (origin === null) return;
+async function register(tabId, origin, sites) {
+  const origins = [...new Set([...(origin === null ? [] : [origin]), ...sites])];
+  if (!origins.length) return unregister(tabId);
+  const permissions = origins.map(value => {
+    const url = new URL(value);
+    if (url.origin !== value || !['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid preview origin');
+    return `${url.protocol}//${url.hostname}/*`;
+  });
+  if (!await chrome.permissions.contains({ origins: permissions })) throw new Error('Missing preview permission');
 
-  const url = new URL(origin);
-  if (url.origin !== origin || !['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid preview origin');
-  const allowed = await chrome.permissions.contains({ origins: [url.protocol + '//' + url.hostname + '/*'] });
-  if (!allowed) throw new Error('Missing preview permission');
-
-  const escaped = origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = origins.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [tabId],
     addRules: [{
       id: tabId,
       priority: 1,
@@ -29,12 +31,12 @@ async function register(tabId, origin) {
       condition: {
         tabIds: [tabId],
         resourceTypes: ['sub_frame'],
-        regexFilter: '^' + escaped + '/',
+        regexFilter: '^(?:' + escaped.join('|') + ')/',
         isUrlFilterCaseSensitive: true
       }
     }]
   });
-  await chrome.storage.session.set({ [previewKey(tabId)]: origin });
+  await chrome.storage.session.set({ [previewKey(tabId)]: { origin, origins } });
 }
 
 chrome.action.onClicked.addListener(tab => {
@@ -43,7 +45,7 @@ chrome.action.onClicked.addListener(tab => {
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type !== 'register' || sender.frameId !== 0 || sender.url !== APP || !sender.tab) return;
-  register(sender.tab.id, message.origin).then(() => reply({ ok: true }), () => reply({ ok: false }));
+  register(sender.tab.id, message.origin, message.sites || []).then(() => reply({ ok: true }), () => reply({ ok: false }));
   return true;
 });
 
@@ -58,10 +60,10 @@ function takeStart(details) {
   return url;
 }
 
-function reportRedirect(details, origin, from) {
+function reportRedirect(details, origins, from) {
   let start, end;
   try { start = new URL(from); end = new URL(details.url); } catch { return; }
-  if (start.origin !== origin || end.origin === origin || !['http:', 'https:'].includes(end.protocol)) return;
+  if (!origins.includes(start.origin) || end.origin === start.origin || !['http:', 'https:'].includes(end.protocol)) return;
   chrome.runtime.sendMessage({ type: 'redirected', tabId: details.tabId, from, url: end.href }).catch(() => {});
 }
 
@@ -74,24 +76,22 @@ chrome.webNavigation.onErrorOccurred.addListener(async details => {
   const from = takeStart(details);
   if (!from || details.parentFrameId !== 0) return;
   const key = previewKey(details.tabId);
-  const { [key]: origin } = await chrome.storage.session.get(key);
-  if (origin) reportRedirect(details, origin, from);
+  const { [key]: preview } = await chrome.storage.session.get(key);
+  if (preview) reportRedirect(details, preview.origins, from);
 });
 
 chrome.webNavigation.onCommitted.addListener(async details => {
   const from = takeStart(details);
   if (details.frameId !== 0 && details.parentFrameId !== 0) return;
   const key = previewKey(details.tabId);
-  const { [key]: origin } = await chrome.storage.session.get(key);
-  if (!origin) return;
+  const { [key]: preview } = await chrome.storage.session.get(key);
+  if (!preview) return;
   if (details.frameId === 0) {
     if (details.url !== APP) await unregister(details.tabId).catch(() => {});
     return;
   }
-  if (new URL(details.url).origin !== origin) {
-    if (from) reportRedirect(details, origin, from);
-    return;
-  }
+  if (from) reportRedirect(details, preview.origins, from);
+  if (!preview.origins.includes(new URL(details.url).origin)) return;
 
   try {
     await chrome.scripting.executeScript({

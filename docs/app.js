@@ -2,7 +2,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function previewDevice(preset, slot) {
-  return { ...preset, slot, touch: preset.kind !== 'desktop', on: !!preset.starter, ready: false, rot: false, linked: true, x: null, y: null };
+  return { ...preset, slot, touch: preset.kind !== 'desktop', on: !!preset.starter, ready: false, rot: false, linked: true, scaleOverride: null, physicalScale: null, x: null, y: null };
 }
 const DEVICES = [...DEVICE_PRESETS, ...loadCustomDevices()].map(previewDevice);
 let nextDeviceSlot = DEVICES.length;
@@ -18,10 +18,17 @@ let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', fo
 let textSalt = null, wallRevision = 0;
 let videoRequest = null;
 const active = () => viewScreens().filter(d => d.el);
+const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
+const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
+const connectedScreens = () => [...allScreens(), ...sitePanels.flatMap(site => site.devices)];
+const previewOrigin = device => device.site ? device.site.url?.origin : target;
+const CALIBRATION_WIDTH = 160;
+const PREVIEW_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads';
+let calibrationWidthMm = null;
 function post(device, type, data) {
-  if (!device?.iframe || !target) return;
+  if (!device?.iframe || !previewOrigin(device)) return;
   const message = { __samestateShell: 1, type, ...data };
-  if (target === EXT) device.iframe.contentWindow.postMessage(message, EXT);
+  if (previewOrigin(device) === EXT) device.iframe.contentWindow.postMessage(message, EXT);
   else device.port?.postMessage(message);
 }
 
@@ -29,7 +36,7 @@ function post(device, type, data) {
 function updateReference() {
   const reference = $('#ref');
   const selection = reference.value;
-  const selected = viewScreens();
+  const selected = sitesMode ? [...new Map(workspaceScreens().map(d => [d.id, d])).values()] : viewScreens();
   reference.replaceChildren(...selected.map(d => new Option(screenName(d), d.id)));
   reference.disabled = selected.length === 0;
   if (selected.some(d => d.id === selection)) reference.value = selection;
@@ -60,6 +67,7 @@ function deviceChrome(preset, landscape) {
 }
 
 function screenName(d) {
+  if (d.site) return sameDevice ? d.name + ' · ' + presetFor(d).name : d.name;
   if (d.step) return 'Step ' + d.step + ' · ' + presetFor(d).name;
   if (sameDevice) return 'Screen ' + (viewScreens().indexOf(d) + 1) + ' · ' + presetFor(d).name;
   return d.name;
@@ -68,6 +76,10 @@ function screenName(d) {
 function size(d) {
   const { w, h, kind } = presetFor(d);
   return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
+}
+
+function physicalSetting(d, preset) {
+  return d.physicalScale?.presetId === preset.id ? d.physicalScale : null;
 }
 
 function layout(d) {
@@ -80,33 +92,55 @@ function layout(d) {
     d.el.classList.add(...[preset.kind, preset.os, preset.frame, preset.notch && 'notch'].filter(Boolean));
     d.top.innerHTML = chrome.top;
     d.bottom.innerHTML = chrome.bottom;
-    const address = d.top.querySelector('.addr');
-    if (address) address.textContent = d.step ? new URL(d.pageUrl).pathname : target === EXT ? 'tidepool.demo' : new URL(target).host;
     d.touch = preset.kind !== 'desktop';
     d.el.querySelector('[data-a=rot]').hidden = !d.touch;
     d.chromeId = preset.id;
     if (d.ready) configure(d);
   }
-  d.el.querySelector('.dev-name').textContent = screenName(d);
-  d.iframe.title = screenName(d) + ' preview';
+  const address = d.top.querySelector('.addr');
+  if (address) address.textContent = d.site ? (d.site.url.origin === EXT ? 'tidepool.demo' : d.site.url.host) : d.step ? new URL(d.pageUrl).pathname : target === EXT ? 'tidepool.demo' : new URL(target).host;
+  const name = screenName(d);
+  d.el.querySelector('.dev-name').textContent = name;
+  d.iframe.title = name + ' preview';
   d.el.classList.toggle('landscape', w > h);
-  let scale = preset.scale * zoom;
-  const height = h + chrome.extra;
-  if (mode === 'focus') {
+  const physical = physicalSetting(d, preset);
+  const pixelsPerMm = physical ? CALIBRATION_WIDTH / calibrationWidthMm : 0;
+  d.el.classList.toggle('physical-preview', !!physical);
+  let scale = physical ? physical.mmPerViewportPx * pixelsPerMm : d.scaleOverride ?? preset.scale * zoom;
+  const height = physical ? h : h + chrome.extra;
+  if (d.site && !physical && d.scaleOverride === null) {
+    const panelWidth = Math.max(1, d.site.preview.clientWidth - 58);
+    scale = mode === 'focus'
+      ? Math.min(panelWidth / w, Math.max(1, d.site.preview.clientHeight - 78) / height, 1.2)
+      : Math.min(scale, panelWidth / w);
+  } else if (!d.site && mode === 'focus' && !physical && d.scaleOverride === null) {
     const canvas = $('#canvas');
     scale = Math.min(Math.max(1, canvas.clientWidth - 80) / w, Math.max(1, canvas.clientHeight - 90) / height, 1.2);
   }
   d.body.style.width = w * scale + 'px';
   d.body.style.height = height * scale + 'px';
   d.body.style.boxSizing = 'content-box';
+  if (physical && preset.physical) {
+    const { bodyWidth, bodyHeight } = preset.physical;
+    const [widthMm, heightMm] = d.rot ? [bodyHeight, bodyWidth] : [bodyWidth, bodyHeight];
+    const vertical = Math.max(0, (heightMm * pixelsPerMm - h * scale) / 2);
+    const horizontal = Math.max(0, (widthMm * pixelsPerMm - w * scale) / 2);
+    d.body.style.padding = `${vertical}px ${horizontal}px`;
+  } else d.body.style.padding = '';
   d.scaled.style.width = w + 'px';
   d.scaled.style.transform = 'scale(' + scale + ')';
   d.iframe.style.width = w + 'px';
   d.iframe.style.height = h + 'px';
-  d.el.querySelector('.dims').textContent = '(' + w + ' × ' + h + ') ' + Math.round(scale * 100) + '%';
+  d.el.querySelector('.viewport-size').textContent = '(' + w + ' × ' + h + ')';
+  const scaleButton = d.el.querySelector('[data-a=scale]');
+  const percent = Math.round(scale * 100) + '%';
+  scaleButton.textContent = percent;
+  scaleButton.title = physical ? 'Calibrated physical size · Change preview scale' : 'Change preview scale';
+  scaleButton.setAttribute('aria-label', 'Change preview scale for ' + name + ', currently ' + percent + (physical ? ' at calibrated physical size' : ''));
 }
 
 function relayout() {
+  if (sitesMode) { sitePanels.forEach(fitSite); return; }
   if (typeof cvAllow !== 'undefined') cvAllow = Date.now() + 300;
   const f = $('#frames');
   f.className = 'frames ' + mode;
@@ -123,11 +157,18 @@ function relayout() {
   applyArrangement();
 }
 
+function setPreviewSource(frame, url) {
+  if (url.origin === EXT) frame.removeAttribute('sandbox');
+  else frame.setAttribute('sandbox', PREVIEW_SANDBOX);
+  frame.credentialless = url.origin !== EXT;
+  frame.src = url.href;
+}
+
 function addFrame(d) {
   const el = document.createElement('div');
   const closeLabel = d.step ? 'Close this step' : 'Close this preview';
   el.className = 'dev' + (d.linked ? '' : ' unlinked');
-  el.innerHTML = `<div class="dev-head"><i class="dot"></i><b class="dev-name"></b><span class="dims"></span><span class="sp"></span><button data-a="link" title="Toggle screen link"${d.step ? ' hidden' : ''}>${IC.link}</button><button data-a="rot" title="Rotate">${IC.rot}</button><button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button><button type="button" data-a="close" title="${closeLabel}" aria-label="${closeLabel}">×</button></div><div class="dev-body"><div class="scaled"><div class="device-top"></div><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads" allow="autoplay; clipboard-write"></iframe><div class="device-bottom"></div></div></div>`;
+  el.innerHTML = `<div class="dev-head"><i class="dot"></i><b class="dev-name"></b><span class="dims"><span class="viewport-size" title="Page viewport in CSS pixels"></span><button type="button" data-a="scale" class="preview-scale-button" aria-haspopup="dialog" title="Change preview scale"></button></span><span class="sp"></span><button data-a="link" title="Toggle screen link"${d.step ? ' hidden' : ''}>${IC.link}</button><button data-a="rot" title="Rotate">${IC.rot}</button><button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button><button type="button" data-a="close" title="${closeLabel}" aria-label="${closeLabel}">×</button></div><div class="dev-body"><div class="scaled"><div class="device-top"></div><iframe sandbox="${PREVIEW_SANDBOX}" allow="autoplay; clipboard-write"></iframe><div class="device-bottom"></div></div></div>`;
   d.el = el;
   d.body = el.querySelector('.dev-body');
   d.scaled = el.querySelector('.scaled');
@@ -138,16 +179,23 @@ function addFrame(d) {
   el.querySelector('.dev-head').addEventListener('click', event => {
     const button = event.target.closest('button');
     const action = button?.dataset.a;
-    if (action === 'rot') { d.rot = !d.rot; layout(d); fitWall(); }
+    if (action === 'scale') editPreviewScale(d, button);
+    if (action === 'rot') { d.rot = !d.rot; layout(d); fitWall(d.site); }
     if (action === 'rel') post(d, 'reload');
     if (action === 'link') {
       d.linked = !d.linked;
       el.classList.toggle('unlinked', !d.linked);
       button.title = d.linked ? 'Linked: this screen follows the others. Click to unlink.' : 'Unlinked: this screen moves on its own. Click to link.';
     }
-    if (action === 'foc') { focusDev = d; setMode(mode === 'focus' ? 'grid' : 'focus'); }
+    if (action === 'foc') {
+      if (d.site) for (const site of sitePanels) site.focusDev = site.devices.find(device => device.id === d.id);
+      else focusDev = d;
+      setMode(mode === 'focus' ? 'grid' : 'focus');
+      if (d.site) updateSiteTools();
+    }
     if (action === 'close') {
-      if (d.step) closePage(d);
+      if (d.site) { d.on = false; removeFrame(d); fitSite(d.site); updateSiteTools(); }
+      else if (d.step) closePage(d);
       else {
         selectDevice(d, false);
         refreshDevicePicker();
@@ -156,12 +204,59 @@ function addFrame(d) {
   });
   arrangeable(d);
   d.token = crypto.randomUUID();
-  if (target !== EXT) d.iframe.credentialless = true;
-  else d.iframe.removeAttribute('sandbox');
-  d.iframe.src = d.pageUrl || previewUrl;
-  const next = allScreens().find(item => item.slot > d.slot && item.el);
-  $('#frames').insertBefore(el, next?.el || null);
+  if (d.site) {
+    setPreviewSource(d.iframe, d.site.url);
+    d.site.frames.append(el);
+  } else {
+    setPreviewSource(d.iframe, new URL(d.pageUrl || previewUrl));
+    const next = allScreens().find(item => item.slot > d.slot && item.el);
+    $('#frames').insertBefore(el, next?.el || null);
+  }
 }
+
+const scaleDialog = $('#preview-scale');
+const scaleInput = $('#preview-scale-value');
+const physicalSettings = $('#physical-size-settings');
+const calibrationInput = $('#physical-calibration-mm');
+const screenWidthInput = $('#physical-screen-mm');
+$('#physical-calibration-line').style.width = CALIBRATION_WIDTH + 'px';
+let scaleDevice = null;
+
+function editPreviewScale(d, button) {
+  scaleDevice = d;
+  scaleDialog.returnValue = '';
+  $('#preview-scale-title').textContent = screenName(d);
+  scaleInput.value = Math.max(1, Number.parseInt(button.textContent, 10));
+  const preset = presetFor(d);
+  const physical = physicalSetting(d, preset);
+  const mmPerViewportPx = preset.physical ? preset.physical.screenWidth / preset.w : physical?.mmPerViewportPx;
+  physicalSettings.open = !!physical;
+  calibrationInput.value = calibrationWidthMm ?? '';
+  screenWidthInput.value = mmPerViewportPx ? (mmPerViewportPx * size(d).w).toFixed(1) : '';
+  screenWidthInput.readOnly = !!preset.physical;
+  $('#physical-size-note').textContent = preset.physical
+    ? 'Uses this model’s screen and body dimensions.'
+    : 'Enter the device’s display width in this orientation, excluding the bezel.';
+  scaleDialog.showModal();
+  scaleInput.select();
+}
+
+scaleDialog.addEventListener('close', () => {
+  const choice = scaleDialog.returnValue;
+  if (scaleDevice?.el && choice === 'physical') {
+    const preset = presetFor(scaleDevice);
+    const mmPerViewportPx = preset.physical ? preset.physical.screenWidth / preset.w : screenWidthInput.valueAsNumber / size(scaleDevice).w;
+    calibrationWidthMm = calibrationInput.valueAsNumber;
+    scaleDevice.scaleOverride = null;
+    scaleDevice.physicalScale = { presetId: preset.id, mmPerViewportPx };
+    relayout();
+  } else if (scaleDevice?.el && ['apply', '100', 'auto'].includes(choice)) {
+    scaleDevice.physicalScale = null;
+    scaleDevice.scaleOverride = choice === 'apply' ? scaleInput.valueAsNumber / 100 : choice === '100' ? 1 : null;
+    relayout();
+  }
+  scaleDevice = null;
+});
 
 function removeFrame(d) {
   pendingAlign.delete(d);
@@ -177,13 +272,17 @@ function updateWall() {
   wallRevision++;
   videoRequest = null;
   $('#video-status').textContent = '';
-  $('#match-text').disabled = !target;
+  $('#match-text').disabled = sitesMode ? !workspaceScreens().length : !target;
   $('#empty').style.display = target ? 'none' : '';
   $('#wall-empty').textContent = pageSteps ? 'Enter a page address to add a step.' : 'Select devices in the sidebar to preview this site.';
   $('#wall-empty').hidden = !target || active().length > 0;
   if (IS_EXT) $('#src').placeholder = pageSteps && target ? 'Enter a site or /path' : 'https://your-site.com   ·   localhost:3000';
   $('#detect span').textContent = 'Detect differences';
   relayout();
+  if (sitesMode) {
+    updateReference();
+    $('#match-text').disabled = !workspaceScreens().length;
+  }
   $('#frames').dispatchEvent(new Event('wall-view-changed'));
 }
 
@@ -213,15 +312,18 @@ function selectDevice(d, selected) {
   updateWall();
 }
 
-function fillSharedDevices() {
-  const picker = $('#shared-device');
-  const groups = Object.entries(DEVICE_GROUPS).map(([id, label]) => {
+function deviceOptions() {
+  return Object.entries(DEVICE_GROUPS).map(([id, label]) => {
     const group = document.createElement('optgroup');
     group.label = label;
     group.append(...DEVICES.filter(d => d.group === id).map(d => new Option(d.name, d.id)));
     return group;
-  });
-  picker.replaceChildren(...groups.filter(group => group.childElementCount));
+  }).filter(group => group.childElementCount);
+}
+
+function fillSharedDevices() {
+  const picker = $('#shared-device');
+  picker.replaceChildren(...deviceOptions());
   if (!DEVICES.some(d => d.id === sharedDeviceId)) sharedDeviceId = 'iphone';
   picker.value = sharedDeviceId;
 }
@@ -236,14 +338,16 @@ function addPage(url, actions = []) {
 }
 
 function refreshViews() {
+  const journeyView = pageSteps && !sitesMode;
   $('#device-sizes').value = sameDevice ? 'same' : 'different';
-  $('#device-sizes').disabled = pageSteps;
-  if (pageSteps) $('#device-sizes').value = 'same';
-  $('#shared-device-row').hidden = !sameDevice && !pageSteps;
-  $('#page-steps').checked = pageSteps;
-  $('#page-steps-help').hidden = !pageSteps;
-  $('#alignall').disabled = pageSteps;
-  document.querySelectorAll('#synclist input').forEach(input => { input.disabled = pageSteps; });
+  $('#device-sizes').disabled = journeyView;
+  if (journeyView) $('#device-sizes').value = 'same';
+  $('#shared-device-row').hidden = !sameDevice && !journeyView;
+  $('#page-steps').checked = journeyView;
+  $('#page-steps').title = sitesMode ? 'Open Page steps on the device wall' : '';
+  $('#page-steps-help').hidden = !journeyView;
+  $('#alignall').disabled = pageSteps && !sitesMode;
+  document.querySelectorAll('#synclist input').forEach(input => { input.disabled = pageSteps && !sitesMode; });
   if (!active().includes(leader)) setLeader(active().find(d => d.ready) || null);
   updateReference();
   findings = [];
@@ -266,8 +370,7 @@ function openPage(address, source, action) {
   const status = $('#page-steps-status');
   let url;
   try { url = new URL(address, previewUrl); } catch { url = null; }
-  const demoPath = new URL('./demo/', location.href).pathname;
-  if (!url || url.origin !== target || url.username || url.password || (target === EXT && !url.pathname.startsWith(demoPath))) {
+  if (!url || url.origin !== target || url.username || url.password || (target === EXT && !url.pathname.startsWith(DEMO_PATH))) {
     status.textContent = 'Choose a page on the current site.';
     return;
   }
@@ -293,10 +396,14 @@ $('#device-sizes').addEventListener('change', event => {
 });
 $('#shared-device').addEventListener('change', event => {
   sharedDeviceId = event.target.value;
-  for (const d of allScreens()) if (sameDevice || d.step) d.rot = false;
+  for (const d of connectedScreens()) if (sameDevice || d.step) d.rot = false;
   refreshViews();
 });
-$('#page-steps').addEventListener('change', event => setPageSteps(event.target.checked));
+$('#page-steps').addEventListener('change', event => {
+  const enabled = event.target.checked;
+  if (sitesMode) setSitesMode(false);
+  setPageSteps(enabled);
+});
 
 /* ---------------------------- arranging the wall ---------------------------- */
 // Screens can be dragged by their title bar to any place on the wall. The first drag pins every screen where
@@ -307,7 +414,9 @@ const SNAP = 10, WALL_PAD = 40;
 const freePlacement = { devices: false, steps: false };
 let layoutLocked = false, drag = null, topZ = 1;
 const currentWall = () => pageSteps ? 'steps' : 'devices';
-const freelyPlaced = () => freePlacement[currentWall()] && mode !== 'focus';
+const freelyPlaced = site => mode !== 'focus' && (site ? site.freePlacement === true : freePlacement[currentWall()]);
+const arrangementFrames = site => site ? site.frames : $('#frames');
+const arrangementScreens = site => site ? siteScreens(site) : active();
 const snap = v => Math.max(0, Math.round(v / SNAP) * SNAP);
 // Where a dragged screen lands: its start position plus the pointer movement, snapped and kept on the wall.
 function dragTarget(start, from, to) {
@@ -324,40 +433,46 @@ function nextFreeSpot(boxes) {
   return { x: boxes.length ? snap(Math.max(...boxes.map(b => b.x + b.w)) + 30) : 26, y: 22 };
 }
 const boxOf = d => ({ x: d.x, y: d.y, w: d.el.offsetWidth, h: d.el.offsetHeight });
-function fitWall() {
-  const f = $('#frames');
-  if (!freelyPlaced()) { f.style.width = f.style.height = ''; return; }
-  const placed = active().filter(d => d.x != null), { w, h } = wallSize(placed.map(boxOf));
+function fitWall(site) {
+  const f = arrangementFrames(site);
+  if (!freelyPlaced(site)) { f.style.width = f.style.height = ''; return; }
+  const placed = arrangementScreens(site).filter(d => d.x != null), { w, h } = wallSize(placed.map(boxOf));
   f.style.width = w + 'px'; f.style.height = h + 'px';
 }
-function placeScreens() {
-  const free = freelyPlaced();
-  for (const d of active()) {
-    if (free && d.x == null) Object.assign(d, nextFreeSpot(active().filter(o => o.x != null).map(boxOf)));
+function placeScreens(site) {
+  const free = freelyPlaced(site);
+  const screens = arrangementScreens(site);
+  for (const d of screens) {
+    if (free && d.x == null) Object.assign(d, nextFreeSpot(screens.filter(o => o.x != null).map(boxOf)));
     d.el.style.left = free ? d.x + 'px' : '';
     d.el.style.top = free ? d.y + 'px' : '';
   }
-  fitWall();
+  fitWall(site);
 }
-function pinScreens() { // switch from the automatic layout to free placement, keeping every screen where it is
-  const f = $('#frames'), origin = f.getBoundingClientRect();
-  for (const d of active()) {
+function pinScreens(site) { // switch from the automatic layout to free placement, keeping every screen where it is
+  const f = arrangementFrames(site), origin = f.getBoundingClientRect();
+  for (const d of arrangementScreens(site)) {
     const r = d.el.getBoundingClientRect();
     d.x = Math.round(r.left - origin.left); d.y = Math.round(r.top - origin.top);
   }
-  freePlacement[currentWall()] = true;
+  if (site) site.freePlacement = true;
+  else freePlacement[currentWall()] = true;
   f.classList.add('free');
-  placeScreens();
+  placeScreens(site);
 }
-function unpinScreens() {
-  freePlacement[currentWall()] = false;
-  const screens = pageSteps ? pageScreens : DEVICES;
+function unpinScreens(site) {
+  if (site) site.freePlacement = false;
+  else freePlacement[currentWall()] = false;
+  const screens = site ? site.devices : pageSteps ? pageScreens : DEVICES;
   screens.forEach(d => { d.x = d.y = null; if (d.el) d.el.style.zIndex = ''; });
 }
 function applyArrangement() {
-  $('#frames').classList.toggle('locked', layoutLocked);
-  $('#frames').classList.toggle('free', freelyPlaced());
-  placeScreens();
+  for (const site of sitesMode ? sitePanels : [null]) {
+    const frames = arrangementFrames(site);
+    frames.classList.toggle('locked', layoutLocked);
+    frames.classList.toggle('free', freelyPlaced(site));
+    placeScreens(site);
+  }
   const lock = $('#lock');
   lock.classList.toggle('on', layoutLocked);
   lock.querySelector('span').textContent = layoutLocked ? 'Unlock layout' : 'Lock layout';
@@ -365,27 +480,28 @@ function applyArrangement() {
 }
 function arrangeable(d) {
   const head = d.el.querySelector('.dev-head');
+  const frames = arrangementFrames(d.site);
   head.addEventListener('pointerdown', e => {
     if (layoutLocked || mode === 'focus' || e.button !== 0 || e.target.closest('button')) return;
     e.preventDefault();
-    if (!freelyPlaced()) pinScreens();
+    if (!freelyPlaced(d.site)) pinScreens(d.site);
     drag = { d, id: e.pointerId, from: { x: e.clientX, y: e.clientY }, start: { x: d.x, y: d.y } };
     head.setPointerCapture(e.pointerId);
     d.el.style.zIndex = ++topZ; // the screen being moved stays on top of the ones it passes
     d.el.classList.add('dragging');
-    $('#frames').classList.add('arranging'); // preview pages must not catch the pointer mid-drag
+    frames.classList.add('arranging'); // preview pages must not catch the pointer mid-drag
   });
   head.addEventListener('pointermove', e => {
     if (drag?.d !== d || e.pointerId !== drag.id) return;
     Object.assign(d, dragTarget(drag.start, drag.from, { x: e.clientX, y: e.clientY }));
     d.el.style.left = d.x + 'px'; d.el.style.top = d.y + 'px';
-    fitWall();
+    fitWall(d.site);
   });
   const end = e => {
     if (drag?.d !== d || e.pointerId !== drag.id) return;
     drag = null;
     d.el.classList.remove('dragging');
-    $('#frames').classList.remove('arranging');
+    frames.classList.remove('arranging');
   };
   head.addEventListener('pointerup', end);
   head.addEventListener('pointercancel', end);
@@ -398,19 +514,29 @@ function setZoom(v) {
   zoom = v / 100;
   $('#zoom').value = v;
   $('#zoomv').textContent = v + '%';
-  active().forEach(layout);
-  fitWall();
+  if (sitesMode) sitePanels.forEach(fitSite);
+  else { active().forEach(layout); fitWall(); }
 }
 $('#zoom').addEventListener('input', e => setZoom(+e.target.value));
 $('#mode').addEventListener('click', event => {
   const button = event.target.closest('button');
   if (!button) return;
-  if (freePlacement[currentWall()] && button.dataset.v !== 'focus') unpinScreens();
+  if (button.dataset.v !== 'focus') {
+    if (sitesMode) sitePanels.forEach(unpinScreens);
+    else if (freePlacement[currentWall()]) unpinScreens();
+  }
   setMode(button.dataset.v);
+  if (sitesMode) updateSiteTools();
 });
-$('#align').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; document.querySelectorAll('#align button').forEach(x => x.classList.toggle('on', x === b)); $('#frames').style.alignItems = b.dataset.v; });
+$('#align').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  document.querySelectorAll('#align button').forEach(x => x.classList.toggle('on', x === b));
+  $('#frames').style.alignItems = b.dataset.v;
+  for (const site of sitePanels) site.frames.style.alignItems = b.dataset.v;
+});
 function setOrientation(landscape) {
-  for (const d of active()) {
+  for (const d of workspaceScreens()) {
     const { w, h, kind } = presetFor(d);
     if (kind !== 'desktop') d.rot = landscape ? w < h : w > h;
   }
@@ -476,15 +602,25 @@ cv.addEventListener('scroll', () => {
 const IS_EXT = typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id);
 const EXT = location.origin;
 const DEMO_URL = new URL('./demo/index.html', location.href);
+const DEMO_PATH = new URL('./demo/', location.href).pathname;
 const REPO = 'https://github.com/shouvik12/samestate';
 let openId = 0, openingId = 0;
 let registration = Promise.resolve();
+let registeredWallOrigin = null;
+let registeredSites = new Map();
+const originPattern = url => `${url.protocol}//${url.hostname}/*`;
 
-function register(origin) {
+function register(origin, site) {
   if (!IS_EXT) return Promise.resolve();
   registration = registration.catch(() => {}).then(async () => {
-    const reply = await chrome.runtime.sendMessage({ type: 'register', origin });
+    const nextWall = site ? registeredWallOrigin : origin;
+    const nextSites = new Map(registeredSites);
+    if (site && origin) nextSites.set(site, origin);
+    else if (site) nextSites.delete(site);
+    const reply = await chrome.runtime.sendMessage({ type: 'register', origin: nextWall, sites: [...new Set(nextSites.values())] });
     if (!reply?.ok) throw new Error('Preview registration failed');
+    registeredWallOrigin = nextWall;
+    registeredSites = nextSites;
   });
   return registration;
 }
@@ -497,7 +633,7 @@ function parseAddress(source, base) {
   const address = relative || hasScheme ? source : (local ? 'http://' : 'https://') + source;
   let url;
   try { url = new URL(address, base); } catch { return null; }
-  const demoPage = base && target === EXT && url.origin === EXT;
+  const demoPage = base && new URL(base).origin === EXT && url.origin === EXT;
   if ((!demoPage && !/^https?:$/.test(url.protocol)) || url.username || url.password) return null;
   return url;
 }
@@ -512,7 +648,7 @@ async function open(url, alreadyAllowed = false) {
   try {
     if (!isDemo && !alreadyAllowed) {
       $('#joblog').textContent = 'Waiting for Chrome site access…';
-      const granted = await chrome.permissions.request({ origins: [`${url.protocol}//${url.hostname}/*`] });
+      const granted = await chrome.permissions.request({ origins: [originPattern(url)] });
       if (id !== openId) return;
       if (!granted) {
         $('#joblog').textContent = 'Allow access to the site in Chrome to open a preview.';
@@ -577,7 +713,7 @@ async function followRedirect(message) {
   try { url = new URL(message.url); } catch { return; }
   const from = new URL(target).host;
   let allowed = false;
-  try { allowed = await chrome.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] }); } catch {}
+  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
   if (id !== openId) return;
   if (allowed && ++redirects <= 3) return open(url, true);
 
@@ -595,6 +731,237 @@ async function followRedirect(message) {
     ? `${from} keeps redirecting. Press Enter to try ${url.host} again.`
     : `${from} redirects to ${url.host}. Press Enter to open it there.`;
 }
+
+/* --------------------------- website comparison --------------------------- */
+const sitePanels = [];
+let sitesMode = false;
+let siteLayoutMode = 'grid', wallModeBeforeSites = 'grid';
+
+function copySiteDevice(d, site) {
+  const { id, name, w, h, kind, os, frame, scale, notch, physical, slot } = d;
+  return { ...previewDevice({ id, name, w, h, kind, os, frame, scale, notch, physical }, slot), site, on: true };
+}
+
+function selectedDevice(d) {
+  return sitesMode ? sitePanels.some(site => site.devices.some(device => device.id === d.id && device.on)) : d.on;
+}
+
+function toggleDevice(d, selected) {
+  if (!sitesMode) return selectDevice(d, selected);
+  for (const site of sitePanels) {
+    const preview = site.devices.find(device => device.id === d.id);
+    if (preview) {
+      preview.on = selected;
+      if (!selected) removeFrame(preview);
+    } else if (selected) site.devices.push(copySiteDevice(d, site));
+    fitSite(site);
+  }
+  updateSiteTools();
+}
+
+function updateSiteTools() {
+  if (!sitesMode) return;
+  wallRevision++;
+  findings = [];
+  refreshDevicePicker();
+  updateReference();
+  renderFindings();
+  $('#detect span').textContent = 'Detect differences';
+  $('#match-text').disabled = !workspaceScreens().length;
+  $('#frames').dispatchEvent(new Event('wall-view-changed'));
+}
+
+function fitSite(site) {
+  const { clientWidth: width, clientHeight: height } = site.preview;
+  if (!width || !height) return;
+  const showWall = site.picker.value === 'wall';
+  site.frames.hidden = !showWall;
+  site.single.hidden = showWall;
+  if (!site.url) return;
+  if (showWall) {
+    site.frames.classList.toggle('row', mode === 'row');
+    site.frames.classList.toggle('focus', mode === 'focus');
+    site.frames.classList.toggle('locked', layoutLocked);
+    site.frames.classList.toggle('free', freelyPlaced(site));
+    if (!site.focusDev?.on || !site.devices.includes(site.focusDev)) site.focusDev = site.devices.find(d => d.on);
+    for (const d of site.devices) {
+      if (!d.on) continue;
+      if (!d.el) addFrame(d);
+      d.el.hidden = mode === 'focus' && site.focusDev !== d;
+      layout(d);
+    }
+    placeScreens(site);
+    return;
+  }
+  if (!site.frame.hasAttribute('src')) setPreviewSource(site.frame, site.url);
+  const preset = dev(site.picker.value);
+  const w = preset?.w ?? width;
+  const h = preset?.h ?? height;
+  const scale = Math.min(1, width / w, height / h);
+  site.size.style.width = w * scale + 'px';
+  site.size.style.height = h * scale + 'px';
+  site.frame.style.width = w + 'px';
+  site.frame.style.height = h + 'px';
+  site.frame.style.transform = 'scale(' + scale + ')';
+}
+
+function syncSiteScroll(site) {
+  if (site.picker.value !== 'wall') return;
+  const top = site.preview.scrollTop;
+  if (site.syncedTop === top) { site.syncedTop = null; return; }
+  for (const other of sitePanels) {
+    if (other === site || other.picker.value !== 'wall') continue;
+    const next = Math.min(top, other.preview.scrollHeight - other.preview.clientHeight);
+    if (other.preview.scrollTop !== next) {
+      other.preview.scrollTop = next;
+      other.syncedTop = other.preview.scrollTop;
+    }
+  }
+}
+
+$('#site-columns').addEventListener('wheel', event => {
+  if (event.target.closest('.site-preview') || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  const scrollable = sitePanels.filter(site => site.preview.scrollHeight > site.preview.clientHeight);
+  const site = scrollable.find(item => item.el.contains(event.target)) || scrollable[0];
+  if (!site) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? site.preview.clientHeight : 1;
+  site.preview.scrollTop += event.deltaY * unit;
+}, { passive: false });
+
+function fillSiteDevices(site) {
+  const value = site.picker.value;
+  site.picker.replaceChildren(new Option('All devices', 'wall'), new Option('Responsive', 'responsive'), ...deviceOptions());
+  site.picker.value = value === 'responsive' || dev(value) ? value : 'wall';
+  fitSite(site);
+}
+
+async function openSite(site, url, alreadyAllowed = false) {
+  const bundled = url.origin === EXT && url.pathname.startsWith(DEMO_PATH);
+  if (!bundled && (!IS_EXT || !/^https?:$/.test(url.protocol) || url.username || url.password)) {
+    site.status.textContent = IS_EXT ? 'Enter an HTTP or HTTPS address without credentials.' : 'Use the Chrome extension to open other sites.';
+    return;
+  }
+  const revision = ++site.revision;
+  site.opening = true;
+  site.status.textContent = '';
+  try {
+    if (!bundled && !alreadyAllowed) {
+      site.status.textContent = 'Waiting for Chrome site access…';
+      const granted = await chrome.permissions.request({ origins: [originPattern(url)] });
+      if (revision !== site.revision) return;
+      if (!granted) {
+        site.status.textContent = 'Allow site access in Chrome to open this preview.';
+        return;
+      }
+    }
+    await register(bundled ? null : url.origin, site);
+    if (revision !== site.revision) return;
+    site.url = url;
+    site.redirectSource = null;
+    site.input.value = bundled ? url.pathname : url.href;
+    site.frame.title = 'Preview of ' + (bundled ? url.pathname : url.host);
+    if (site.frame.hasAttribute('src')) setPreviewSource(site.frame, url);
+    site.leader = null;
+    site.lastAlign = null;
+    for (const d of site.devices) {
+      if (!d.iframe) continue;
+      pendingAlign.delete(d);
+      d.port?.disconnect();
+      d.port = null;
+      d.ready = false;
+      d.token = crypto.randomUUID();
+      d.el.classList.remove('ready', 'leader');
+      setPreviewSource(d.iframe, url);
+    }
+    site.status.textContent = '';
+    fitSite(site);
+    updateSiteTools();
+  } catch {
+    if (revision === site.revision) site.status.textContent = 'Could not open this preview. Try the address again.';
+  } finally {
+    if (revision === site.revision) site.opening = false;
+  }
+}
+
+function addSite(url) {
+  const el = $('#site-panel-template').content.firstElementChild.cloneNode(true);
+  const site = {
+    el, input: el.querySelector('.site-url'), picker: el.querySelector('.site-preset'),
+    status: el.querySelector('.site-status'), preview: el.querySelector('.site-preview'),
+    frames: el.querySelector('.site-frames'), single: el.querySelector('.site-single'),
+    size: el.querySelector('.site-size'), frame: el.querySelector('iframe'),
+    revision: 0, redirects: 0
+  };
+  const selected = DEVICES.filter(d => sitePanels.length ? selectedDevice(d) : d.on);
+  site.devices = (selected.length || sitePanels.length ? selected : DEVICES.filter(d => d.starter)).map(d => copySiteDevice(d, site));
+  site.frames.style.alignItems = $('#frames').style.alignItems;
+  site.input.setAttribute('aria-label', 'Site address');
+  el.querySelector('form').addEventListener('submit', event => {
+    event.preventDefault();
+    const address = parseAddress(site.input.value.trim(), site.url?.href);
+    if (!address) { site.status.textContent = 'Enter a valid site address.'; return; }
+    site.redirects = 0;
+    openSite(site, address);
+  });
+  el.querySelector('.site-close').addEventListener('click', () => {
+    site.revision++;
+    site.observer.disconnect();
+    site.devices.forEach(removeFrame);
+    el.remove();
+    sitePanels.splice(sitePanels.indexOf(site), 1);
+    register(null, site).catch(() => {});
+    updateSiteTools();
+    (sitePanels.at(-1)?.input || $('#add-site')).focus();
+  });
+  site.picker.addEventListener('change', () => { fitSite(site); updateSiteTools(); });
+  site.preview.addEventListener('scroll', () => syncSiteScroll(site));
+  site.observer = new ResizeObserver(() => fitSite(site));
+  site.observer.observe(site.preview);
+  fillSiteDevices(site);
+  sitePanels.push(site);
+  $('#site-columns').append(el);
+  openSite(site, url, true);
+  return site;
+}
+
+const initialSite = () => previewUrl ? new URL(previewUrl) : DEMO_URL;
+
+async function followSiteRedirect(site, message) {
+  if (site.opening || site.url?.href !== message.from || site.redirectSource === message.from) return;
+  const url = new URL(message.url);
+  const revision = site.revision;
+  site.redirectSource = message.from;
+  let allowed = false;
+  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
+  if (revision !== site.revision) return;
+  if (allowed && ++site.redirects <= 3) return openSite(site, url, true);
+  site.input.value = url.href;
+  site.status.textContent = 'This site redirects. Open the new address to continue.';
+}
+
+function setSitesMode(enabled) {
+  if (sitesMode === enabled) return;
+  if (enabled) { wallModeBeforeSites = mode; updateMode(siteLayoutMode); }
+  else { siteLayoutMode = mode; updateMode(wallModeBeforeSites); }
+  sitesMode = enabled;
+  $('#sites-toggle').setAttribute('aria-pressed', String(enabled));
+  $('#site-workspace').hidden = !enabled;
+  $('#add-site').hidden = !enabled;
+  for (const selector of ['#canvas', '#wall-scroll', '#open']) {
+    $(selector).hidden = enabled;
+  }
+  refreshViews();
+  refreshDevicePicker();
+  workspaceScreens().filter(d => d.ready).forEach(configure);
+  if (enabled) {
+    endTour(false);
+    if (!sitePanels.length) { addSite(initialSite()); addSite(initialSite()); }
+  }
+}
+
+$('#sites-toggle').addEventListener('click', () => setSitesMode(!sitesMode));
+$('#add-site').addEventListener('click', () => addSite(sitePanels[0]?.url || initialSite()).input.focus());
 /* -------------------------------- guided demo -------------------------------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const dev = id => DEVICES.find(d => d.id === id);
@@ -609,6 +976,7 @@ const STEPS = [
 ];
 let tour = 0;
 async function startTour() {
+  setSitesMode(false);
   setPageSteps(false);
   sameDevice = false;
   refreshViews();
@@ -632,16 +1000,17 @@ function endTour(clear) {
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with
 $('#demo').onclick = $('#watch').onclick = startTour;
 $('#own').onclick = () => { if (IS_EXT) $('#src').focus(); else window.open(REPO + '#install', '_blank', 'noopener'); };
-$('#reload').onclick = () => active().forEach(device => post(device, 'reload'));
+$('#reload').onclick = () => workspaceScreens().forEach(device => post(device, 'reload'));
 $('#match-text').onchange = event => {
   textSalt = event.target.checked ? crypto.randomUUID() : null;
-  active().filter(device => device.ready).forEach(configure);
+  workspaceScreens().filter(device => device.ready).forEach(configure);
   detect(true);
 };
 
 /* ------------------------------ message routing ------------------------------ */
 const pendingSnap = new Map(), entries = new Map();
 const configure = device => post(device, 'config', { touch: device.touch, textSalt, pageSteps: pageSteps && !!device.step });
+const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
 
 function handleMessage(device, message) {
   if (!message?.__samestate) return;
@@ -654,7 +1023,7 @@ function handleMessage(device, message) {
         device.replayPending = false;
         post(device, 'replay-step', { actions: device.actions });
       }
-      if (!leader && active().includes(device)) setLeader(device);
+      if (workspaceScreens().includes(device) && !(device.site ? device.site.leader?.ready : leader?.ready)) setLeader(device);
       const align = pendingAlign.get(device);
       pendingAlign.delete(device);
       // The screen was sent to the leading screen's page; now that it has loaded, match the scroll position.
@@ -664,11 +1033,13 @@ function handleMessage(device, message) {
     case 'state':
       pendingState.get(message.rid)?.(message);
       break;
-    case 'aligning': // the screen is loading the leading screen's page; finish when it says hello again
-      if (lastAlign) pendingAlign.set(device, lastAlign);
+    case 'aligning': { // the screen is loading the leading screen's page; finish when it says hello again
+      const align = device.site ? device.site.lastAlign : lastAlign;
+      if (align) pendingAlign.set(device, align);
       break;
+    }
     case 'active':
-      if (active().includes(device)) setLeader(device);
+      if (workspaceScreens().includes(device)) setLeader(device);
       break;
     case 'open-page':
       if (pageSteps && device.step && active().includes(device) && typeof message.url === 'string') openPage(message.url);
@@ -692,14 +1063,14 @@ function handleMessage(device, message) {
       playbackResult(message, device);
       break;
     case 'act': {
-      if (pageSteps || !active().includes(device)) return;
+      if ((!device.site && pageSteps) || !workspaceScreens().includes(device)) return;
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;
       setLeader(device);
       if (!device.linked) return; // an unlinked screen moves on its own
       const id = ['click', 'swipe', 'media'].includes(message.kind) ? ++aid : 0;
       if (id) startEntry(id, device, message);
       const { type, __samestate, ...action } = message;
-      for (const other of active()) {
+      for (const other of device.site ? siteScreens(device.site) : active()) {
         if (other !== device && other.ready && other.linked) post(other, 'act', { ...action, aid: id });
       }
       break;
@@ -714,34 +1085,48 @@ function alignTargets(all, lead) {
   return all.filter(d => d !== lead && d.ready && d.linked);
 }
 async function alignScreens() {
-  const lead = leader?.ready ? leader : active().find(d => d.ready);
+  if (sitesMode) return Promise.all(sitePanels.map(site => alignSiteScreens(siteScreens(site), site.leader, site)));
+  return alignSiteScreens(active(), leader);
+}
+async function alignSiteScreens(screens, current, site) {
+  const lead = current?.ready && screens.includes(current) ? current : screens.find(d => d.ready);
   if (!lead) return;
-  const rid = crypto.randomUUID(), preview = openId;
+  const rid = crypto.randomUUID(), revision = wallRevision;
   const state = await new Promise(done => {
     pendingState.set(rid, done);
     post(lead, 'state', { rid });
     setTimeout(() => done(null), 1500);
   });
   pendingState.delete(rid);
-  if (!state || preview !== openId || typeof state.url !== 'string') return;
-  lastAlign = { url: state.url, scroll: state.scroll };
-  pendingAlign.clear();
-  for (const other of alignTargets(active(), lead)) post(other, 'align', { ...lastAlign, navigate: true });
+  if (!state || revision !== wallRevision || typeof state.url !== 'string') return;
+  const align = { url: state.url, scroll: state.scroll };
+  if (site) site.lastAlign = align;
+  else lastAlign = align;
+  for (const other of alignTargets(screens, lead)) {
+    pendingAlign.delete(other);
+    post(other, 'align', { ...align, navigate: true });
+  }
 }
 
 function setLeader(device) {
+  if (device?.site) {
+    const site = device.site;
+    if (site.leader === device) return;
+    site.leader = device;
+    for (const d of site.devices) d.el?.classList.toggle('leader', d === device);
+    return;
+  }
   if (leader === device) return;
   leader = device;
   allScreens().forEach(d => d.el?.classList.toggle('leader', d === device));
 }
 
 window.addEventListener('message', event => {
-  if (!target || event.origin !== target) return;
-  const device = allScreens().find(d => d.iframe?.contentWindow === event.source);
-  if (!device) return;
-  if (target === EXT) handleMessage(device, event.data);
+  const device = connectedScreens().find(d => d.iframe?.contentWindow === event.source);
+  if (!device || event.origin !== previewOrigin(device)) return;
+  if (event.origin === EXT) handleMessage(device, event.data);
   else if (event.data?.__samestateReady === true) {
-    device.iframe.contentWindow.postMessage({ type: 'connect', token: device.token }, target);
+    device.iframe.contentWindow.postMessage({ type: 'connect', token: device.token }, event.origin);
   }
 });
 
@@ -749,15 +1134,17 @@ if (IS_EXT) {
   const appTab = chrome.tabs.getCurrent();
   appTab.then(tab => { appTabId = tab?.id ?? null; });
   chrome.runtime.onMessage.addListener((message, sender) => {
-    if (message?.type === 'redirected' && sender.id === chrome.runtime.id && !sender.tab) followRedirect(message);
+    if (message?.type !== 'redirected' || sender.id !== chrome.runtime.id || sender.tab || message.tabId !== appTabId) return;
+    followRedirect(message);
+    for (const site of sitePanels) followSiteRedirect(site, message).catch(() => {});
   });
   chrome.runtime.onConnect.addListener(port => {
     if (port.name !== 'samestate-preview' || !port.sender?.frameId) return;
     async function identify(message) {
       port.onMessage.removeListener(identify);
       const tab = await appTab;
-      const device = allScreens().find(d => d.el && d.token === message.token);
-      if (!device || tab?.id !== port.sender.tab?.id || port.sender.origin !== target) {
+      const device = connectedScreens().find(d => d.el && d.token === message.token);
+      if (!device || tab?.id !== port.sender.tab?.id || port.sender.origin !== previewOrigin(device)) {
         port.disconnect();
         return;
       }
@@ -778,7 +1165,7 @@ if (IS_EXT) {
 
 /* --------------------------------- sync log --------------------------------- */
 function requestPlayback(playing) {
-  const devices = active().filter(d => d.ready);
+  const devices = workspaceScreens().filter(d => d.ready);
   if (!devices.length) {
     $('#video-status').textContent = 'Open a video page and wait for the previews to connect.';
     return;
@@ -822,9 +1209,9 @@ function startEntry(id, device, message) {
   const name = message.d?.demoControl || message.d?.kind || 'control';
   if (message.kind === 'media') {
     const action = message.playing ? 'play video' : 'pause video';
-    heading.textContent = device ? screenName(device) + ' · ' + action : (message.playing ? 'Play all videos' : 'Pause all videos');
+    heading.textContent = device ? reportName(device) + ' · ' + action : (message.playing ? 'Play all videos' : 'Pause all videos');
   } else {
-    heading.textContent = message.kind === 'swipe' ? screenName(device) + ' · swipe' : screenName(device) + ' · click ' + name;
+    heading.textContent = message.kind === 'swipe' ? reportName(device) + ' · swipe' : reportName(device) + ' · click ' + name;
   }
   entry.appendChild(heading);
   box.prepend(entry);
@@ -846,7 +1233,7 @@ function addResult(message, device) {
   const row = document.createElement('div');
   row.className = 'r';
   const name = document.createElement('b');
-  name.textContent = screenName(device);
+  name.textContent = reportName(device);
   const label = document.createElement('span');
   label.className = 'tag ' + message.status;
   label.textContent = labels[message.status];
@@ -896,6 +1283,7 @@ function matchItems(reference, device) {
 }
 function analyze(snaps, refId) {
   const ref = snaps.find(s => s.dev.id === refId) || snaps[0];
+  if (!ref) return [];
   const out = [], referenceKeys = new Map();
   function add(sev, cat, dev, title, detail, keys = [], refKeys = keys.map(key => referenceKeys.get(key)).filter(Boolean)) {
     out.push({ sev, cat, dev, title, detail, keys, refKeys, reference: ref.dev });
@@ -987,7 +1375,7 @@ function analyze(snaps, refId) {
 }
 
 async function detect(quiet) {
-  const devs = active().filter(d => d.ready); if (devs.length < 1) return;
+  const devs = workspaceScreens().filter(d => d.ready); if (devs.length < 1) return;
   $('#detect span').textContent = 'Measuring…';
   const rid = crypto.randomUUID(), snaps = [];
   const scanSalt = textSalt;
@@ -1000,7 +1388,8 @@ async function detect(quiet) {
   pendingSnap.delete(rid);
   if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision) return;
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
-  findings = snaps.length ? analyze(snaps, $('#ref').value) : [];
+  const ref = $('#ref').value;
+  findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
 function renderFindings() {
@@ -1011,10 +1400,10 @@ function renderFindings() {
   const shown = findings.map((f, i) => Object.assign(f, { i })).filter(f => !catFilter || f.cat === catFilter);
   if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
   let html = '';
-  for (const d of viewScreens()) {
+  for (const d of sitesMode ? workspaceScreens() : viewScreens()) {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
-    html += `<div class="group">${esc(screenName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
+    html += `<div class="group">${esc(reportName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
       fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div></div>`).join('');
   }
   $('#findings').innerHTML = html;
@@ -1025,7 +1414,11 @@ $('#findings').addEventListener('click', e => {
   const f = findings[+el.dataset.i];
   if (f.keys.length) post(f.dev, 'highlight', { keys: f.keys });
   if (f.refKeys.length) post(f.reference, 'highlight', { keys: f.refKeys });
-  if (mode === 'focus') { focusDev = f.dev; relayout(); }
+  if (mode === 'focus') {
+    if (f.dev.site) f.dev.site.focusDev = f.dev;
+    else focusDev = f.dev;
+    relayout();
+  }
   cvAllow = Date.now() + 900;
   f.dev.el && f.dev.el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
 });
@@ -1037,17 +1430,26 @@ document.querySelector('.right-tools').addEventListener('click', e => { const b 
 
 /* ----------------------------------- boot ----------------------------------- */
 const refreshDevicePicker = mountDevicePicker(DEVICES, {
-  toggle: selectDevice,
+  toggle: toggleDevice,
+  isSelected: selectedDevice,
   add(preset) {
     const d = previewDevice(preset, nextDeviceSlot++);
     DEVICES.push(d);
-    selectDevice(d, true);
+    toggleDevice(d, true);
     fillSharedDevices();
+    sitePanels.forEach(fillSiteDevices);
   },
   remove(d) {
     selectDevice(d, false);
+    for (const site of sitePanels) {
+      const preview = site.devices.find(device => device.id === d.id);
+      if (!preview) continue;
+      removeFrame(preview);
+      site.devices.splice(site.devices.indexOf(preview), 1);
+    }
     DEVICES.splice(DEVICES.indexOf(d), 1);
     fillSharedDevices();
+    sitePanels.forEach(fillSiteDevices);
     refreshViews();
   }
 });
@@ -1060,7 +1462,7 @@ const DEFAULT_SITE = 'https://claude.com/';
 async function openDefault() {
   const url = new URL(DEFAULT_SITE);
   let allowed = false;
-  try { allowed = await chrome.permissions.contains({ origins: [`${url.protocol}//${url.hostname}/*`] }); } catch {}
+  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
   if (target || openId) return; // the user already opened something
   if (allowed) return open(url, true);
   $('#src').value = DEFAULT_SITE;

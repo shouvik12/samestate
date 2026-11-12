@@ -79,11 +79,23 @@ Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog u
 
 When previews extend beyond the visible wall, drag the scrollbar at the bottom to move left or right. The bar is available with the sidebar closed.
 
+Click the percentage in a preview’s title bar to change its display scale. Choose **100% (CSS px)** to display the page at its viewport dimensions, enter a custom percentage, or choose **Auto** to follow the wall zoom or Focus fit again. The dimensions apply to the webpage area inside the frame. Its physical size depends on the display and system scaling.
+
+To match a device on your monitor, open the preview’s percentage menu and expand **Physical size**. Measure the blue line with a ruler, enter its length in millimetres, then choose **Match size**. The iPhone 11 Pro uses its published screen and body dimensions. For other presets, enter the width of the device’s lit display. Measure the line again after changing monitors, Chrome zoom, or system display scaling. [iPhone 11 Pro specifications](https://support.apple.com/en-us/111879)
+
+## Compare websites side by side
+
+Click **Compare sites** in the toolbar. Two device walls open side by side, with the current site loaded on every device in both walls. Enter a different address in either column to update all of its devices. Use **+ Add site** for more walls. The **Viewport** menu defaults to **All devices**, with options for one responsive or fixed-size preview.
+
+Click **Compare sites** again to return to the device wall. The open site columns, devices, and page steps stay loaded when you switch. Chrome asks for access when you open a new site. The hosted demo starts both walls on its bundled home page.
+
+Scroll outside the webpages to move the site walls up or down together. Use the sidebar to select devices, change the layout, or capture the visible comparison. Sync and difference reports work within each site's device previews. The **Page steps** control opens the journey view on the device wall.
+
 ## Capture the device wall
 
 With a preview open in desktop Chrome, click **Screenshot** or **Record**, then share the current Samestate tab in Chrome’s picker. **Screenshot** starts a PNG download. **Record** starts a silent video, and **Stop** downloads it as WebM. You can take screenshots while recording.
 
-Capture follows the visible part of the wall as you scroll or zoom. Chrome crops the tab capture to the wall, and Samestate saves files locally.
+Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
 ## Sync video playback
 
@@ -100,17 +112,16 @@ personal data. Mark elements with `data-samestate-private` to exclude their text
 
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
 and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
-or the structure of a supported control to open the next preview. Samestate scopes inspection to the site you open
-in its preview tab. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
+or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
+**Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
 
 ## How it works
 
 ```
 extension/
-  background.js   Lets the selected origin load inside a Samestate tab and injects the agent
-                  into its preview frames.
+  background.js   Lets opened origins load inside a Samestate tab and connects the device wall agent.
   agent.js        Measures layout and mirrors interactions using element positions and control types.
-  app.html/js/css The device wall, the message router, the sync log and the difference engine.
+  app.html/js/css The device wall, site comparison, message router, sync log, and difference engine.
   devices.js      Device presets, search, and custom device settings.
   capture.js      Local screenshots and recordings of the device wall.
   demo/           The sample site used by the guided demo.
@@ -138,6 +149,10 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-12** | — | — | **Compare sites controls** — linked wall scrolling, sidebar controls, screenshots, and recordings ([details](changelogs/CHANGELOG-compare-sites-controls.md)) |
+| **2026-11-12** | — | — | **Compare sites** — open several websites on side-by-side device walls ([details](changelogs/CHANGELOG-compare-sites.md)) |
+| **2026-11-12** | — | — | **Physical preview size** — calibrate a preview to the size of a real device on your monitor ([details](changelogs/CHANGELOG-physical-preview-size.md)) |
+| **2026-11-12** | — | — | **Per-preview scale** — click a preview’s percentage to set its display scale ([details](changelogs/CHANGELOG-preview-scale.md)) |
 | **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Close device previews** — close individual screens from the device wall ([details](changelogs/CHANGELOG-close-device-previews.md)) |
 | **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Preview borders** — each preview and its title-bar controls share a visible border ([details](changelogs/CHANGELOG-preview-borders.md)) |
 | **2026-11-12** | 20:57:34 +09:00 | `59b09a1` | **Switch sites in Page steps** — enter another domain or URL to start a new journey ([details](changelogs/CHANGELOG-switch-preview-site.md)) |

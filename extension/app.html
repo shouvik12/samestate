@@ -19,13 +19,15 @@
     <span id="joblog" class="address-status" role="status"></span>
   </form>
   <div class="right-tools">
+    <button id="sites-toggle" class="pill" type="button" aria-pressed="false" aria-controls="site-workspace">Compare sites</button>
+    <button id="add-site" class="pill" type="button" hidden>+ Add site</button>
     <button id="demo" class="pill">Demo</button>
     <button class="pill" data-panel="diff">Differences <b id="diffn"></b></button>
     <button class="pill" data-panel="log">Sync log</button>
   </div>
 </header>
 
-<div class="main">
+<div class="main" id="device-workspace">
   <aside class="left" id="sidebar" aria-label="Preview settings">
     <details class="sidebar-drawer" open>
       <summary>Capture</summary>
@@ -156,23 +158,28 @@
   </aside>
 
   <div class="wall">
-    <section class="canvas" id="canvas">
-      <div class="empty" id="empty">
-        <div class="hero-card">
-          <div class="brand big"><span class="logo"><i></i><i></i><i></i></span>Samestate</div>
-          <h1>One interaction, every device.</h1>
-          <p class="sub">Compare responsive layouts side by side and mirror clicks and scrolling.</p>
-          <ul class="points">
-            <li><b>Click sync</b>Matches controls by their position in the page structure.</li>
-            <li><b>Difference report</b>Lists what changes per device: hidden content, tables, tap targets, overlays.</li>
-            <li><b>Site access</b>Chrome asks for access when you open a site.</li>
-          </ul>
-          <div class="actions"><button class="cta" id="watch">Watch the demo</button><button class="cta ghost" id="own">Use my own site</button></div>
+    <div class="capture-area" id="capture-area">
+      <section class="canvas" id="canvas">
+        <div class="empty" id="empty">
+          <div class="hero-card">
+            <div class="brand big"><span class="logo"><i></i><i></i><i></i></span>Samestate</div>
+            <h1>One interaction, every device.</h1>
+            <p class="sub">Compare responsive layouts side by side and mirror clicks and scrolling.</p>
+            <ul class="points">
+              <li><b>Click sync</b>Matches controls by their position in the page structure.</li>
+              <li><b>Difference report</b>Lists what changes per device: hidden content, tables, tap targets, overlays.</li>
+              <li><b>Site access</b>Chrome asks for access when you open a site.</li>
+            </ul>
+            <div class="actions"><button class="cta" id="watch">Watch the demo</button><button class="cta ghost" id="own">Use my own site</button></div>
+          </div>
         </div>
-      </div>
-      <p id="wall-empty" class="wall-empty" hidden>Select devices in the sidebar to preview this site.</p>
-      <div class="frames" id="frames"></div>
-    </section>
+        <p id="wall-empty" class="wall-empty" hidden>Select devices in the sidebar to preview this site.</p>
+        <div class="frames" id="frames"></div>
+      </section>
+      <section id="site-workspace" class="site-workspace" aria-label="Website comparison" hidden>
+        <div id="site-columns" class="site-columns"></div>
+      </section>
+    </div>
     <input class="wall-scroll" id="wall-scroll" type="range" min="0" max="0" value="0" aria-label="Scroll previews horizontally" aria-controls="canvas" disabled>
   </div>
 
@@ -189,6 +196,50 @@
     <div class="pane" id="pane-log" hidden><div id="log"><p class="muted">Clicks, typing and navigation you perform on one device show up here, with how each other device reached the same state.</p></div></div>
   </aside>
 </div>
+<template id="site-panel-template">
+  <section class="site-panel">
+    <form class="site-address">
+      <input class="site-url" spellcheck="false" autocomplete="off" placeholder="Enter a site address" required>
+      <button class="pill" type="submit">Open</button>
+      <button class="pill site-close" type="button" title="Close this site" aria-label="Close this site">×</button>
+    </form>
+    <div class="site-options">
+      <label>Viewport <select class="site-preset"></select></label>
+      <p class="site-status" role="status"></p>
+    </div>
+    <div class="site-preview">
+      <div class="site-frames"></div>
+      <div class="site-single" hidden><div class="site-size"><iframe class="site-frame"></iframe></div></div>
+    </div>
+  </section>
+</template>
+<dialog id="preview-scale" class="scale-dialog" aria-labelledby="preview-scale-title" aria-describedby="preview-scale-note">
+  <form method="dialog">
+    <h2 id="preview-scale-title">Preview scale</h2>
+    <p id="preview-scale-note">100% shows the page at its viewport size in CSS pixels. Physical size depends on your display.</p>
+    <label for="preview-scale-value">Scale (%)</label>
+    <input id="preview-scale-value" type="number" min="1" max="200" step="1" required autofocus>
+    <div class="scale-actions">
+      <button class="pill scale-apply" value="apply">Apply</button>
+      <button class="pill" value="100" formnovalidate>100% (CSS px)</button>
+      <button class="pill" value="auto" formnovalidate>Auto</button>
+      <button class="pill" value="cancel" formnovalidate>Cancel</button>
+    </div>
+  </form>
+  <details id="physical-size-settings" class="physical-size-settings">
+    <summary>Physical size</summary>
+    <form method="dialog">
+      <p>Measure this line from end to end on your monitor.</p>
+      <div id="physical-calibration-line" class="calibration-line" aria-hidden="true"></div>
+      <label for="physical-calibration-mm">Measured line (mm)</label>
+      <input id="physical-calibration-mm" type="number" min="5" max="200" step="any" required>
+      <label for="physical-screen-mm">Device screen width (mm)</label>
+      <input id="physical-screen-mm" type="number" min="10" max="2500" step="any" required aria-describedby="physical-size-note">
+      <p id="physical-size-note"></p>
+      <button class="pill scale-apply" value="physical">Match size</button>
+    </form>
+  </details>
+</dialog>
 <script src="devices.js"></script>
 <script src="app.js"></script>
 <script src="capture.js"></script>

@@ -18,7 +18,11 @@ function device(id, name, w, h, group, options = {}) {
 }
 
 const STARTER_DEVICES = [
-  device('iphone', 'iPhone 11 Pro', 375, 812, 'apple', { notch: true, starter: true }),
+  device('iphone', 'iPhone 11 Pro', 375, 812, 'apple', {
+    notch: true, starter: true,
+    // Apple lists a 1125 px screen width at 458 ppi and a 71.4 × 144 mm body.
+    physical: { screenWidth: 62.4, bodyWidth: 71.4, bodyHeight: 144 }
+  }),
   device('nexus7', 'Nexus 7', 600, 960, 'tablets', { starter: true }),
   device('desktop', 'Desktop', 1920, 1080, 'specials', { kind: 'desktop', os: '', starter: true }),
   device('macbook', 'MacBook Air', 1440, 900, 'specials', { kind: 'desktop', os: '', starter: true }),
@@ -161,7 +165,7 @@ function saveCustomDevices(presets) {
   localStorage.setItem(CUSTOM_DEVICE_KEY, JSON.stringify(saved));
 }
 
-function mountDevicePicker(devices, { toggle, add, remove }) {
+function mountDevicePicker(devices, { toggle, add, remove, isSelected = preset => preset.on }) {
   const list = document.querySelector('#devlist');
   const search = document.querySelector('#device-search');
   const selectedOnly = document.querySelector('#selected-devices');
@@ -191,11 +195,12 @@ function mountDevicePicker(devices, { toggle, add, remove }) {
       for (const preset of devices) {
         if (preset.group !== group) continue;
         const { row, checkbox, keywords } = rows.get(preset.id);
-        const matchesFilter = keywords.includes(query) && (!selectedOnly.checked || preset.on);
+        const enabled = isSelected(preset);
+        const matchesFilter = keywords.includes(query) && (!selectedOnly.checked || enabled);
         row.hidden = !matchesFilter;
-        checkbox.checked = preset.on;
+        checkbox.checked = enabled;
         matches += Number(matchesFilter);
-        count += Number(preset.on);
+        count += Number(enabled);
       }
       const badge = drawer.querySelector('.drawer-count');
       badge.textContent = count || '';

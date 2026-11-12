@@ -1,13 +1,14 @@
 (() => {
   'use strict';
 
-  const wall = document.querySelector('#canvas');
+  const wall = document.querySelector('#capture-area');
+  const canvasView = document.querySelector('#canvas');
   const frames = document.querySelector('#frames');
+  const sites = document.querySelector('#site-workspace');
   const screenshotButton = document.querySelector('#screenshot');
   const recordButton = document.querySelector('#record');
   const status = document.querySelector('#capture-status');
   const canCapture = !!(navigator.mediaDevices?.getDisplayMedia && globalThis.CropTarget?.fromElement);
-  const canScreenshot = canCapture && typeof ImageCapture === 'function';
   const videoType = canCapture && typeof MediaRecorder === 'function' &&
     ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
 
@@ -20,12 +21,17 @@
   }
 
   function updateButtons() {
-    const hasDevices = !!frames.querySelector('.dev:not([hidden])');
+    const hasDevices = sites.hidden
+      ? !!frames.querySelector('.dev:not([hidden])')
+      : !!sites.querySelector('.site-frames:not([hidden]) .dev:not([hidden]), .site-single:not([hidden]) iframe[src]');
+    const canScreenshot = sites.hidden ? canCapture && typeof ImageCapture === 'function' : !!videoType;
     screenshotButton.disabled = !canScreenshot || !hasDevices || busy || !!recording?.stopping;
     recordButton.disabled = recording ? recording.stopping : !videoType || !hasDevices || busy;
     recordButton.textContent = recording ? 'Stop' : 'Record';
-    recordButton.setAttribute('aria-label', recording ? 'Stop recording' : 'Record the visible device wall');
-    recordButton.title = recording ? 'Stop recording and download the video' : 'Record the visible device wall as a WebM';
+    const view = sites.hidden ? 'device wall' : 'site comparison';
+    screenshotButton.title = 'Save the visible ' + view + ' as a PNG';
+    recordButton.setAttribute('aria-label', recording ? 'Stop recording' : 'Record the visible ' + view);
+    recordButton.title = recording ? 'Stop recording and download the video' : 'Record the visible ' + view + ' as a WebM';
     recordButton.classList.toggle('recording', !!recording);
   }
 
@@ -33,7 +39,7 @@
     stream?.getTracks().forEach(track => track.stop());
   }
 
-  async function captureWall() {
+  async function captureWall(element = wall) {
     showStatus('Choose this Samestate tab in Chrome.');
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: { displaySurface: 'browser', frameRate: { ideal: 30, max: 30 } },
@@ -50,7 +56,7 @@
       if (track?.getSettings().displaySurface !== 'browser' || !track.cropTo) throw new Error();
       showStatus('Preparing wall capture…');
       // Chrome only accepts this crop target when the source is the current tab.
-      const target = await CropTarget.fromElement(wall);
+      const target = await CropTarget.fromElement(element);
       await Promise.race([
         track.cropTo(target),
         new Promise((_, reject) => {
@@ -77,19 +83,65 @@
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
   }
 
-  async function screenshot(stream) {
+  async function saveFrame(frame, width, height) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(frame, 0, 0);
+    const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!png) throw new Error('Could not save the screenshot. Try again.');
+    download(png, 'png');
+  }
+
+  async function screenshot(stream, comparison) {
+    const failure = () => new Error('Chrome could not capture a frame. Keep this tab visible and try again.');
     const [track] = stream.getVideoTracks();
-    const image = await new ImageCapture(track).grabFrame();
+    if (track?.readyState !== 'live') throw failure();
+    if (!comparison) {
+      let timeout, expired = false;
+      const image = await Promise.race([
+        new ImageCapture(track).grabFrame().then(frame => { if (expired) frame.close(); return frame; }),
+        new Promise((_, reject) => { timeout = setTimeout(() => { expired = true; reject(failure()); }, 6000); })
+      ]).finally(() => clearTimeout(timeout));
+      try { await saveFrame(image, image.width, image.height); } finally { image.close(); }
+      return;
+    }
+    // A short recording supplies a decoded frame even when the cropped tab stream does not play inline.
+    const clip = await new Promise((resolve, reject) => {
+      const recorder = new MediaRecorder(stream, { mimeType: videoType, videoBitsPerSecond: 4_000_000 });
+      const chunks = [];
+      recorder.addEventListener('dataavailable', event => {
+        if (event.data.size) chunks.push(event.data);
+      });
+      recorder.start(1000);
+      const timeout = setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 1600);
+      recorder.addEventListener('stop', () => {
+        clearTimeout(timeout);
+        if (chunks.length) resolve(new Blob(chunks, { type: recorder.mimeType }));
+        else reject(failure());
+      }, { once: true });
+      recorder.addEventListener('error', () => { clearTimeout(timeout); reject(failure()); }, { once: true });
+    });
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(clip);
+    let timeout;
     try {
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      canvas.getContext('2d').drawImage(image, 0, 0);
-      const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (!png) throw new Error('Could not save the screenshot. Try again.');
-      download(png, 'png');
+      await new Promise((resolve, reject) => {
+        video.onloadeddata = () => {
+          video.onloadeddata = null;
+          // Chrome can emit a blank frame before the crop reaches the compositor.
+          video.currentTime = 0.5;
+        };
+        video.onseeked = resolve;
+        video.onerror = () => reject(failure());
+        timeout = setTimeout(() => reject(failure()), 5000);
+        video.src = url;
+      });
+      if (!video.videoWidth || !video.videoHeight) throw failure();
+      await saveFrame(video, video.videoWidth, video.videoHeight);
     } finally {
-      image.close();
+      clearTimeout(timeout);
+      URL.revokeObjectURL(url);
     }
   }
 
@@ -102,10 +154,11 @@
     busy = true;
     updateButtons();
     const existing = recording?.stream;
+    const comparison = !sites.hidden;
     let stream;
     try {
-      stream = existing || await captureWall();
-      await screenshot(stream);
+      stream = existing || await captureWall(comparison ? wall : canvasView);
+      await screenshot(stream, comparison);
       if (!recording?.stopping) showStatus(recording ? 'Screenshot download started. Recording…' : 'Screenshot download started.');
     } catch (error) {
       if (!recording?.stopping) showStatus(captureError(error));
