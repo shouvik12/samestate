@@ -91,6 +91,12 @@ Click **Compare sites** again to return to the device wall. The open site column
 
 Scroll outside the webpages to move the site walls up or down together. Use the sidebar to select devices, change the layout, or capture the visible comparison. Sync and difference reports work within each site's device previews. The **Page steps** control opens the journey view on the device wall.
 
+## Annotate previews
+
+Click the pencil in a preview’s title bar. Choose **Draw**, **Line**, or **Arrow**, then drag over the page. Choose **Note**, click where it belongs, and save your text. Click a note while the Note tool is active to edit it. Use **Erase** to remove a mark or note.
+
+Click the pencil again to interact with the webpage while keeping the marks visible. Annotations belong to the individual preview in the current tab, including in **Page steps** and **Compare sites**. They follow the preview when it moves or resizes and appear in wall captures.
+
 ## Capture the device wall
 
 With a preview open in desktop Chrome, click **Screenshot** or **Record**, then share the current Samestate tab in Chrome’s picker. **Screenshot** starts a PNG download. **Record** starts a silent video, and **Stop** downloads it as WebM. You can take screenshots while recording.
@@ -123,6 +129,7 @@ extension/
   agent.js        Measures layout and mirrors interactions using element positions and control types.
   app.html/js/css The device wall, site comparison, message router, sync log, and difference engine.
   devices.js      Device presets, search, and custom device settings.
+  annotations.js  Notes, strokes, lines, and arrows on individual previews.
   capture.js      Local screenshots and recordings of the device wall.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
@@ -149,6 +156,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-12** | — | — | **Preview annotations** — add notes, drawings, lines, and arrows to any preview ([details](changelogs/CHANGELOG-preview-annotations.md)) |
 | **2026-11-12** | 22:51:33 +09:00 | `aca3c1e` | **Compare sites controls** — linked wall scrolling, sidebar controls, screenshots, and recordings ([details](changelogs/CHANGELOG-compare-sites-controls.md)) |
 | **2026-11-12** | 22:51:33 +09:00 | `aca3c1e` | **Compare sites** — open several websites on side-by-side device walls ([details](changelogs/CHANGELOG-compare-sites.md)) |
 | **2026-11-12** | 22:51:33 +09:00 | `aca3c1e` | **Physical preview size** — calibrate a preview to the size of a real device on your monitor ([details](changelogs/CHANGELOG-physical-preview-size.md)) |

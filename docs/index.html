@@ -210,6 +210,7 @@
     </form>
     <div class="site-options">
       <label>Viewport <select class="site-preset"></select></label>
+      <div class="site-annotation-controls" hidden></div>
       <p class="site-status" role="status"></p>
     </div>
     <div class="site-preview">
@@ -245,7 +246,19 @@
     </form>
   </details>
 </dialog>
+<dialog id="annotation-note-dialog" class="scale-dialog annotation-dialog" aria-labelledby="annotation-note-title">
+  <form method="dialog">
+    <h2 id="annotation-note-title">Preview note</h2>
+    <label for="annotation-note-text">Note</label>
+    <textarea id="annotation-note-text" maxlength="280" required></textarea>
+    <div class="scale-actions">
+      <button class="pill scale-apply" value="save">Save</button>
+      <button class="pill" value="cancel" formnovalidate>Cancel</button>
+    </div>
+  </form>
+</dialog>
 <script src="devices.js"></script>
+<script src="annotations.js"></script>
 <script src="app.js"></script>
 <script src="capture.js"></script>
 </body>

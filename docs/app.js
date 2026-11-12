@@ -131,6 +131,7 @@ function layout(d) {
   d.scaled.style.transform = 'scale(' + scale + ')';
   d.iframe.style.width = w + 'px';
   d.iframe.style.height = h + 'px';
+  d.annotations.redraw();
   d.el.querySelector('.viewport-size').textContent = '(' + w + ' × ' + h + ')';
   const scaleButton = d.el.querySelector('[data-a=scale]');
   const percent = Math.round(scale * 100) + '%';
@@ -175,6 +176,9 @@ function addFrame(d) {
   d.iframe = el.querySelector('iframe');
   d.top = el.querySelector('.device-top');
   d.bottom = el.querySelector('.device-bottom');
+  const annotationTools = document.createElement('div');
+  d.body.before(annotationTools);
+  d.annotations = mountPreviewAnnotations(d.iframe, el.querySelector('.dev-head'), annotationTools, () => fitWall(d.site));
   d.chromeId = null;
   el.querySelector('.dev-head').addEventListener('click', event => {
     const button = event.target.closest('button');
@@ -265,6 +269,7 @@ function removeFrame(d) {
   port?.disconnect();
   d.el?.remove();
   d.el = d.iframe = null;
+  d.annotations = null;
   d.ready = false;
 }
 
@@ -777,6 +782,7 @@ function fitSite(site) {
   const showWall = site.picker.value === 'wall';
   site.frames.hidden = !showWall;
   site.single.hidden = showWall;
+  site.annotationControls.hidden = showWall || !site.url;
   if (!site.url) return;
   if (showWall) {
     site.frames.classList.toggle('row', mode === 'row');
@@ -802,7 +808,9 @@ function fitSite(site) {
   site.size.style.height = h * scale + 'px';
   site.frame.style.width = w + 'px';
   site.frame.style.height = h + 'px';
-  site.frame.style.transform = 'scale(' + scale + ')';
+  site.annotations.surface.style.width = w + 'px';
+  site.annotations.surface.style.transform = 'scale(' + scale + ')';
+  site.annotations.redraw();
 }
 
 function syncSiteScroll(site) {
@@ -857,6 +865,10 @@ async function openSite(site, url, alreadyAllowed = false) {
     }
     await register(bundled ? null : url.origin, site);
     if (revision !== site.revision) return;
+    if (site.url && site.url.href !== url.href) {
+      site.annotations.clear();
+      for (const d of site.devices) d.annotations?.clear();
+    }
     site.url = url;
     site.redirectSource = null;
     site.input.value = bundled ? url.pathname : url.href;
@@ -890,9 +902,11 @@ function addSite(url) {
     el, input: el.querySelector('.site-url'), picker: el.querySelector('.site-preset'),
     status: el.querySelector('.site-status'), preview: el.querySelector('.site-preview'),
     frames: el.querySelector('.site-frames'), single: el.querySelector('.site-single'),
+    annotationControls: el.querySelector('.site-annotation-controls'),
     size: el.querySelector('.site-size'), frame: el.querySelector('iframe'),
     revision: 0, redirects: 0
   };
+  site.annotations = mountPreviewAnnotations(site.frame, site.annotationControls, site.annotationControls);
   const selected = DEVICES.filter(d => sitePanels.length ? selectedDevice(d) : d.on);
   site.devices = (selected.length || sitePanels.length ? selected : DEVICES.filter(d => d.starter)).map(d => copySiteDevice(d, site));
   site.frames.style.alignItems = $('#frames').style.alignItems;
