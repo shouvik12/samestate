@@ -224,7 +224,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
-| **2026-11-13** | — | — | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
+| **2026-11-13** | 20:21:47 +09:00 | `df5f6f4` | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
 | **2026-11-13** | 15:07:16 +05:30 | `0e8cbad` | **Nav menu reveal limits** — the menu is only opened for navigation controls, and closed again by its button, a close button or Escape ([details](changelogs/CHANGELOG-nav-menu-reveal-limits.md)) |
 | **2026-11-13** | 14:54:27 +05:30 | `e0f8262` | **Re-enabled device placement** — a device switched back on is placed next to the visible screens instead of its old spot ([details](changelogs/CHANGELOG-reenabled-device-placement.md)) |
 | **2026-11-13** | 14:32:04 +05:30 | `eda2e33` | **Hamburger reveal** — a mirrored control hidden behind a closed menu button on another screen size is reached by opening the menu ([details](changelogs/CHANGELOG-hamburger-reveal.md)) |
