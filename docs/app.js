@@ -80,8 +80,10 @@ function size(d) {
 
 // Phones and tablets tell the page they are one (emulate.js reads this from the frame's name before the page runs):
 // user-agent, platform, touch, pixel ratio and screen size. Desktop presets keep the browser's own identity.
-let emulateDevices = true;
-try { emulateDevices = localStorage.getItem('samestate.emulate') !== 'off'; } catch {}
+// Off unless turned on: a site whose server picks the layout still sends desktop pages, and its scripts may then
+// build a page no real phone gets, so screens would stop showing the same thing.
+let emulateDevices = false;
+try { emulateDevices = localStorage.getItem('samestate.emulate') === 'on'; } catch {}
 const CHROME_MAJOR = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || '130';
 const IOS_VERSION = '17_5', SAFARI_VERSION = '17.5';
 function deviceIdentity(d) {
@@ -448,15 +450,23 @@ $('#shared-device').addEventListener('change', event => {
   for (const d of connectedScreens()) if (sameDevice || d.step) d.rot = false;
   refreshViews();
 });
-$('#device-identity').checked = emulateDevices;
-$('#device-identity').addEventListener('change', event => {
-  emulateDevices = event.target.checked;
-  try { localStorage.setItem('samestate.emulate', emulateDevices ? 'on' : 'off'); } catch {}
+// Turns phone and tablet identity on or off and reloads the previews, which read it when a page loads.
+// The guided demo turns it on for one step without saving, then puts back the user's choice.
+function setDeviceIdentity(on, save) {
+  emulateDevices = on;
+  $('#device-identity').checked = on;
+  if (save) try { localStorage.setItem('samestate.emulate', on ? 'on' : 'off'); } catch {}
   for (const d of connectedScreens()) {
     if (!d.el || d === d.site?.singleDevice) continue;
-    setIdentity(d, true); // the page reads its identity when it loads
+    setIdentity(d, true);
   }
-});
+}
+const savedDeviceIdentity = () => { try { return localStorage.getItem('samestate.emulate') === 'on'; } catch { return false; } };
+function restoreDeviceIdentity() {
+  if (emulateDevices !== savedDeviceIdentity()) setDeviceIdentity(savedDeviceIdentity(), false);
+}
+$('#device-identity').checked = emulateDevices;
+$('#device-identity').addEventListener('change', event => setDeviceIdentity(event.target.checked, true));
 $('#page-steps').addEventListener('change', event => {
   const enabled = event.target.checked;
   endTour(false);
@@ -1494,9 +1504,15 @@ const STEPS = [
     run: demoClick('desktop', '.desk-only .mode-toggle')
   },
   {
-    title: 'Device identity', at: inScreen('iphone', '#app-banner'), wait: 3200,
-    text: 'Phones and tablets tell the page what they are: user-agent, touch, pixel ratio. This site shows its app banner to phones only, so it appears on the iPhone, Android and Pixel, not on tablets or desktops.',
-    run: async t => { if (await t.point(inScreen('iphone', '#app-banner .app-open'))) await t.point(inScreen('pixel', '#app-banner')); }
+    title: 'Device identity', at: '#device-identity', wait: 3200,
+    text: '<b>Phone and tablet identity</b> in Views makes phones and tablets tell the page what they are. This site then shows its app banner to phones only. It is off by default, since some sites then show phones a different page.',
+    run: async t => {
+      if (!await t.click('#device-identity')) return;
+      if (!emulateDevices) setDeviceIdentity(true, false); // for this step only; the user's setting comes back at the end
+      if (!await t.nap(2500) || !await t.until(() => active().every(d => d.ready))) return;
+      t.focus(inScreen('iphone', '#app-banner'));
+      if (await t.point(inScreen('iphone', '#app-banner .app-open'))) await t.point(inScreen('pixel', '#app-banner'));
+    }
   },
   {
     title: 'Scroll sync', at: inScreen('desktop', ''), wait: 2800,
@@ -1640,6 +1656,7 @@ const STEPS = [
     text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
     run: () => {
       setSitesMode(false);
+      restoreDeviceIdentity();
       scrollWall(0, 0);
       tourPointer.hidden = true;
       $('#tourpause').hidden = true;
@@ -1713,6 +1730,7 @@ async function startTour() {
   tourRunning = false;
 }
 function endTour(clear) {
+  if (tourRunning) restoreDeviceIdentity(); // skipped part-way, possibly after the identity step
   tour++;
   tourRunning = false;
   setTourPaused(false);

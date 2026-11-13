@@ -140,7 +140,7 @@
     const sig = description.sig;
     if (!sig || typeof sig !== 'object') return null;
     const pool = Array.from(document.querySelectorAll(ACTIONABLE))
-      .filter(el => canMirrorClick(el) && kindOf(el) === description.kind && visible(el)).slice(0, 400)
+      .filter(el => canMirrorClick(el, description.link) && kindOf(el) === description.kind && visible(el)).slice(0, 400)
       .map(el => [el, signature(el)]);
     for (const tier of ['id', 'label', 'shape']) {
       if (!sig[tier] || typeof sig[tier] !== 'string') continue;
@@ -162,9 +162,11 @@
     return target instanceof Element ? target.closest(ACTIONABLE) : null;
   }
 
-  function canMirrorClick(el) {
+  // links: also a link that works as a button. Such a click is only shared when the page cancelled its navigation.
+  function canMirrorClick(el, links = false) {
     if (demo && el.matches('#signin .close')) return true;
     if (el.closest(playerControl)) return false;
+    if (links && el.matches('a[href],[role=link]') && !el.closest('form,[contenteditable]')) return true;
     if (el.closest('form,[contenteditable]') || el.matches('a, input, textarea, select, [role=link], [role=checkbox], [role=switch]')) return false;
     return el.matches('button,summary,[role=button],[role=tab],[aria-expanded]');
   }
@@ -177,12 +179,12 @@
   }
 
   async function findTarget(description) {
-    const candidates = matchingControls(description).filter(canMirrorClick);
+    const candidates = matchingControls(description).filter(el => canMirrorClick(el, description.link));
     if (description.textKey && cfg.textKey && !description.demoControl) {
       const structural = candidates.find(visible);
       if (structural && await textFingerprint(structural) === description.textKey) return { el: structural, status: 'direct' };
       const eligible = Array.from(document.querySelectorAll(ACTIONABLE))
-        .filter(el => el !== structural && canMirrorClick(el) && kindOf(el) === description.kind && visible(el)).slice(0, 300);
+        .filter(el => el !== structural && canMirrorClick(el, description.link) && kindOf(el) === description.kind && visible(el)).slice(0, 300);
       const keys = await Promise.all(eligible.map(textFingerprint));
       const first = keys.indexOf(description.textKey);
       if (first !== -1 && first === keys.lastIndexOf(description.textKey)) return { el: eligible[first], status: 'semantic' };
@@ -281,8 +283,8 @@
   document.addEventListener('mouseenter', () => { hovering = true; mark(); });
   document.addEventListener('mouseleave', () => { hovering = false; if (lastHover) { lastHover = null; act('unhover', {}); } });
 
-  function mirrorClick(el) {
-    const description = describe(el);
+  function mirrorClick(el, link = false) {
+    const description = { ...describe(el), ...(link && { link: true }) };
     const version = playbackVersion;
     setTimeout(async () => {
       if (!el.isConnected || version !== playbackVersion) return;
@@ -367,6 +369,9 @@
     if (e.target.closest?.(playerControl)) return;
     const el = actionable(e.target);
     if (el && canMirrorClick(el)) mirrorClick(el);
+    // A link the page handles itself (it cancels the click, then opens a menu, a tab or a dialog) acts as a button.
+    // Links that open a page are left to link sync. The page's own handlers have all run by the next task.
+    else if (el && canMirrorClick(el, true)) setTimeout(() => { if (e.defaultPrevented) mirrorClick(el, true); }, 0);
   }, true);
 
   // A link followed on this screen, or a page change a click here started (single-page apps change pages
@@ -638,6 +643,8 @@
       if (typeof m.pressed === 'string' && el.getAttribute('aria-pressed') === m.pressed) return { status: 'skip' }; // toggle is already in that state
       try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
       flash(el);
+      // A link that acted as a button on the leading screen must not open a page here, even if this page lets it.
+      if (m.d.link) addEventListener('click', event => { if (event.target === el || el.contains(event.target)) event.preventDefault(); }, { once: true });
       press(el);
       return { status };
     },

@@ -55,6 +55,8 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 
 - **Device presets.** Choose from 83 built-in viewports or save a custom size.
 - **Click and scroll sync.** Samestate matches controls and scroll sections by their position in the page structure.
+  A link that the page turns into a button (it opens a menu, tab or dialog instead of a page, like Google's apps
+  button) is mirrored like a button.
   Enable **Match visible text** to help match controls and compare content when layouts use different markup.
   The bundled demo also maps the desktop Products menu to the phone’s navigation drawer.
 - **Link sync.** Following a link on one screen opens the same page on every linked screen, including
@@ -108,7 +110,7 @@ Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog u
 
 ## Compare devices and page steps
 
-- **Views → Phone and tablet identity** (on by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. Previews reload when you change it.
+- **Views → Phone and tablet identity** (off by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. Previews reload when you change it. It is off by default because a site whose server picks the layout (Google, for example) still sends desktop pages, and its scripts may then show a phone a different page from the other screens, so clicks there have nothing to match.
 - In **Views → Device sizes**, choose **Different devices** to use the selected presets or **Same device on every screen** to give those previews one shared size. Select **Device for all previews** to resize them in place.
 - Turn on **Views → Page steps** to start a row with the page you originally opened. Follow a same-origin link or use a supported control, such as **Sign in**, to open the next state beside the current screen. Dialogs, menus and tabs can become steps even when the address stays the same. In the extension, you can also enter a path such as `/pricing` in the address bar. Close a step with **×** in its header.
 - To switch sites, enter a domain or full URL in the address bar. After Chrome grants access, the new site opens at Step 1 with the selected device size.
@@ -229,6 +231,8 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-14** | — | — | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
+| **2026-11-14** | — | — | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
 | **2026-11-14** | 00:01:11 +09:00 | `fe49f5d` | **Device identity** — phone and tablet previews tell the page's scripts what they are: user-agent, platform, touch, pixel ratio, screen size and hover/pointer ([details](changelogs/CHANGELOG-device-identity.md)) |
 | **2026-11-13** | 20:21:47 +09:00 | `df5f6f4` | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
 | **2026-11-13** | 15:07:16 +05:30 | `0e8cbad` | **Nav menu reveal limits** — the menu is only opened for navigation controls, and closed again by its button, a close button or Escape ([details](changelogs/CHANGELOG-nav-menu-reveal-limits.md)) |
