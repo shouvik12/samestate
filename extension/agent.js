@@ -208,6 +208,25 @@
     return { el: null, status: candidates.length ? 'hidden' : 'none' };
   }
 
+  function finishAnimations() {
+    for (const animation of document.getAnimations()) {
+      const timing = animation.effect?.getComputedTiming();
+      if (timing && Number.isFinite(timing.endTime) && animation.playState === 'running') animation.finish();
+    }
+  }
+
+  // The page's closed navigation menu button (hamburger), if it shows one.
+  function menuToggle() {
+    const words = /\b(menu|nav|navigation|hamburger|burger)\b/i;
+    const pool = Array.from(document.querySelectorAll('button,[role=button],a[aria-controls],[aria-expanded]'))
+      .filter(el => visible(el) && el.getAttribute('aria-expanded') !== 'true').slice(0, 300);
+    const text = el => [el.getAttribute('aria-label'), el.getAttribute('title'), el.id, typeof el.className === 'string' ? el.className.replace(/[-_]/g, ' ') : '', el.getAttribute('aria-controls'), el.textContent.trim().length < 20 ? el.textContent : ''].join(' ');
+    return pool.find(el => el.getAttribute('aria-haspopup') && words.test(text(el)))
+      || pool.find(el => words.test(text(el)) && el.getAttribute('aria-expanded') === 'false')
+      || pool.find(el => words.test(text(el)))
+      || null;
+  }
+
   let replaying = 0;
   function press(el) {
     replaying++; setTimeout(() => replaying--, 0);
@@ -550,11 +569,22 @@
       // running animations, since background frames may not advance them.
       for (let tries = 0; !el && tries < 8; tries++) {
         await sleep(150);
-        for (const animation of document.getAnimations()) {
-          const timing = animation.effect?.getComputedTiming();
-          if (timing && Number.isFinite(timing.endTime) && animation.playState === 'running') animation.finish();
-        }
+        finishAnimations();
         ({ el, status } = await findTarget(m.d));
+      }
+      // The control may live behind a closed menu on this screen size (a desktop nav item that sits
+      // in the hamburger menu on tablets and phones). Open the menu and look again; close it if the
+      // control still is not there.
+      let opened = null;
+      if (!el && !demo && (opened = menuToggle())) {
+        press(opened);
+        for (let tries = 0; !el && tries < 6; tries++) {
+          await sleep(150);
+          finishAnimations();
+          ({ el, status } = await findTarget(m.d));
+        }
+        if (el) status = 'revealed';
+        else if (opened.isConnected && visible(opened)) press(opened);
       }
       if (!el) return { status };
       if (m.expanded !== null && el.matches(m.expanded ? '[aria-expanded=true]' : '[aria-expanded=false]')) return { status: 'skip' };
