@@ -219,9 +219,14 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Workspace www access** — opening a saved workspace asks for each site's bare and `www` host together, like opening a site ([details](changelogs/CHANGELOG-workspace-www-access.md)) |
+| **2026-11-13** | 13:47:24 +05:30 | `a1a7e76` | **Open drawer reachable** — items further down an open drawer count as reachable, and mirrored clicks scroll their target into view ([details](changelogs/CHANGELOG-open-drawer-reachable.md)) |
+| **2026-11-13** | 13:45:11 +05:30 | `cd8cceb` | **Menu wait click** — a mirrored click waits briefly for a menu that is still opening before giving up ([details](changelogs/CHANGELOG-menu-wait-click.md)) |
 | **2026-11-13** | 17:14:14 +09:00 | `a84c1d3` | **Saved workspaces** — save the current setup under a name and reopen it, with the last session kept automatically ([details](changelogs/CHANGELOG-saved-workspaces.md)) |
 | **2026-11-13** | 17:14:14 +09:00 | `a84c1d3` | **Report export** — export the difference report as Markdown, CSV or HTML, optionally with a screenshot per finding ([details](changelogs/CHANGELOG-report-export.md)) |
 | **2026-11-13** | 17:14:14 +09:00 | `a84c1d3` | **Smoke test** — `tests/smoke.mjs` plays the guided demo in headless Chrome and checks every step, on each push and pull request ([details](changelogs/CHANGELOG-smoke-test.md)) |
+| **2026-11-13** | 13:28:34 +05:30 | `ba6f473` | **Redirect www access** — opening a site asks for its bare and `www` host together, so redirects between them need no second prompt ([details](changelogs/CHANGELOG-redirect-www-access.md)) |
+| **2026-11-13** | 13:26:06 +05:30 | `00bc914` | **Address bar site** — the address bar keeps the opened site's address instead of clearing ([details](changelogs/CHANGELOG-address-bar-site.md)) |
 | **2026-11-13** | 02:29:23 +09:00 | `34199be` | **Grouped findings** — the difference report lists each problem once with the screens it affects, with **By device** for the per-screen list ([details](changelogs/CHANGELOG-grouped-findings.md)) |
 | **2026-11-13** | 02:02:13 +09:00 | `c9dde7a` | **Address placeholder** — the address bar's example is just `https://your-site.com`, without `localhost:3000` ([details](changelogs/CHANGELOG-address-placeholder.md)) |
 | **2026-11-13** | 01:14:00 +09:00 | `e4d22de` | **Demo tour pointer** — a pointer performs each demo action, with the explanation beside the control and a result label on every preview ([details](changelogs/CHANGELOG-demo-tour-pointer.md)) |

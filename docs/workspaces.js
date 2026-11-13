@@ -80,8 +80,9 @@
     restoring = true;
     try {
       if (external.length) {
-        // One request for every site, while the click still counts as the user's gesture.
-        const granted = await chrome.permissions.request({ origins: [...new Set(external.map(originPattern))] });
+        // One request for every site, while the click still counts as the user's gesture. Each site's bare and
+        // www host are asked for together, as when opening a site, so a redirect between them needs no second prompt.
+        const granted = await chrome.permissions.request({ origins: [...new Set(external.flatMap(twinOrigins))] });
         if (!granted) { say('Allow site access in Chrome to open this workspace.'); return; }
       }
       say(`Opening ${label}…`);
