@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samestate privacy policy</title>
+<meta name="description" content="How the Samestate Chrome extension handles your data: everything runs locally, nothing is collected.">
+<link rel="icon" href="icons/48.png">
+<style>
+:root{
+  color-scheme:light;
+  --page:#f3f5fb;
+  --ink:#1b2336;
+  --soft:#55648a;
+  --rule:#d5dbea;
+  --link:#2f5fc4;
+  --mark:#2b3a5c;
+  --chip:#e4e9f6;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    color-scheme:dark;
+    --page:#2b3a5c;
+    --ink:#e9eefb;
+    --soft:#a3b1d1;
+    --rule:#44557e;
+    --link:#6ea8ff;
+    --mark:#e9eefb;
+    --chip:#3a4b73;
+  }
+}
+*{box-sizing:border-box}
+html{background:var(--page)}
+body{margin:0;color:var(--ink);font:17px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:40rem;margin:0 auto;padding:4rem 1.5rem 5rem}
+header{display:flex;align-items:center;gap:.9rem;margin-bottom:2.75rem}
+header img{width:44px;height:44px;border-radius:10px}
+header a{color:var(--mark);text-decoration:none;font-weight:650;font-size:1.05rem}
+h1{font-size:2.4rem;line-height:1.1;letter-spacing:-.02em;margin:0 0 .6rem;font-weight:700}
+.updated{color:var(--soft);margin:0 0 2.5rem}
+.summary{background:var(--chip);border-radius:12px;padding:1.25rem 1.4rem;margin:0 0 3rem;font-size:1.1rem}
+.summary p{margin:0}
+h2{font-size:1.2rem;margin:2.5rem 0 .5rem;font-weight:650}
+p,li{max-width:66ch}
+ul{padding-left:1.2rem}
+li{margin:.35rem 0}
+a{color:var(--link)}
+a:focus-visible{outline:2px solid var(--link);outline-offset:3px;border-radius:3px}
+code{font:.88em ui-monospace,Menlo,Consolas,monospace;background:var(--chip);padding:.1em .35em;border-radius:5px}
+footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color:var(--soft);font-size:.95rem}
+@media (max-width:520px){body{font-size:16px}h1{font-size:2rem}main{padding-top:2.5rem}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/128.png" alt="">
+    <a href="./">Samestate</a>
+  </header>
+
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated November 13, 2026</p>
+
+  <div class="summary">
+    <p>Samestate runs entirely in your browser. It does not collect, store on any server, sell, or share your personal data or browsing activity. There are no accounts, analytics, or tracking.</p>
+  </div>
+
+  <h2>What Samestate does</h2>
+  <p>Samestate is a Chrome extension that shows a website on a wall of device previews, keeps those previews in the same state as you interact with one of them, and reports layout differences between devices.</p>
+
+  <h2>Pages you preview</h2>
+  <p>Samestate only works with sites you choose to open in it. Chrome asks for your permission the first time you open each site, and you can remove that permission at any time from the extension's settings in Chrome.</p>
+  <p>To build its difference report, Samestate measures element structure, visibility, and layout inside the previews. This happens locally on your device and is never sent anywhere.</p>
+  <ul>
+    <li>Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection.</li>
+    <li><strong>Match visible text</strong> is off by default. When you turn it on, rendered text is read locally and compared using temporary fingerprints. Raw page text is kept out of the report and the sync log.</li>
+    <li>Developers can mark elements with <code>data-samestate-private</code> to exclude their text from matching.</li>
+    <li>Previews start with separate, temporary browser storage and do not reuse your existing sign-ins.</li>
+  </ul>
+
+  <h2>How previews are allowed to load</h2>
+  <p>Many sites block being shown inside a frame. For the sites you approve, Samestate removes framing-related response headers so they can load in its device previews. This only applies inside the Samestate tab, only to frames, only for the sites you opened, and stops when you close that tab. It does not change how those sites behave in any other tab.</p>
+
+  <h2>Data stored on your device</h2>
+  <p>Samestate saves a small amount of data in your browser so your setup is there next time: saved workspaces, custom devices, and your preferred report view. It also keeps the list of sites open in the current Samestate tab in temporary session storage. This data stays on your device. Uninstalling the extension removes it.</p>
+  <p>Screenshots, recordings, and exported reports are created locally and only saved where you choose to download them.</p>
+
+  <h2>Theme presets</h2>
+  <p>If you use the Theme panel and pick a tweakcn preset, Samestate downloads that preset's theme data from <a href="https://tweakcn.com">tweakcn.com</a>. These requests send no cookies and no referrer, and include nothing about you or the sites you preview. If you don't use tweakcn presets, Samestate makes no outside requests of its own.</p>
+
+  <h2>Sharing and selling</h2>
+  <p>Samestate does not sell, rent, or transfer any user data to third parties, and does not use data for advertising, credit decisions, or any purpose unrelated to its single function.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the updated version will be posted on this page with a new date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or concerns? <a href="https://github.com/shouvik12/samestate/issues/new">Open an issue on GitHub</a>.</p>
+
+  <footer>Samestate is open source. You can read every line of its code at <a href="https://github.com/shouvik12/samestate">github.com/shouvik12/samestate</a>.</footer>
+</main>
+</body>
+</html>
