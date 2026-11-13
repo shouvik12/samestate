@@ -309,7 +309,11 @@ function buildFrames() {
 }
 
 function selectDevice(d, selected) {
+  const wasEmpty = selected && !active().length;
   d.on = selected;
+  // A screen switched back on is placed next to the screens already showing, not at the spot it
+  // had before, which can be far to the right of an otherwise empty wall.
+  if (selected) d.x = d.y = null;
   if (target && selected) addFrame(d);
   else removeFrame(d);
   if (leader === d && !d.el) setLeader(active().find(item => item.ready) || null);
@@ -317,6 +321,7 @@ function selectDevice(d, selected) {
   findings = [];
   renderFindings();
   updateWall();
+  if (wasEmpty) { cvAllow = Date.now() + 300; cv.scrollLeft = cv.scrollTop = 0; cvPos = [0, 0]; updateWallScroll(); }
 }
 
 function deviceOptions() {
