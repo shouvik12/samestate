@@ -129,7 +129,10 @@
 
   function describe(el) {
     const control = demo && demoControls.find(([, selector]) => el.matches(selector));
-    return { kind: kindOf(el), path: elementPath(el), sig: signature(el), ...(control && { demoControl: control[0] }) };
+    // Whether the control is part of the site's navigation, the only place another screen size may
+    // have tucked it behind a menu button.
+    const nav = !!el.closest('nav,header,[role=navigation],[role=menubar],[role=menu]');
+    return { kind: kindOf(el), path: elementPath(el), sig: signature(el), ...(nav && { nav: true }), ...(control && { demoControl: control[0] }) };
   }
 
   // The one visible control here with the same attributes as the control used on the leading screen.
@@ -213,6 +216,16 @@
       const timing = animation.effect?.getComputedTiming();
       if (timing && Number.isFinite(timing.endTime) && animation.playState === 'running') animation.finish();
     }
+  }
+
+  // Closes a menu the agent opened itself: its own button when still reachable, else a close button
+  // that has appeared (the drawer usually covers the hamburger), else Escape.
+  function closeMenu(toggle) {
+    if (toggle.isConnected && visible(toggle)) return press(toggle);
+    const close = Array.from(document.querySelectorAll('button,[role=button]'))
+      .find(el => visible(el) && /\bclose\b/i.test([el.getAttribute('aria-label'), el.getAttribute('title'), typeof el.className === 'string' ? el.className.replace(/[-_]/g, ' ') : '', el.textContent.trim().length < 12 ? el.textContent : ''].join(' ')));
+    if (close) return press(close);
+    for (const type of ['keydown', 'keyup']) document.dispatchEvent(new KeyboardEvent(type, { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
   }
 
   // The page's closed navigation menu button (hamburger), if it shows one.
@@ -576,7 +589,7 @@
       // in the hamburger menu on tablets and phones). Open the menu and look again; close it if the
       // control still is not there.
       let opened = null;
-      if (!el && !demo && (opened = menuToggle())) {
+      if (!el && !demo && m.d.nav && (opened = menuToggle())) {
         press(opened);
         for (let tries = 0; !el && tries < 6; tries++) {
           await sleep(150);
@@ -584,7 +597,7 @@
           ({ el, status } = await findTarget(m.d));
         }
         if (el) status = 'revealed';
-        else if (opened.isConnected && visible(opened)) press(opened);
+        else closeMenu(opened);
       }
       if (!el) return { status };
       if (m.expanded !== null && el.matches(m.expanded ? '[aria-expanded=true]' : '[aria-expanded=false]')) return { status: 'skip' };
