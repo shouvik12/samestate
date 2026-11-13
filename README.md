@@ -33,7 +33,7 @@ that are too small, text that disappears.
 
 | | |
 |---|---|
-| 🔁 **Logical sync** | Clicks, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
+| 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
 | 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input and usability, per device. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
@@ -57,6 +57,9 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Click and scroll sync.** Samestate matches controls and scroll sections by their position in the page structure.
   Enable **Match visible text** to help match controls and compare content when layouts use different markup.
   The bundled demo also maps the desktop Products menu to the phone’s navigation drawer.
+- **Link sync.** Following a link on one screen opens the same page on every linked screen, including
+  same-page links (`#section`) and page changes in single-page apps. Turn it off with **Links & pages** in the
+  **Sync** drawer. Form submissions, downloads, links to other sites and back/forward stay on the screen you used.
 - **Video playback.** Play or pause the main video across the wall from the **Sync** drawer.
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
@@ -201,6 +204,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 ## Known limits
 
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
+- In a single-page app, the other screens load the new address as a full page rather than through the app's
+  router, so state kept only in memory (an open filter, a typed search) is not carried over.
 - Device frames have the device's size but send your browser's own user-agent. Sites that pick a
   mobile layout on the server by user-agent will show desktop markup.
 - CSS `hover` / `pointer` media queries and device pixel ratio report your real computer.
@@ -219,6 +224,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
 | **2026-11-13** | 15:07:16 +05:30 | `0e8cbad` | **Nav menu reveal limits** — the menu is only opened for navigation controls, and closed again by its button, a close button or Escape ([details](changelogs/CHANGELOG-nav-menu-reveal-limits.md)) |
 | **2026-11-13** | 14:54:27 +05:30 | `e0f8262` | **Re-enabled device placement** — a device switched back on is placed next to the visible screens instead of its old spot ([details](changelogs/CHANGELOG-reenabled-device-placement.md)) |
 | **2026-11-13** | 14:32:04 +05:30 | `eda2e33` | **Hamburger reveal** — a mirrored control hidden behind a closed menu button on another screen size is reached by opening the menu ([details](changelogs/CHANGELOG-hamburger-reveal.md)) |

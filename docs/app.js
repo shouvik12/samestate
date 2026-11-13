@@ -11,8 +11,8 @@ let pageSteps = false, sameDevice = false, sharedDeviceId = 'iphone', nextPage =
 const allScreens = () => [...DEVICES, ...pageScreens];
 const viewScreens = () => pageSteps ? pageScreens : DEVICES.filter(d => d.on);
 const presetFor = d => (sameDevice || d.step) ? DEVICES.find(device => device.id === sharedDeviceId) || d : d;
-const SYNC = { click: ['Clicks & menus', true], scroll: ['Scrolling', true], hover: ['Hover', true], media: ['Video playback', true] };
-const KIND_SYNC = { click: 'click', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover', media: 'media' };
+const SYNC = { click: ['Clicks & menus', true], nav: ['Links & pages', true], scroll: ['Scrolling', true], hover: ['Hover', true], media: ['Video playback', true] };
+const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover', media: 'media' };
 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
 let textSalt = null, wallRevision = 0;
@@ -1295,7 +1295,7 @@ async function tourScroll(t, id, section) { // the pointer rests on the preview 
 // A short label on a preview saying what just happened there.
 const TOUR_BADGES = {
   direct: '✓ same control', semantic: '✓ matched', revealed: '✓ opened its menu first', skip: 'already there',
-  playing: '▶ playing', paused: 'paused', muted: '▶ playing muted'
+  playing: '▶ playing', paused: 'paused', muted: '▶ playing muted', navigated: '✓ opened the page'
 };
 function tourBadge(device, text, kind = '') {
   if (!tourRunning || !device?.el || !device.body) return;
@@ -1421,6 +1421,7 @@ function tourCompare() {
 
 // One step: `at` is what the ring and the message attach to, `run` moves the pointer and does the work.
 const demoClick = (id, sel) => async t => { if (await t.click(inScreen(id, sel))) play(id, { do: 'click', sel }); };
+const demoLink = (id, sel) => async t => { if (await t.click(inScreen(id, sel))) play(id, { do: 'link', sel }); };
 const STEPS = [
   {
     title: 'Click sync', at: inScreen('desktop', '.dd-btn'), wait: 4400,
@@ -1505,6 +1506,16 @@ const STEPS = [
       alignScreens();
       tourBadge(dev('iphone'), 'aligned', '');
     }
+  },
+  {
+    title: 'Follow links', at: inScreen('desktop', '.desk > a[href="pricing.html"]'), wait: 4200,
+    text: 'Following a link on one screen opens the same page on all of them. The Desktop clicks <b>Pricing</b> in its bar, and every phone and tablet opens the pricing page too.',
+    run: async t => { $('#panel').hidden = true; await demoLink('desktop', '.desk > a[href="pricing.html"]')(t); }
+  },
+  {
+    title: 'Back from any screen', at: inScreen('iphone', '.cta a[href="index.html"]'), wait: 4000,
+    text: 'The iPhone follows <b>Back to overview</b>, and the other screens go back with it. <b>Links & pages</b> in the Sync drawer turns this off.',
+    run: demoLink('iphone', '.cta a[href="index.html"]')
   },
   {
     title: 'Free placement', at: () => dev('iphone').el, wait: 3200,
@@ -1740,7 +1751,7 @@ function handleMessage(device, message) {
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;
       setLeader(device);
       if (!device.linked) return; // an unlinked screen moves on its own
-      const id = ['click', 'swipe', 'media'].includes(message.kind) ? ++aid : 0;
+      const id = ['click', 'swipe', 'media', 'navigate'].includes(message.kind) ? ++aid : 0;
       if (id) startEntry(id, device, message);
       const { type, __samestate, ...action } = message;
       for (const other of device.site ? siteScreens(device.site) : active()) {
@@ -1872,6 +1883,11 @@ function playbackResult(message, device) {
   $('#video-status').textContent = `${verb} on ${request.applied}/${request.total}${muted}${detail}`;
 }
 
+// The page part of an address, for the Sync log: /pricing, /docs?page=2#setup
+function pageLabel(address) {
+  try { const url = new URL(address); return (url.pathname + url.search + url.hash) || '/'; } catch { return 'a page'; }
+}
+
 function startEntry(id, device, message) {
   const box = $('#log');
   box.querySelector('.muted')?.remove();
@@ -1883,11 +1899,14 @@ function startEntry(id, device, message) {
   if (message.kind === 'media') {
     const action = message.playing ? 'play video' : 'pause video';
     heading.textContent = device ? reportName(device) + ' · ' + action : (message.playing ? 'Play all videos' : 'Pause all videos');
+  } else if (message.kind === 'navigate') {
+    heading.textContent = reportName(device) + ' · open ' + pageLabel(message.url);
   } else {
     heading.textContent = message.kind === 'swipe' ? reportName(device) + ' · swipe' : reportName(device) + ' · click ' + name;
   }
   entry.appendChild(heading);
   if (device && message.kind === 'click') tourBadge(device, device.touch ? 'tapped here' : 'clicked here', 'lead');
+  if (device && message.kind === 'navigate') tourBadge(device, 'followed a link', 'lead');
   box.prepend(entry);
   entries.set(id, entry);
   if (entries.size > 80) {
@@ -1901,7 +1920,7 @@ function addResult(message, device) {
   const entry = entries.get(message.aid);
   const labels = {
     direct: 'same', semantic: 'matched', revealed: 'revealed', skip: 'skipped', none: 'no match', hidden: 'unreachable',
-    playing: 'playing', paused: 'paused', muted: 'playing muted', blocked: 'blocked by Chrome', 'no-video': 'no video', unavailable: 'unavailable'
+    navigated: 'opened', playing: 'playing', paused: 'paused', muted: 'playing muted', blocked: 'blocked by Chrome', 'no-video': 'no video', unavailable: 'unavailable'
   };
   if (!entry || !Object.hasOwn(labels, message.status)) return;
   tourBadge(device, TOUR_BADGES[message.status] || labels[message.status], Object.hasOwn(TOUR_BADGES, message.status) ? '' : 'miss');

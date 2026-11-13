@@ -131,6 +131,13 @@ const PROBE = `(() => {
       return [!phone().linked && stayed && desk > memory.deskScroll + 100, 'iPhone linked: ' + phone().linked + ', stayed: ' + stayed + ', Desktop scrolled ' + memory.deskScroll + ' → ' + desk];
     },
     'Align screens': () => [phone().linked && scrollOf(phone()) > memory.phoneScroll + 100, 'iPhone linked: ' + phone().linked + ', scrolled ' + memory.phoneScroll + ' → ' + scrollOf(phone())],
+    'Follow links': () => {
+      const pricing = count(d => d.location.pathname.endsWith('/pricing.html'));
+      const entry = [...document.querySelectorAll('#log .entry')].find(e => e.querySelector('.h').textContent.startsWith('Desktop · open'));
+      const opened = [...(entry?.querySelectorAll('.tag') || [])].filter(tag => tag.textContent === 'opened').length;
+      return [pricing === 7 && opened === 6, 'screens on pricing.html: ' + pricing + ', Sync log "opened": ' + opened];
+    },
+    'Back from any screen': () => { const home = count(d => d.location.pathname.endsWith('/index.html')); return [home === 7, 'screens back on index.html: ' + home]; },
     'Free placement': () => {
       const between = phone().x > byId('desktop').x && phone().x < byId('macbook').x;
       return [document.querySelector('#frames').classList.contains('free') && between, 'x: Desktop ' + byId('desktop').x + ', iPhone ' + phone().x + ', MacBook ' + byId('macbook').x];

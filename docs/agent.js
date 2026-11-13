@@ -369,6 +369,38 @@
     if (el && canMirrorClick(el)) mirrorClick(el);
   }, true);
 
+  // A link followed on this screen, or a page change a click here started (single-page apps change pages
+  // without loading one), opens the same address on the other screens. Form submissions, downloads, other
+  // sites and back/forward stay on this screen.
+  let following = null; // the address this screen was told to open, so it is not sent back
+  window.navigation?.addEventListener('navigate', event => {
+    if (cfg.pageSteps || !cfg.inspect || replaying || event.navigationType !== 'push') return;
+    if (event.downloadRequest != null || event.formData || event.sourceElement?.closest?.('form,[contenteditable]')) return;
+    if (!event.userInitiated && now() - playbackGesture > 1000) return; // playbackGesture is the last trusted click or key
+    let url;
+    try { url = new URL(event.destination.url); } catch { return; }
+    if (url.origin !== location.origin || url.href === following) return;
+    act('navigate', { url: url.href });
+    // Loading a new page ends this document before the message above reaches Samestate, which then
+    // drops it, so this screen goes there itself once the message is on its way.
+    if (!event.destination.sameDocument && event.cancelable) {
+      event.preventDefault();
+      following = url.href;
+      setTimeout(() => location.assign(url.href), 120);
+    }
+  });
+  function followAddress(address) {
+    let url;
+    try { url = new URL(address); } catch { return { status: 'none' }; }
+    if (url.origin !== location.origin || url.username || url.password) return { status: 'none' };
+    if (url.href === location.href) return { status: 'skip' };
+    following = url.href;
+    const samePage = url.pathname === location.pathname && url.search === location.search;
+    // After the result has been sent: a full page load ends this script.
+    setTimeout(() => { if (samePage && url.hash) location.hash = url.hash; else location.assign(url.href); }, 0);
+    return { status: 'navigated' };
+  }
+
   window.navigation?.addEventListener('navigate', event => {
     if (!cfg.pageSteps || !event.isTrusted || !event.cancelable || !event.canIntercept || event.defaultPrevented) return;
     const source = event.sourceElement;
@@ -575,6 +607,7 @@
   let hoverEl = null;
   const handlers = {
     media: applyPlayback,
+    navigate: m => followAddress(m.url),
     async click(m) {
       let { el, status } = await findTarget(m.d);
       // A control inside a menu or drawer that is still opening (for example, the previous mirrored
@@ -730,6 +763,12 @@
     const el = m.sel && document.querySelector(m.sel); if (!el) return; send('active');
     if (m.do === 'click' && canMirrorClick(el)) { flash(el); press(el); mirrorClick(el); }
     else if (m.do === 'scroll') { const y0 = scrollY, y = el.getBoundingClientRect().top + scrollY - 90; for (let i = 1; i <= 28; i++) { window.scrollTo({ top: y0 + (y - y0) * i / 28, behavior: 'instant' }); act('scroll', scrollState()); await sleep(28); } }
+    else if (m.do === 'link' && el.matches('a[href]')) { // a synthetic click is not user-initiated, so the tour shares the address itself
+      flash(el);
+      act('navigate', { url: el.href });
+      following = el.href;
+      setTimeout(() => location.assign(el.href), 250);
+    }
     else if (m.do === 'step' && cfg.pageSteps) { // the tour's clicks are synthetic, so Page steps is told directly what a real click would open
       flash(el);
       const link = el.closest('a[href]');
