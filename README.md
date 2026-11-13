@@ -233,6 +233,8 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 |------|-------------|---------|------------------|
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
+| **2026-11-13** | 22:17:23 +05:30 | `95c6a54` | **Ignore zip builds** — `*.zip` is ignored, so packaged extension zips are not committed ([details](changelogs/CHANGELOG-ignore-zip-builds.md)) |
+| **2026-11-13** | 22:11:09 +05:30 | `f91e5ed` | **Privacy policy** — a privacy policy page, `docs/privacy.html`, for the Chrome Web Store listing ([details](changelogs/CHANGELOG-privacy-policy.md)) |
 | **2026-11-14** | 00:01:11 +09:00 | `fe49f5d` | **Device identity** — phone and tablet previews tell the page's scripts what they are: user-agent, platform, touch, pixel ratio, screen size and hover/pointer ([details](changelogs/CHANGELOG-device-identity.md)) |
 | **2026-11-13** | 20:21:47 +09:00 | `df5f6f4` | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
 | **2026-11-13** | 15:07:16 +05:30 | `0e8cbad` | **Nav menu reveal limits** — the menu is only opened for navigation controls, and closed again by its button, a close button or Escape ([details](changelogs/CHANGELOG-nav-menu-reveal-limits.md)) |
