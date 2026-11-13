@@ -679,7 +679,8 @@ async function open(url, alreadyAllowed = false) {
   $('#match-text').checked = false;
   $('#page-steps-status').textContent = '';
   $('#joblog').textContent = '';
-  $('#src').value = '';
+  // Keep the opened site in the address bar so it shows what is previewing, not the placeholder.
+  $('#src').value = isDemo || pageSteps ? '' : url.href;
   buildFrames();
   findings = [];
   renderFindings();
