@@ -538,7 +538,18 @@
   const handlers = {
     media: applyPlayback,
     async click(m) {
-      const { el, status } = await findTarget(m.d);
+      let { el, status } = await findTarget(m.d);
+      // A control inside a menu or drawer that is still opening (for example, the previous mirrored
+      // click just opened it) is not visible yet. Wait for it instead of giving up, and finish
+      // running animations, since background frames may not advance them.
+      for (let tries = 0; !el && tries < 8; tries++) {
+        await sleep(150);
+        for (const animation of document.getAnimations()) {
+          const timing = animation.effect?.getComputedTiming();
+          if (timing && Number.isFinite(timing.endTime) && animation.playState === 'running') animation.finish();
+        }
+        ({ el, status } = await findTarget(m.d));
+      }
       if (!el) return { status };
       if (m.expanded !== null && el.matches(m.expanded ? '[aria-expanded=true]' : '[aria-expanded=false]')) return { status: 'skip' };
       if (m.open !== null && el.matches('details > summary') && el.parentElement.open === m.open) return { status: 'skip' };
