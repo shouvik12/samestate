@@ -93,16 +93,23 @@
     download(png, 'png');
   }
 
-  async function screenshot(stream, comparison) {
-    const failure = () => new Error('Chrome could not capture a frame. Keep this tab visible and try again.');
+  const frameFailure = () => new Error('Chrome could not capture a frame. Keep this tab visible and try again.');
+
+  // One frame of a device-wall capture, as an ImageBitmap the caller closes.
+  async function grabFrame(stream) {
     const [track] = stream.getVideoTracks();
-    if (track?.readyState !== 'live') throw failure();
+    if (track?.readyState !== 'live') throw frameFailure();
+    let timeout, expired = false;
+    return Promise.race([
+      new ImageCapture(track).grabFrame().then(frame => { if (expired) frame.close(); return frame; }),
+      new Promise((_, reject) => { timeout = setTimeout(() => { expired = true; reject(frameFailure()); }, 6000); })
+    ]).finally(() => clearTimeout(timeout));
+  }
+
+  async function screenshot(stream, comparison) {
+    const failure = frameFailure;
     if (!comparison) {
-      let timeout, expired = false;
-      const image = await Promise.race([
-        new ImageCapture(track).grabFrame().then(frame => { if (expired) frame.close(); return frame; }),
-        new Promise((_, reject) => { timeout = setTimeout(() => { expired = true; reject(failure()); }, 6000); })
-      ]).finally(() => clearTimeout(timeout));
+      const image = await grabFrame(stream);
       try { await saveFrame(image, image.width, image.height); } finally { image.close(); }
       return;
     }
@@ -215,6 +222,16 @@
       updateButtons();
     }
   });
+
+  // Used by report.js to take one screenshot per finding.
+  globalThis.wallCapture = {
+    available: canCapture && typeof ImageCapture === 'function',
+    start: element => captureWall(element),
+    frame: grabFrame,
+    stop: stopCapture,
+    error: captureError,
+    clearStatus: () => showStatus('')
+  };
 
   if (!canCapture) showStatus('Wall capture requires desktop Chrome.');
   frames.addEventListener('wall-view-changed', updateButtons);

@@ -10,10 +10,11 @@ When committing code changes, **always** include a changelog file that documents
 
 1. Run `git status --short` in the project root to see all changed files.
 
-2. If you changed `extension/agent.js`, `extension/app.js` or `extension/app.css`, copy them to `docs/` so the live demo stays identical:
+2. If you changed scripts or styles in `extension/`, copy them to `docs/` so the live demo stays identical:
 ```
-cp extension/agent.js extension/app.js extension/app.css docs/
+cp extension/*.js extension/app.css docs/ && rm docs/background.js
 ```
+   `background.js` only exists in the extension. Run `node tests/smoke.mjs` before committing.
    Apply the same edits to `docs/index.html` that you made to `extension/app.html`.
 
 3. Create a `changelogs/CHANGELOG-<topic>.md` file. The changelog MUST follow this two-part format:

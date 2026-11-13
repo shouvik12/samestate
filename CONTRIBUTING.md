@@ -14,14 +14,22 @@ Thanks for helping. Samestate is small and maintained by one person, so short, f
 2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the `extension` folder.
 3. After editing a file, click the reload icon on the Samestate card and reopen the Samestate tab.
 
-The live demo lives in `docs/` and is served by GitHub Pages.
+The live demo lives in `docs/` and is served by GitHub Pages. Copy changed scripts and styles from `extension/` to `docs/` so the two stay identical.
+
+## Testing
+
+`node tests/smoke.mjs` plays the guided demo from `docs/` in headless Chrome and checks what each step did, then checks report export and saved workspaces. It needs Node 22 or later and Chrome, and no packages. Set `CHROME_PATH` if Chrome is not in the usual place, or `SMOKE_HEADED=1` to watch it run. The **Smoke test** check runs it on every pull request.
+
+If you change what a tour step does, update its check in `tests/smoke.mjs` (the checks are keyed by step title).
 
 ## Where things are
 
 - `extension/background.js`: header handling and frame injection for Samestate tabs only
 - `extension/agent.js`: captures interactions and replays them by meaning
-- `extension/app.js`, `app.html`, `app.css`: the device wall, sync log and difference engine
-- `docs/`: the live demo and guided tour
+- `extension/app.js`, `app.html`, `app.css`: the device wall, sync log, difference engine and guided tour
+- `extension/report.js`: report export; `extension/workspaces.js`: saved setups
+- `docs/`: the live demo
+- `tests/smoke.mjs`: the end-to-end smoke test
 
 ## Pull requests
 

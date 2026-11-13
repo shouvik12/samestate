@@ -40,6 +40,18 @@
       </div>
     </details>
 
+    <details class="sidebar-drawer" id="workspaces-drawer">
+      <summary>Workspaces</summary>
+      <div class="drawer-body">
+        <form id="workspace-form" class="workspace-form">
+          <input id="workspace-name" maxlength="60" placeholder="Name this setup" aria-label="Workspace name" autocomplete="off" required>
+          <button class="pill" type="submit">Save</button>
+        </form>
+        <ul id="workspace-list" class="workspace-list"></ul>
+        <p id="workspace-status" class="workspace-status" role="status" hidden></p>
+      </div>
+    </details>
+
     <details class="sidebar-drawer" id="devices-drawer" open>
       <summary>Devices <span id="active-device-count" class="drawer-count" aria-label="Selected devices">7</span></summary>
       <div class="drawer-body">
@@ -222,7 +234,19 @@
   <aside class="right" id="panel" hidden>
     <div class="tabs"><button data-tab="diff" class="on">Differences</button><button data-tab="log">Sync log</button><button id="closepanel" title="Close">✕</button></div>
     <div class="pane" id="pane-diff">
-      <div class="report-view" id="report-view" role="group" aria-label="List findings" hidden><button type="button" data-view="issue" aria-pressed="true">By issue</button><button type="button" data-view="device" aria-pressed="false">By device</button></div>
+      <div class="report-bar" id="report-bar" hidden>
+        <div class="report-view" id="report-view" role="group" aria-label="List findings"><button type="button" data-view="issue" aria-pressed="true">By issue</button><button type="button" data-view="device" aria-pressed="false">By device</button></div>
+        <details class="report-export" id="report-export">
+          <summary>Export</summary>
+          <div class="export-menu">
+            <button type="button" data-export="md">Markdown (.md)</button>
+            <button type="button" data-export="csv">CSV (.csv)</button>
+            <button type="button" data-export="html">HTML page (.html)</button>
+            <button type="button" data-export="html-shots">HTML with screenshots</button>
+          </div>
+        </details>
+      </div>
+      <p class="export-status" id="export-status" role="status" hidden></p>
       <div class="chips" id="chips"></div>
       <div id="findings"><p class="muted">Open a site, then press <b>Detect differences</b>. Every device is measured and compared with the reference device.</p></div>
     </div>
@@ -290,5 +314,7 @@
 <script src="themes.js"></script>
 <script src="app.js"></script>
 <script src="capture.js"></script>
+<script src="report.js"></script>
+<script src="workspaces.js"></script>
 </body>
 </html>

@@ -1114,6 +1114,8 @@ const play = (id, m) => post(dev(id), 'demo', m);
 const calmMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const tourPointer = $('#tour-cursor');
 const within = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// ?tour-pace=0.3 shortens the reading time and the pause after each step, for tests. Waits a step needs are unchanged.
+const tourPace = within(Number(new URLSearchParams(location.search).get('tour-pace')) || 1, 0.05, 1);
 let tour = 0, tourRunning = false, tourPaused = false, tourAnchor = null, tourSide = null, tourWatch = 0;
 const touring = id => id === tour;
 
@@ -1627,9 +1629,10 @@ async function startTour() {
     showStep(i);
     tourFocus(step.at, step.side);
     // Time to read the message before the pointer moves.
-    if (!await nap(id, Math.min(3000, 900 + step.text.split(' ').length * 70))) return;
+    if (!await nap(id, Math.min(3000, 900 + step.text.split(' ').length * 70) * tourPace)) return;
     await step.run?.(t);
-    if (!await nap(id, step.wait)) return;
+    if (!await nap(id, step.wait * tourPace)) return;
+    document.dispatchEvent(new CustomEvent('samestate-tour-step', { detail: { step: i + 1, title: step.title } })); // read by tests/smoke.mjs
   }
   tourFocus(null);
   tourRunning = false;
@@ -2049,13 +2052,16 @@ async function detect(quiet) {
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
+  lastScan = { at: new Date(), screens: snaps.map(s => s.dev) };
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
 // The report lists each problem once with the screens it affects ("By issue"), or every screen's own list ("By device").
-let reportView = 'issue', reportGroups = [];
+let reportView = 'issue', reportGroups = [], lastScan = null;
 try { if (localStorage.getItem('samestate.reportView') === 'device') reportView = 'device'; } catch {}
 const pickedScreen = new Map(); // issue group → the screen whose details are shown
+const SEVERITY = { issue: 0, warn: 1, info: 2 };
 
+// One entry per problem: its findings in screen order, the screens it affects, most severe and widespread first.
 function issueGroups(list) {
   const groups = new Map();
   for (const f of list) {
@@ -2065,18 +2071,22 @@ function issueGroups(list) {
     if (!group) groups.set(key, group = { key, site, sev: f.sev, cat: f.cat, kind: f.kind, items: [] });
     group.items.push(f);
   }
-  return [...groups.values()];
+  for (const g of groups.values()) {
+    g.items.sort((a, b) => a.dev.slot - b.dev.slot);
+    g.screens = [...new Set(g.items.map(f => f.dev))]; // a screen can have the same problem more than once, such as two overlays
+  }
+  return [...groups.values()].sort((a, b) => SEVERITY[a.sev] - SEVERITY[b.sev] || b.screens.length - a.screens.length || CATS.indexOf(a.cat) - CATS.indexOf(b.cat));
 }
 
 function renderFindings() {
-  const order = { issue: 0, warn: 1, info: 2 };
+  const order = SEVERITY;
   const byIssue = reportView === 'issue';
   findings.forEach((f, i) => { f.i = i; });
   const groups = issueGroups(findings);
   const counted = byIssue ? groups : findings;
   const count = cat => counted.filter(item => !cat || item.cat === cat).length;
   const cats = CATS.filter(c => findings.some(f => f.cat === c));
-  $('#report-view').hidden = !findings.length;
+  $('#report-bar').hidden = !findings.length;
   document.querySelectorAll('#report-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === reportView)));
   $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
   $('#diffn').textContent = counted.length || '';
@@ -2086,11 +2096,6 @@ function renderFindings() {
   let html = '';
   if (byIssue) {
     reportGroups = groups.filter(g => !catFilter || g.cat === catFilter);
-    for (const g of reportGroups) {
-      g.items.sort((a, b) => screens.indexOf(a.dev) - screens.indexOf(b.dev));
-      g.screens = [...new Set(g.items.map(f => f.dev))]; // a screen can have the same problem more than once, such as two overlays
-    }
-    reportGroups.sort((a, b) => order[a.sev] - order[b.sev] || b.screens.length - a.screens.length || CATS.indexOf(a.cat) - CATS.indexOf(b.cat));
     for (const site of sitesMode ? sitePanels : [null]) {
       const own = reportGroups.filter(g => g.site === site);
       if (!own.length) continue;

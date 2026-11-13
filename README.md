@@ -114,6 +114,21 @@ With a preview open in desktop Chrome, click **Screenshot** or **Record**, then 
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
+## Export the difference report
+
+After **Detect differences**, open **Export** in the Differences panel and choose a format. Every finding is exported, whichever category filter is selected.
+
+- **Markdown** for pasting into an issue or a pull request, with each problem once and a line per affected screen.
+- **CSV** with one row per finding and screen, for spreadsheets and bug trackers.
+- **HTML page**, a single file that opens in any browser.
+- **HTML with screenshots** adds a cropped screenshot of the affected screen to each finding, with the elements outlined. Share the current Samestate tab when Chrome asks. Samestate shows each screen on its own in Focus mode while it takes the screenshots, then returns to your layout. This option is on the device wall only, not in **Compare sites**.
+
+## Save and reopen a setup
+
+Open **Workspaces** in the sidebar, enter a name, and click **Save**. A workspace keeps the site, the selected devices and their rotation, scale and link state, the layout (mode, zoom, alignment, lock and dragged positions), **Views** settings and page steps, **Compare sites** columns, sync settings, themes and annotations. Click **Open** to return to it; Chrome asks once for any sites that need access. Saving under an existing name replaces it.
+
+The setup in use when the Samestate tab closes is kept as **Last session**. Workspaces are stored in this browser only. Dragged positions in comparison columns are not saved.
+
 ## Sync video playback
 
 Open the video’s page directly in Samestate, then open **Sync** and click **Play all** or **Pause all**. With **Video playback** checked, playing or pausing in one linked preview also updates the other linked previews.
@@ -143,9 +158,14 @@ extension/
   annotations.js  Notes, strokes, lines, and arrows on individual previews.
   themes.js       Loads tweakcn presets, parses custom CSS, and builds preview styles.
   capture.js      Local screenshots and recordings of the device wall.
+  report.js       Exports the difference report as Markdown, CSV or HTML.
+  workspaces.js   Saves and reopens setups in the browser's local storage.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
+tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
 ```
+
+Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`.
 
 ## Known limits
 
@@ -167,6 +187,9 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Saved workspaces** — save the current setup under a name and reopen it, with the last session kept automatically ([details](changelogs/CHANGELOG-saved-workspaces.md)) |
+| **2026-11-13** | — | — | **Report export** — export the difference report as Markdown, CSV or HTML, optionally with a screenshot per finding ([details](changelogs/CHANGELOG-report-export.md)) |
+| **2026-11-13** | — | — | **Smoke test** — `tests/smoke.mjs` plays the guided demo in headless Chrome and checks every step, on each push and pull request ([details](changelogs/CHANGELOG-smoke-test.md)) |
 | **2026-11-13** | 02:29:23 +09:00 | `34199be` | **Grouped findings** — the difference report lists each problem once with the screens it affects, with **By device** for the per-screen list ([details](changelogs/CHANGELOG-grouped-findings.md)) |
 | **2026-11-13** | 02:02:13 +09:00 | `c9dde7a` | **Address placeholder** — the address bar's example is just `https://your-site.com`, without `localhost:3000` ([details](changelogs/CHANGELOG-address-placeholder.md)) |
 | **2026-11-13** | 01:14:00 +09:00 | `e4d22de` | **Demo tour pointer** — a pointer performs each demo action, with the explanation beside the control and a result label on every preview ([details](changelogs/CHANGELOG-demo-tour-pointer.md)) |

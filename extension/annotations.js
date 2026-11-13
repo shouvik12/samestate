@@ -157,7 +157,7 @@ function mountPreviewAnnotations(iframe, triggerHost, toolbarHost, onToggle) {
     node.addEventListener('click', () => {
       if (tool === 'note') editAnnotationNote(node.textContent, value => { if (value) node.textContent = value; });
     });
-    marks.push({ node });
+    marks.push({ node, point });
     layer.append(node);
     redraw();
   }
@@ -212,6 +212,22 @@ function mountPreviewAnnotations(iframe, triggerHost, toolbarHost, onToggle) {
       return mark;
     },
     note: placeNote,
+    // Saved workspaces keep marks as plain data: strokes as points, notes as text at a point.
+    snapshot() {
+      return marks.map(mark => mark.node
+        ? { note: mark.node.textContent, x: mark.point.x, y: mark.point.y }
+        : { tool: mark.tool, points: mark.points.map(({ x, y }) => ({ x, y })) });
+    },
+    restore(saved) {
+      const fraction = n => Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0;
+      for (const mark of Array.isArray(saved) ? saved.slice(0, 200) : []) {
+        if (typeof mark?.note === 'string') placeNote({ x: fraction(mark.x), y: fraction(mark.y) }, mark.note.slice(0, 280));
+        else if (['draw', 'line', 'arrow'].includes(mark?.tool) && Array.isArray(mark.points) && mark.points.length) {
+          marks.push({ tool: mark.tool, points: mark.points.slice(0, 2000).map(p => ({ x: fraction(p?.x), y: fraction(p?.y) })) });
+        }
+      }
+      redraw();
+    },
     clear() {
       for (const mark of marks) mark.node?.remove();
       marks.length = 0;
