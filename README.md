@@ -219,7 +219,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
-| **2026-11-13** | — | — | **Workspace www access** — opening a saved workspace asks for each site's bare and `www` host together, like opening a site ([details](changelogs/CHANGELOG-workspace-www-access.md)) |
+| **2026-11-13** | 17:53:29 +09:00 | `b405d8f` | **Workspace www access** — opening a saved workspace asks for each site's bare and `www` host together, like opening a site ([details](changelogs/CHANGELOG-workspace-www-access.md)) |
 | **2026-11-13** | 13:47:24 +05:30 | `a1a7e76` | **Open drawer reachable** — items further down an open drawer count as reachable, and mirrored clicks scroll their target into view ([details](changelogs/CHANGELOG-open-drawer-reachable.md)) |
 | **2026-11-13** | 13:45:11 +05:30 | `cd8cceb` | **Menu wait click** — a mirrored click waits briefly for a menu that is still opening before giving up ([details](changelogs/CHANGELOG-menu-wait-click.md)) |
 | **2026-11-13** | 17:14:14 +09:00 | `a84c1d3` | **Saved workspaces** — save the current setup under a name and reopen it, with the last session kept automatically ([details](changelogs/CHANGELOG-saved-workspaces.md)) |
