@@ -32,7 +32,13 @@
     if (r.right + window.scrollX <= 0 || r.left + window.scrollX >= Math.max(de.scrollWidth, vw)) return false;
     for (let a = el; a && a !== de; a = a.parentElement) {
       const cs = getComputedStyle(a);
-      if (cs.position === 'fixed' && (r.left >= vw || r.right <= 0 || r.top >= vh || r.bottom <= 0)) return false; // off-canvas drawer
+      if (cs.position === 'fixed') {
+        // An off-canvas drawer is a fixed element pushed outside the viewport. An item further down
+        // an open drawer that scrolls is still reachable, so only the drawer's own position counts.
+        const fr = a.getBoundingClientRect();
+        if (fr.left >= vw || fr.right <= 0 || fr.top >= vh || fr.bottom <= 0) return false;
+        if (a === el && (r.left >= vw || r.right <= 0 || r.top >= vh || r.bottom <= 0)) return false;
+      }
       if (a !== el && (cs.overflowX !== 'visible' || cs.overflowY !== 'visible')) {
         const ar = a.getBoundingClientRect();
         if (cs.overflowY !== 'visible' && (r.bottom <= ar.top + 1 || r.top >= ar.bottom - 1) && cs.overflowY === 'hidden') return false; // collapsed panel
@@ -554,6 +560,7 @@
       if (m.expanded !== null && el.matches(m.expanded ? '[aria-expanded=true]' : '[aria-expanded=false]')) return { status: 'skip' };
       if (m.open !== null && el.matches('details > summary') && el.parentElement.open === m.open) return { status: 'skip' };
       if (typeof m.pressed === 'string' && el.getAttribute('aria-pressed') === m.pressed) return { status: 'skip' }; // toggle is already in that state
+      try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
       flash(el);
       press(el);
       return { status };
