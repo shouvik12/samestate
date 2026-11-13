@@ -806,6 +806,11 @@
     }
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') location.reload();
+    else if (m.type === 'identity' && typeof m.name === 'string' && (m.name === '' || m.name.startsWith('samestate-device:'))) {
+      // The device identity emulate.js reads when a page loads. Only Samestate's own names are accepted.
+      if (window.name !== m.name && (m.name || window.name.startsWith('samestate-device:'))) window.name = m.name;
+      if (m.reload) location.reload();
+    }
     else if (m.type === 'state') send('state', { rid: m.rid, url: location.href, scroll: scrollState() });
     else if (m.type === 'align') {
       // Asked for by the user with "Align screens": go to the page the leading screen is on, then to its scroll position.

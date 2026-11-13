@@ -109,6 +109,14 @@ const PROBE = `(() => {
       return [dark === 7 && desktop === 'matched', 'dark screens: ' + dark + ', Desktop: ' + desktop];
     },
     'Works both ways': () => [count(d => d.documentElement.classList.contains('dark')) === 0, 'dark screens: ' + count(d => d.documentElement.classList.contains('dark'))],
+    'Device identity': () => {
+      const banners = workspaceScreens().filter(d => !docOf(d).querySelector('#app-banner').hidden).map(d => d.id).sort().join(',');
+      const phoneWindow = phone().iframe.contentWindow, deskWindow = byId('desktop').iframe.contentWindow;
+      const phoneOk = /iPhone/.test(phoneWindow.navigator.userAgent) && phoneWindow.navigator.maxTouchPoints === 5 && phoneWindow.devicePixelRatio === 3
+        && phoneWindow.matchMedia('(hover: none) and (pointer: coarse)').matches && phoneWindow.matchMedia('(min-resolution: 2dppx)').matches;
+      const deskOk = !deskWindow.matchMedia('(hover: none)').matches && !/iPhone|Android/.test(deskWindow.navigator.userAgent);
+      return [banners === 'android,iphone,pixel' && phoneOk && deskOk, 'app banner on: ' + banners + ', iPhone identity: ' + phoneOk + ', Desktop unchanged: ' + deskOk];
+    },
     'Scroll sync': () => {
       const scrolled = workspaceScreens().filter(d => scrollOf(d) > 200).length, plans = top(byId('desktop'), '#plans');
       return [scrolled === 7 && plans < 250, 'scrolled screens: ' + scrolled + ', Desktop #plans at ' + plans + 'px'];

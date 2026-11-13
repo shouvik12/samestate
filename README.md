@@ -108,6 +108,7 @@ Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog u
 
 ## Compare devices and page steps
 
+- **Views → Phone and tablet identity** (on by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. Previews reload when you change it.
 - In **Views → Device sizes**, choose **Different devices** to use the selected presets or **Same device on every screen** to give those previews one shared size. Select **Device for all previews** to resize them in place.
 - Turn on **Views → Page steps** to start a row with the page you originally opened. Follow a same-origin link or use a supported control, such as **Sign in**, to open the next state beside the current screen. Dialogs, menus and tabs can become steps even when the address stays the same. In the extension, you can also enter a path such as `/pricing` in the address bar. Close a step with **×** in its header.
 - To switch sites, enter a domain or full URL in the address bar. After Chrome grants access, the new site opens at Step 1 with the selected device size.
@@ -191,6 +192,7 @@ extension/
   devices.js      Device presets, search, and custom device settings.
   annotations.js  Notes, strokes, lines, and arrows on individual previews.
   themes.js       Loads tweakcn presets, parses custom CSS, and builds preview styles.
+  emulate.js      Gives phone and tablet previews their device identity before the page's scripts run.
   capture.js      Local screenshots and recordings of the device wall.
   report.js       Exports the difference report as Markdown, CSV or HTML.
   workspaces.js   Saves and reopens setups in the browser's local storage.
@@ -206,9 +208,12 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
 - In a single-page app, the other screens load the new address as a full page rather than through the app's
   router, so state kept only in memory (an open filter, a typed search) is not carried over.
-- Device frames have the device's size but send your browser's own user-agent. Sites that pick a
-  mobile layout on the server by user-agent will show desktop markup.
-- CSS `hover` / `pointer` media queries and device pixel ratio report your real computer.
+- Phone and tablet identity reaches the page's JavaScript only. Requests to the server still carry your
+  browser's own user-agent, so sites that pick a mobile layout on the server show desktop markup.
+- CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
+  `matchMedia()` in scripts answers as the device.
+- Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
+- Pixel ratio is 3 for phones and 2 for tablets, not each model's exact value.
 - Security headers are removed inside Samestate tabs so pages can be framed. Use those tabs for
   previewing, not for sensitive browsing. Other tabs are untouched.
 
@@ -216,7 +221,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 - **v2: suggested fixes** for findings in the difference report, not just detection
 - Chrome Web Store listing
-- Per-device user-agent in the extension
+- Per-device user-agent on requests to the server (the page's scripts already see it)
 
 ## Release Notes
 
@@ -224,6 +229,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-13** | — | — | **Device identity** — phone and tablet previews tell the page's scripts what they are: user-agent, platform, touch, pixel ratio, screen size and hover/pointer ([details](changelogs/CHANGELOG-device-identity.md)) |
 | **2026-11-13** | 20:21:47 +09:00 | `df5f6f4` | **Link sync** — following a link on one screen opens the same page on every linked screen, with **Links & pages** in Sync to turn it off ([details](changelogs/CHANGELOG-link-sync.md)) |
 | **2026-11-13** | 15:07:16 +05:30 | `0e8cbad` | **Nav menu reveal limits** — the menu is only opened for navigation controls, and closed again by its button, a close button or Escape ([details](changelogs/CHANGELOG-nav-menu-reveal-limits.md)) |
 | **2026-11-13** | 14:54:27 +05:30 | `e0f8262` | **Re-enabled device placement** — a device switched back on is placed next to the visible screens instead of its old spot ([details](changelogs/CHANGELOG-reenabled-device-placement.md)) |

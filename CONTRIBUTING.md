@@ -24,7 +24,8 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 
 ## Where things are
 
-- `extension/background.js`: header handling and frame injection for Samestate tabs only
+- `extension/background.js`: header handling and frame injection for Samestate tabs only, and registration of `emulate.js` for the sites those tabs have open
+- `extension/emulate.js`: phone and tablet identity inside a preview; it exits at once anywhere else
 - `extension/agent.js`: captures interactions and replays them by meaning
 - `extension/app.js`, `app.html`, `app.css`: the device wall, sync log, difference engine and guided tour
 - `extension/report.js`: report export; `extension/workspaces.js`: saved setups

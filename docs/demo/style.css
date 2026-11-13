@@ -13,6 +13,9 @@ a{color:#0b6e69}
 .grow{flex:1}
 .mode-toggle{background:none;border:1px solid #cfc6b2;border-radius:8px;width:38px;height:38px;font-size:18px;line-height:1;color:#14213d;cursor:pointer}
 .mob-only{display:none}
+.app-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;padding:10px 16px;background:#14213d;color:#fff;font:14px system-ui}
+.app-banner[hidden]{display:none}
+.app-open{flex:none;padding:6px 12px;border:0;border-radius:6px;background:#ffbf57;color:#14213d;font:600 13px system-ui;cursor:pointer}
 .btn{display:inline-block;background:#0b6e69;color:#fff;border:1px solid #0b6e69;border-radius:8px;padding:10px 18px;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer}
 .btn.ghost{background:transparent;color:#0b6e69}
 .icon{display:none;background:none;border:0;padding:6px;cursor:pointer;color:#14213d}

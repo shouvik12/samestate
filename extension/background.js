@@ -6,6 +6,31 @@ const HEADERS = ['x-frame-options', 'content-security-policy', 'content-security
 async function unregister(tabId) {
   await chrome.storage.session.remove(previewKey(tabId));
   await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
+  await syncEmulation();
+}
+
+// emulate.js gives phone and tablet previews their device identity. It has to run in the page's own world before the
+// page's scripts, which only a registered content script can do. It is registered for the sites open in Samestate
+// tabs and does nothing outside a Samestate preview frame that names a device.
+const EMULATION = 'samestate-device-identity';
+let emulationQueue = Promise.resolve();
+function syncEmulation() {
+  emulationQueue = emulationQueue.catch(() => {}).then(async () => {
+    const stored = await chrome.storage.session.get(null);
+    const matches = [...new Set(Object.entries(stored)
+      .filter(([key]) => key.startsWith('preview-origin-'))
+      .flatMap(([, preview]) => preview?.origins || [])
+      .map(origin => { const url = new URL(origin); return `${url.protocol}//${url.hostname}/*`; }))];
+    const [current] = await chrome.scripting.getRegisteredContentScripts({ ids: [EMULATION] });
+    if (!matches.length) {
+      if (current) await chrome.scripting.unregisterContentScripts({ ids: [EMULATION] });
+      return;
+    }
+    const script = { id: EMULATION, matches, js: ['emulate.js'], allFrames: true, runAt: 'document_start', world: 'MAIN', persistAcrossSessions: false };
+    if (current) await chrome.scripting.updateContentScripts([script]);
+    else await chrome.scripting.registerContentScripts([script]);
+  });
+  return emulationQueue;
 }
 
 async function register(tabId, origin, sites) {
@@ -37,6 +62,7 @@ async function register(tabId, origin, sites) {
     }]
   });
   await chrome.storage.session.set({ [previewKey(tabId)]: { origin, origins } });
+  await syncEmulation();
 }
 
 chrome.action.onClicked.addListener(tab => {

@@ -18,3 +18,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') setDrawer(fa
 const modeToggles = $$('.mode-toggle');
 function setDark(on) { document.documentElement.classList.toggle('dark', on); modeToggles.forEach(b => { b.setAttribute('aria-pressed', on); b.textContent = on ? '☀' : '☾'; }); }
 modeToggles.forEach(b => b.addEventListener('click', () => setDark(b.getAttribute('aria-pressed') !== 'true')));
+// Like many real sites, the app banner is chosen by user-agent, not by screen width: phones only, not tablets.
+const appBanner = document.getElementById('app-banner');
+if (appBanner && /iPhone|Android.+Mobile/.test(navigator.userAgent)) appBanner.hidden = false;

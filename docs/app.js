@@ -78,6 +78,39 @@ function size(d) {
   return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
 }
 
+// Phones and tablets tell the page they are one (emulate.js reads this from the frame's name before the page runs):
+// user-agent, platform, touch, pixel ratio and screen size. Desktop presets keep the browser's own identity.
+let emulateDevices = true;
+try { emulateDevices = localStorage.getItem('samestate.emulate') !== 'off'; } catch {}
+const CHROME_MAJOR = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || '130';
+const IOS_VERSION = '17_5', SAFARI_VERSION = '17.5';
+function deviceIdentity(d) {
+  const preset = presetFor(d);
+  if (!emulateDevices || preset.kind === 'desktop') return null;
+  const { w, h } = size(d);
+  const ios = preset.os === 'ios', phone = preset.kind === 'phone';
+  // iPads have reported themselves as a Mac with touch since iPadOS 13.
+  const ua = ios
+    ? phone
+      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${IOS_VERSION} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Mobile/15E148 Safari/604.1`
+      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Safari/605.1.15`
+    : `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 ${phone ? 'Mobile ' : ''}Safari/537.36`;
+  return {
+    ua, ios, mobile: phone, chrome: CHROME_MAJOR, w, h, dpr: phone ? 3 : 2,
+    platform: ios ? (phone ? 'iPhone' : 'MacIntel') : 'Linux armv81',
+    vendor: ios ? 'Apple Computer, Inc.' : 'Google Inc.'
+  };
+}
+const identityName = d => { const identity = deviceIdentity(d); return identity ? 'samestate-device:' + JSON.stringify(identity) : ''; };
+// A frame keeps the name it was created with, whatever its name attribute says later, so a changed identity is
+// handed to the preview's agent, which renames its own window; with reload, the page then loads with it.
+function setIdentity(d, reload) {
+  const identity = identityName(d);
+  if (identity === d.identity && !reload) return;
+  d.identity = d.iframe.name = identity;
+  if (d.ready) post(d, 'identity', { name: identity, reload });
+}
+
 function physicalSetting(d, preset) {
   return d.physicalScale?.presetId === preset.id ? d.physicalScale : null;
 }
@@ -97,6 +130,8 @@ function layout(d) {
     d.chromeId = preset.id;
     if (d.ready) configure(d);
   }
+  // A changed preset or orientation applies from the preview's next page load.
+  setIdentity(d, false);
   const address = d.top.querySelector('.addr');
   if (address) address.textContent = d.site ? (d.site.url.origin === EXT ? 'tidepool.demo' : d.site.url.host) : d.step ? new URL(d.pageUrl).pathname : target === EXT ? 'tidepool.demo' : new URL(target).host;
   const name = screenName(d);
@@ -209,6 +244,7 @@ function addFrame(d) {
   });
   arrangeable(d);
   d.themeTargetId = d.token = crypto.randomUUID();
+  d.identity = d.iframe.name = identityName(d); // before the first load
   if (d.site) {
     setPreviewSource(d.iframe, d.site.url);
     d.site.frames.append(el);
@@ -411,6 +447,15 @@ $('#shared-device').addEventListener('change', event => {
   sharedDeviceId = event.target.value;
   for (const d of connectedScreens()) if (sameDevice || d.step) d.rot = false;
   refreshViews();
+});
+$('#device-identity').checked = emulateDevices;
+$('#device-identity').addEventListener('change', event => {
+  emulateDevices = event.target.checked;
+  try { localStorage.setItem('samestate.emulate', emulateDevices ? 'on' : 'off'); } catch {}
+  for (const d of connectedScreens()) {
+    if (!d.el || d === d.site?.singleDevice) continue;
+    setIdentity(d, true); // the page reads its identity when it loads
+  }
 });
 $('#page-steps').addEventListener('change', event => {
   const enabled = event.target.checked;
@@ -1449,6 +1494,11 @@ const STEPS = [
     run: demoClick('desktop', '.desk-only .mode-toggle')
   },
   {
+    title: 'Device identity', at: inScreen('iphone', '#app-banner'), wait: 3200,
+    text: 'Phones and tablets tell the page what they are: user-agent, touch, pixel ratio. This site shows its app banner to phones only, so it appears on the iPhone, Android and Pixel, not on tablets or desktops.',
+    run: async t => { if (await t.point(inScreen('iphone', '#app-banner .app-open'))) await t.point(inScreen('pixel', '#app-banner')); }
+  },
+  {
     title: 'Scroll sync', at: inScreen('desktop', ''), wait: 2800,
     text: 'Scrolling the Desktop to <b>Compare plans</b>. Screens stop at the same section even though their pages are different lengths.',
     run: t => tourScroll(t, 'desktop', '#plans')
@@ -1703,6 +1753,7 @@ function handleMessage(device, message) {
       device.ready = true;
       device.el.classList.add('ready');
       configure(device);
+      if (device.identity !== undefined) post(device, 'identity', { name: device.identity }); // in case it changed while loading
       if (device.replayPending) {
         device.replayPending = false;
         post(device, 'replay-step', { actions: device.actions });
