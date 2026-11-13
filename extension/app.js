@@ -618,6 +618,14 @@ let registration = Promise.resolve();
 let registeredWallOrigin = null;
 let registeredSites = new Map();
 const originPattern = url => `${url.protocol}//${url.hostname}/*`;
+// Most sites redirect between the bare and www host, so Chrome access is asked for both at once
+// and the redirect is then followed without a second prompt.
+function twinOrigins(url) {
+  const host = url.hostname;
+  const plain = /^[\d.]+$|^\[/.test(host) || !host.includes('.');
+  const twin = plain ? null : host.startsWith('www.') ? host.slice(4) : host.split('.').length === 2 ? 'www.' + host : null;
+  return [originPattern(url), ...(twin ? [`${url.protocol}//${twin}/*`] : [])];
+}
 
 function register(origin, site) {
   if (!IS_EXT) return Promise.resolve();
@@ -657,7 +665,7 @@ async function open(url, alreadyAllowed = false) {
   try {
     if (!isDemo && !alreadyAllowed) {
       $('#joblog').textContent = 'Waiting for Chrome site access…';
-      const granted = await chrome.permissions.request({ origins: [originPattern(url)] });
+      const granted = await chrome.permissions.request({ origins: twinOrigins(url) });
       if (id !== openId) return;
       if (!granted) {
         $('#joblog').textContent = 'Allow access to the site in Chrome to open a preview.';
@@ -862,7 +870,7 @@ async function openSite(site, url, alreadyAllowed = false) {
   try {
     if (!bundled && !alreadyAllowed) {
       site.status.textContent = 'Waiting for Chrome site access…';
-      const granted = await chrome.permissions.request({ origins: [originPattern(url)] });
+      const granted = await chrome.permissions.request({ origins: twinOrigins(url) });
       if (revision !== site.revision) return;
       if (!granted) {
         site.status.textContent = 'Allow site access in Chrome to open this preview.';
