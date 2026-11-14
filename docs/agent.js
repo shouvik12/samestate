@@ -764,6 +764,24 @@
     }
   }
 
+  // Fix previews: the suggested CSS is set on the elements of one finding, and taken off again with Undo.
+  const fixes = new Map(); // fix id → [{ el, style }]
+  function applyFix(id, keys, declarations) {
+    if (fixes.has(id) || !declarations || typeof declarations !== 'object') return 0;
+    const changed = [];
+    for (const key of keys || []) for (const el of snapMap.get(key) || []) {
+      if (!el.isConnected || changed.some(c => c.el === el)) continue;
+      changed.push({ el, style: el.getAttribute('style') });
+      for (const [property, value] of Object.entries(declarations)) if (typeof value === 'string') el.style.setProperty(property, value, 'important');
+    }
+    fixes.set(id, changed);
+    return changed.length;
+  }
+  function removeFix(id) {
+    for (const { el, style } of (fixes.get(id) || []).reverse()) { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }
+    fixes.delete(id);
+  }
+
   /* ------------------------------ page weight ------------------------------ */
   // Reads only the browser's resource timing: each request's address, its type and its size.
   // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
@@ -834,7 +852,7 @@
     });
     document.querySelectorAll('table').forEach(el => {
       let scroller = null;
-      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      for (let a = el; a && a !== document.body; a = a.parentElement) { // a table set to display: block can scroll itself
         if (/auto|scroll/.test(getComputedStyle(a).overflowX)) { scroller = a; break; }
       }
       const box = scroller || el.parentElement;
@@ -855,7 +873,7 @@
       if (++n > 5000) break; if (el.tagName === 'SAMESTATE-LAYER' || el.closest('samestate-layer')) continue;
       const cs = getComputedStyle(el); if (cs.display === 'none') continue;
       const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
-      if (/auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 4) { const key = 'sc|' + scrollers.length; reg(key, el); scrollers.push({ key, name: 'scroll area', snap: cs.scrollSnapType && cs.scrollSnapType !== 'none', table: !!el.querySelector('table') }); }
+      if (/auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 4) { const key = 'sc|' + scrollers.length; reg(key, el); scrollers.push({ key, name: 'scroll area', snap: cs.scrollSnapType && cs.scrollSnapType !== 'none', table: el.matches('table') || !!el.querySelector('table') }); }
       if ((cs.position === 'fixed' || cs.position === 'sticky') && visible(el) && r.width * Math.min(r.height, vh) / (vw * vh) > 0.25 && r.top < vh && r.bottom > 0) { const key = 'fx|' + fixed.length; reg(key, el); fixed.push({ key, name: 'fixed element', cover: Math.round(r.width * Math.min(r.height, vh) / (vw * vh) * 100) }); }
       if (r.right + scrollX > vw + 2 && overflow.length < 6 && visible(el)) {
         let clipped = false, parentOver = false;
@@ -943,6 +961,8 @@
       applyPreviewTheme(m.themeCss);
       if (document.body) { setLongText(m.longText === true); setVariant(['dark', 'light', 'text200'].includes(m.variant) ? m.variant : ''); }
     }
+    else if (m.type === 'fix' && typeof m.id === 'string') send('fixed', { id: m.id, count: applyFix(m.id, m.keys, m.css) });
+    else if (m.type === 'unfix' && typeof m.id === 'string') removeFix(m.id);
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') reloadPage();
     else if (m.type === 'identity' && typeof m.name === 'string' && (m.name === '' || m.name.startsWith('samestate-device:'))) {

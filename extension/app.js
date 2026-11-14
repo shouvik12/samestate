@@ -1837,6 +1837,9 @@ function handleMessage(device, message) {
     case 'snapshot':
       pendingSnap.get(message.rid)?.(device, message.data);
       break;
+    case 'fixed':
+      if (Number.isInteger(message.count)) fixCounts.set(message.id, (fixCounts.get(message.id) || 0) + message.count);
+      break;
     case 'result':
       addResult(message, device);
       playbackResult(message, device);
@@ -2304,7 +2307,7 @@ function renderFindings() {
         const details = g.items.filter(f => f.dev === pick).map(f => (f.title === g.kind ? '' : f.title + '. ') + f.detail);
         html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}<span class="c">${g.cat}</span></div>`
           + `<div class="screens" role="group" aria-label="Screens with this finding">${g.screens.map((d, s) => `<button type="button" class="screen-chip${d === pick ? ' on' : ''}" data-s="${s}" aria-pressed="${d === pick}" title="Show details for ${esc(screenName(d))}">${esc(screenName(d))}</button>`).join('')}</div>`
-          + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + '</div>';
+          + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + fixHtml(g.kind, g.items) + '</div>';
       }
     }
     $('#findings').innerHTML = html;
@@ -2314,7 +2317,7 @@ function renderFindings() {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
     html += `<div class="group">${esc(reportName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
-      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div></div>`).join('');
+      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div>${fixHtml(f.kind, [f])}</div>`).join('');
   }
   $('#findings').innerHTML = html;
 }
@@ -2326,6 +2329,57 @@ $('#report-view').addEventListener('click', e => {
   try { localStorage.setItem('samestate.reportView', view); } catch {}
   renderFindings();
 });
+/* ------------------------------ fix previews ------------------------------ */
+// CSS that usually fixes a finding, set on that finding's elements in every affected preview until Undo.
+const FIX_CSS = {
+  'Page scrolls sideways': { 'max-width': '100%', 'box-sizing': 'border-box', 'overflow-wrap': 'anywhere' },
+  'Table is wider than its container': { display: 'block', 'max-width': '100%', 'overflow-x': 'auto' },
+  'Text cut off': { 'white-space': 'normal', 'text-overflow': 'clip', '-webkit-line-clamp': 'unset', overflow: 'visible' },
+  'Tap targets under 24px': { 'min-width': '44px', 'min-height': '44px', display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center' },
+  'Tap targets under 40px': { 'min-width': '44px', 'min-height': '44px', display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center' },
+  'Text under 12px': { 'font-size': '12px' },
+  'Fields under 16px font': { 'font-size': '16px' },
+  'Text touches the screen edge': { 'padding-inline': '16px', 'box-sizing': 'border-box' },
+  'Images stretched beyond source size': { 'max-width': '100%', height: 'auto', 'object-fit': 'contain' }
+};
+const FIX_ADVICE = [
+  ['Hidden images still downloaded', 'Add loading="lazy" to these images, or use <picture> with a media query so this screen never fetches them.'],
+  ['Images larger than shown', 'Add srcset with smaller widths and a sizes attribute, so each screen downloads the size it shows.'],
+  ['Downloads as much as', 'Load below-the-fold images lazily, split scripts this screen doesn’t run, and send smaller images to narrow screens.'],
+  ['Large API responses', 'Ask the API for only the fields this screen shows, or page the results.'],
+  ['Keyboard reaches hidden controls', 'Add the inert attribute (or visibility: hidden) to menus and panels while they are closed.'],
+  ['Tab order differs from what you see', 'Match the HTML order to the visual order instead of reordering with CSS order, flex-direction or grid placement.'],
+  ['Key controls below the fold', 'Move the main action up on small screens, or shorten what comes before it (hero image, intro text).'],
+  ['Overlay hides controls', 'Give the banner a smaller footprint on phones, or add bottom padding to the page while it is shown.'],
+  ['No viewport meta tag', 'Add <meta name="viewport" content="width=device-width, initial-scale=1">.']
+];
+const appliedFixes = new Map(), fixCounts = new Map(); // finding kind → screens with the fix on; fix id → elements changed
+const fixCss = declarations => Object.entries(declarations).map(([p, v]) => `${p}: ${v};`).join(' ');
+function fixHtml(kind, items) {
+  const css = FIX_CSS[kind], advice = FIX_ADVICE.find(([start]) => kind.startsWith(start))?.[1];
+  if (!css && !advice) return '';
+  const hasElements = items.some(f => f.keys.length);
+  return '<div class="fix">' + (css ? `<code>${esc(fixCss(css))}</code><button type="button" class="pill fix-btn" data-fix${hasElements ? '' : ' disabled title="No elements to change on these screens"'}>${appliedFixes.has(kind) ? 'Undo fix' : 'Preview fix'}</button>` : '')
+    + (advice ? `<p>${esc(advice)}</p>` : '') + '</div>';
+}
+function toggleFix(items) {
+  const kind = items[0].kind, id = 'fix:' + kind;
+  if (appliedFixes.has(kind)) {
+    for (const d of appliedFixes.get(kind)) post(d, 'unfix', { id });
+    appliedFixes.delete(kind);
+  } else if (FIX_CSS[kind]) {
+    fixCounts.delete(id);
+    for (const f of items) if (f.keys.length) post(f.dev, 'fix', { id, keys: f.keys, css: FIX_CSS[kind] });
+    appliedFixes.set(kind, new Set(items.map(f => f.dev)));
+  }
+  renderFindings();
+}
+function undoAllFixes() {
+  for (const [kind, screens] of appliedFixes) for (const d of screens) post(d, 'unfix', { id: 'fix:' + kind });
+  appliedFixes.clear();
+  renderFindings();
+}
+
 /* ------------------------------ screen settings and long text ------------------------------ */
 function applyScreenSettings() {
   let rotated = false;
@@ -2353,6 +2407,7 @@ $('#long-text').addEventListener('change', event => {
   longText = event.target.checked;
   for (const d of connectedScreens()) if (d.ready) configure(d);
 });
+
 // Outlines the findings in their previews, and the matching elements on the reference screen.
 function showFindings(list) {
   for (const f of list) if (f.keys.length) post(f.dev, 'highlight', { keys: f.keys });
@@ -2369,6 +2424,8 @@ function showFindings(list) {
 }
 $('#findings').addEventListener('click', e => {
   const el = e.target.closest('.finding'); if (!el) return;
+  if (e.target.closest('[data-fix]')) { toggleFix(el.dataset.g === undefined ? [findings[+el.dataset.i]] : reportGroups[+el.dataset.g].items); return; }
+  if (e.target.closest('.fix')) return; // selecting the CSS to copy it
   if (el.dataset.g === undefined) { showFindings([findings[+el.dataset.i]]); return; }
   const group = reportGroups[+el.dataset.g], chip = e.target.closest('.screen-chip');
   if (!chip) { showFindings(group.items); return; } // the whole issue, on every screen it affects

@@ -66,6 +66,9 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
+- **Fix previews.** Findings with a CSS fix (wide tables, cut-off text, small tap targets, small text, sideways
+  scrolling) show the CSS and a **Preview fix** button that applies it to every affected screen. **Check again**
+  re-runs the report; **Undo** takes it off. Other findings show what to change in the site.
 - **Long text.** **Compare → Long text (+35%)** makes every preview's text about a third longer, with accented
   letters, as translations often do. Run **Detect differences** to see what gets cut off or pushes the layout.
 - **Screen settings.** **Views → Screen settings** gives every second screen dark mode, 200% text or landscape.
@@ -225,6 +228,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - **Screen settings → Light and dark** rewrites the page's `prefers-color-scheme` rules in the stylesheets it can
   read. Stylesheets from other sites and scripts that ask `matchMedia()` still get your computer's setting.
 - **Long text** lengthens the text on the page as it is; text the page adds later is not lengthened.
+- Fix previews set inline styles on the elements of one scan; a page reload removes them.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
@@ -236,7 +240,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 ## Roadmap
 
-- **v2: suggested fixes** for findings in the difference report, not just detection
+- Fix previews for more findings (overlays, images), and fixes written as a stylesheet to copy
 - Chrome Web Store listing
 - Server user-agent for a preview's images, scripts and API calls, not only its page loads
 
@@ -247,6 +251,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
 | **2026-11-15** | pending | pending | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
+| **2026-11-15** | pending | pending | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
 | **2026-11-15** | pending | pending | **Screen settings** — every second screen in dark mode, at 200% text or in landscape, to compare one device both ways ([details](changelogs/CHANGELOG-screen-settings.md)) |
 | **2026-11-15** | pending | pending | **Long text** — every preview's text about a third longer, as translations often are, to find what gets cut off ([details](changelogs/CHANGELOG-long-text.md)) |
 | **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
