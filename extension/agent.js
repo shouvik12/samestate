@@ -813,7 +813,7 @@
     return {
       vw, docW: de.scrollWidth, metaViewport: !!document.querySelector('meta[name=viewport]'),
       dpr: devicePixelRatio, requests: requests(),
-      items, overflow, scrollers, fixed, hiddenFocus,
+      vh, items, overflow, scrollers, fixed, hiddenFocus,
       menuToggle: Array.from(document.querySelectorAll('[aria-haspopup=menu],[aria-controls][aria-expanded]')).some(visible)
     };
   }

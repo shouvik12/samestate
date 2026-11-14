@@ -2145,6 +2145,15 @@ function analyze(snaps, refId) {
     }
     const matches = matchItems(R, I);
     for (const [referenceItem, item] of matches) referenceKeys.set(item.key, referenceItem.key);
+    // ---- above the fold: what the reference shows on its first screen, this screen makes you scroll to
+    if (ref.data.vh && data.vh) {
+      const firstScreen = ([r, i], cats) => cats.includes(r.cat) && !r.inNav && !r.inline && r.y + r.h <= ref.data.vh && i.y + i.h > data.vh;
+      const below = [...matches].filter(([r, i]) => r.visible && i.visible && r.w * r.h >= 1800 && firstScreen([r, i], ['button', 'link', 'input']));
+      const heading = [...matches].find(([r, i]) => r.visible && i.visible && r.level === 1 && firstScreen([r, i], ['heading']));
+      const screens = i => i.y < data.vh ? 'cut off by the bottom of the screen' : (i.y / data.vh).toFixed(1) + ' screens down';
+      if (below.length) add('warn', 'Layout', dev, 'Key controls below the fold', `${plural(below.length, 'control')} from ${rn}'s first screen ${below.length === 1 ? 'needs' : 'need'} scrolling`, more(below.map(([, i]) => `${q(i.name)} ${screens(i)}`)), below.map(p => p[1].key));
+      if (heading) add('info', 'Layout', dev, 'Main heading below the fold', 'Main heading below the fold', `On ${rn} it is on the first screen; here it is ${screens(heading[1])}.`, [heading[1].key]);
+    }
     const both = [...matches].filter(([r, i]) => r.visible && i.visible);
     const matchedVisible = new Set(both.map(([, item]) => item));
     const gone = [...R.values()].filter(item => item.visible && !matches.get(item)?.visible);
