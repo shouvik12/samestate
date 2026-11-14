@@ -94,7 +94,7 @@ Samestate is a Chrome extension. No server and no terminal.
    (the one that contains `manifest.json`), not the repo's top-level folder.
 5. Pin the Samestate icon from the puzzle-piece menu.
 
-Click the Samestate icon to open the preview tab. It starts with `claude.com` on every screen. To preview
+Click the Samestate icon to open the preview tab. It starts with the bundled sample site on every screen. To preview
 another site, enter its address and grant Chrome access to that site. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
 Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.

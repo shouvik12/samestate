@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Samestate",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "minimum_chrome_version": "110",
   "description": "One interaction, every device. Preview any page on a wall of devices that stay in the same logical state, with a difference report.",
   "action": { "default_title": "Open this page in Samestate" },
   "background": { "service_worker": "background.js" },
   "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
   "permissions": ["declarativeNetRequestWithHostAccess", "scripting", "webNavigation", "storage"],
-  "host_permissions": ["https://claude.com/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"]
 }

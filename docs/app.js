@@ -2291,16 +2291,10 @@ fillSharedDevices();
 renderLeft();
 refreshThemeTargets();
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
-// The extension starts on the default site, which the manifest already has access to, so no prompt is
-// needed. The web demo can only show the bundled sample site, so it starts with the tour.
-const DEFAULT_SITE = 'https://claude.com/';
+// The extension starts on the bundled sample site, which needs no site access, so no prompt is
+// needed and no outside site is requested in the manifest. The web demo starts with the tour.
 async function openDefault() {
-  const url = new URL(DEFAULT_SITE);
-  let allowed = false;
-  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
   if (target || openId) return; // the user already opened something
-  if (allowed) return open(url, true);
-  $('#src').value = DEFAULT_SITE;
-  $('#joblog').textContent = `Press Enter to open ${url.host}.`;
+  await open(DEMO_URL);
 }
 if (IS_EXT) openDefault(); else startTour();
