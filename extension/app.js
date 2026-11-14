@@ -2005,7 +2005,7 @@ function addResult(message, device) {
 }
 
 /* ----------------------------- difference engine ----------------------------- */
-const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Network'];
+const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Network'];
 // Network findings use resource timing sizes from each preview; request and response contents are never read.
 const API_TYPES = new Set(['fetch', 'xmlhttprequest']);
 const kb = bytes => !bytes ? '0 KB' : bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
@@ -2058,6 +2058,13 @@ function matchItems(reference, device) {
     }
   }
   return matches;
+}
+// Indexes of the longest run that keeps its order (longest increasing subsequence).
+function keptInOrder(values) {
+  const tails = [], prev = [], keep = new Set();
+  values.forEach((v, idx) => { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (values[tails[mid]] < v) lo = mid + 1; else hi = mid; } prev[idx] = lo ? tails[lo - 1] : -1; tails[lo] = idx; });
+  for (let k = tails[tails.length - 1]; k !== undefined && k >= 0; k = prev[k]) keep.add(k);
+  return keep;
 }
 function analyze(snaps, refId) {
   const ref = snaps.find(s => s.dev.id === refId) || snaps[0];
@@ -2113,6 +2120,21 @@ function analyze(snaps, refId) {
     const ratio = dev.kind === 'phone' ? 3 : 2; // the sharpest screens of each kind
     const oversized = vis.filter(i => i.cat === 'image' && i.loaded && i.natW && !/\.svg$/i.test(i.src || '') && i.natW > i.w * ratio * 1.5 && i.natW - i.w * ratio >= 400);
     if (oversized.length) add('warn', 'Network', dev, 'Images larger than shown', `${plural(oversized.length, 'image')} much larger than shown`, more(oversized.map(i => `${imageLabel(i)} ${i.natW}px wide, shown at ${i.w}px (${Math.round(i.w * ratio)}px covers a ${ratio}× screen)`)), oversized.map(i => i.key));
+    // ---- accessibility
+    const hiddenFocus = data.hiddenFocus || [];
+    if (hiddenFocus.length) {
+      const where = Object.entries(hiddenFocus.reduce((n, h) => ({ ...n, [h.reason]: (n[h.reason] || 0) + 1 }), {})).map(([reason, n]) => `${n} in ${reason === 'transparent' ? 'a transparent layer' : reason === 'off-screen panel' ? 'an off-screen panel' : 'a ' + reason}`);
+      add('warn', 'Accessibility', dev, 'Keyboard reaches hidden controls', `${plural(hiddenFocus.length, 'hidden control')} reachable with Tab`, `${where.join(', ')}: ${list(hiddenFocus.map(h => h.kind), 4)}. Keyboard users land on controls they can't see.`);
+    }
+    const tabbable = vis.filter(i => Number.isInteger(i.dom) && !i.pinned).sort((a, b) => a.dom - b.dom).slice(0, 300);
+    const visual = [...tabbable].sort((a, b) => {
+      const rows = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y), cols = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      if (rows > .3 * Math.min(a.h, b.h)) return cols > 0 ? a.dom - b.dom : a.x - b.x; // overlapping boxes have no visual order of their own
+      return a.y - b.y;
+    });
+    const kept = keptInOrder(visual.map(i => i.dom));
+    const jumps = visual.filter((_, k) => !kept.has(k));
+    if (tabbable.length >= 4 && jumps.length && jumps.length <= tabbable.length / 2) add('warn', 'Accessibility', dev, 'Tab order differs from what you see', `Tab order skips around for ${plural(jumps.length, 'control')}`, `The Tab key reaches these in a different order than they appear: ${list(jumps.map(i => i.name))}`, jumps.map(i => i.key));
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
     const rn = screenName(ref.dev);

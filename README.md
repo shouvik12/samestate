@@ -34,7 +34,7 @@ that are too small, text that disappears.
 | | |
 |---|---|
 | 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
-| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input and usability, per device. |
+| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
 | 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
@@ -81,6 +81,7 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Tables | Tables wider than the screen, tables that need a sideways swipe |
 | Input | Tap targets under 24px and 40px |
 | Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
+| Accessibility | Controls the Tab key reaches inside closed menus and panels, Tab order that jumps around the screen |
 | Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
 ## Install
@@ -237,6 +238,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
 | **2026-11-15** | pending | pending | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |

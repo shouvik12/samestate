@@ -675,6 +675,16 @@
     }
   };
 
+  function hiddenReason(el, vw, vh) {
+    for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+      const cs = getComputedStyle(a), r = a.getBoundingClientRect();
+      if (+cs.opacity === 0 && a !== el) return 'transparent'; // a see-through control over its own styled box (custom selects, checkboxes) is fine
+      if (cs.position === 'fixed' && (r.right <= 0 || r.left >= vw || r.bottom <= 0 || r.top >= vh)) return 'off-screen panel';
+      if (a !== el && /hidden|clip/.test(cs.overflowY) && r.height < 2) return 'collapsed panel';
+    }
+    return null;
+  }
+
   /* ------------------------------ page weight ------------------------------ */
   // Reads only the browser's resource timing: each request's address, its type and its size.
   // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
@@ -731,11 +741,14 @@
     document.querySelectorAll('p,li,blockquote,figcaption,dd,dt').forEach(el => {
       if (hasTextNode(el)) push('text', el);
     });
+    let dom = 0; // document order, which is the Tab order for controls without a positive tabindex
     document.querySelectorAll('a[href],button,[role=button],input:not([type=hidden]),select,textarea,summary,[role=tab]').forEach(el => {
       const kind = kindOf(el);
       const field = ['field', 'select', 'check'].includes(kind);
       const inline = kind === 'link' && getComputedStyle(el).display === 'inline' && hasTextNode(el.parentElement);
-      push(field ? 'input' : kind === 'link' ? 'link' : 'button', el, { kind, inline });
+      let pinned = false; // inside a fixed or sticky bar, which shows out of document order on purpose
+      for (let a = el; a && a !== document.body && !pinned; a = a.parentElement) pinned = /fixed|sticky/.test(getComputedStyle(a).position);
+      push(field ? 'input' : kind === 'link' ? 'link' : 'button', el, { kind, inline, dom: dom++, pinned });
     });
     document.querySelectorAll('img').forEach(el => {
       push('image', el, { natW: el.naturalWidth, src: el.currentSrc ? requestAddress(el.currentSrc) : null, loaded: el.complete && el.naturalWidth > 0, boxed: el.getClientRects().length > 0, broken: el.complete && el.naturalWidth === 0 && el.matches('img[src],img[srcset],picture img') });
@@ -786,11 +799,21 @@
       const r = fx.getBoundingClientRect(), key = 'cv|' + fixed.length; reg(key, fx); els.forEach(e => reg(key, e));
       fixed.push({ key, name: 'overlay', cover: Math.round(r.width * Math.min(r.height, vh) / (vw * vh) * 100), hides: els.slice(0, 6).map(kindOf) });
     }
+    // controls the Tab key reaches although nobody can see them (a closed drawer or accordion, a transparent layer)
+    const hiddenFocus = []; let seen = 0;
+    for (const el of document.querySelectorAll('a[href]:not([href^="#"]),button,input:not([type=hidden]),select,textarea,summary,[tabindex]')) {
+      if (++seen > 3000 || hiddenFocus.length >= 40) break;
+      if (el.tabIndex < 0 || el.disabled || el.closest('[inert],[aria-hidden=true],samestate-layer') || !el.getClientRects().length || visible(el)) continue;
+      if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue; // visibility: hidden is skipped by Tab
+      const reason = hiddenReason(el, vw, vh);
+      if (!reason) continue;
+      const key = 'hf|' + hiddenFocus.length; reg(key, el); hiddenFocus.push({ key, kind: kindOf(el), reason });
+    }
     await Promise.all(textTasks);
     return {
       vw, docW: de.scrollWidth, metaViewport: !!document.querySelector('meta[name=viewport]'),
       dpr: devicePixelRatio, requests: requests(),
-      items, overflow, scrollers, fixed,
+      items, overflow, scrollers, fixed, hiddenFocus,
       menuToggle: Array.from(document.querySelectorAll('[aria-haspopup=menu],[aria-controls][aria-expanded]')).some(visible)
     };
   }
