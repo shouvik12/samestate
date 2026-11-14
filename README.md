@@ -15,7 +15,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <img alt="Free" src="https://img.shields.io/badge/price-free-5eead4">
   <img alt="Chrome extension" src="https://img.shields.io/badge/Chrome-extension-4285F4">
   <img alt="No server" src="https://img.shields.io/badge/server-none-111827">
-  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
@@ -285,4 +285,5 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 ## License
 
-MIT © Souvik Palit
+Samestate is licensed under the [Apache License 2.0](LICENSE). © 2026 Souvik Palit.
+The Samestate name and logo are not covered by this license.

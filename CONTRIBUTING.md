@@ -58,4 +58,4 @@ Samestate removes frame-blocking headers inside its own tabs. If you find a way 
 
 ## License
 
-By contributing, you agree your work is released under the repo's MIT license.
+By contributing, you agree your work is released under the repo's Apache 2.0 license.
