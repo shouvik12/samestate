@@ -31,6 +31,7 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 - `extension/report.js`: report export; `extension/workspaces.js`: saved setups
 - `docs/`: the live demo
 - `tests/smoke.mjs`: the end-to-end smoke test
+- `tools/samestate-ci.mjs`: runs the difference report on any site in headless Chrome, for CI
 
 ## Pull requests
 

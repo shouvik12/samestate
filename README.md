@@ -37,6 +37,7 @@ that are too small, text that disappears.
 | 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
 | 📏 **Width sweep** | Resizes a screen from 320 to 1920px and reports the exact widths where each problem starts and stops. |
 | 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
+| 🤖 **CI** | `node tools/samestate-ci.mjs <url>` writes the report from headless Chrome and fails the build on new issues. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
 | 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
@@ -179,6 +180,32 @@ After **Detect differences**, open **Export** in the Differences panel and choos
 - **HTML page**, a single file that opens in any browser.
 - **HTML with screenshots** adds a cropped screenshot of the affected screen to each finding, with the elements outlined. Share the current Samestate tab when Chrome asks. Samestate shows each screen on its own in Focus mode while it takes the screenshots, then returns to your layout. This option is on the device wall only, not in **Compare sites**.
 
+## Run it in CI
+
+`tools/samestate-ci.mjs` loads the extension in headless Chrome, opens a site on the device wall, runs the
+difference report and writes `report.md`, `report.html`, `report.csv` and `report.json`. It needs Node 22 or later
+and Chrome, and no packages.
+
+```
+node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,ipad,desktop --sweep
+```
+
+- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1.
+- `--baseline=old/report.json` compares with an earlier run, so only new findings fail the build.
+- `--identity` turns on phone and tablet identity, including the server user-agent.
+- `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
+
+In GitHub Actions, run it after the preview deploy and attach the folder as an artifact:
+
+```yaml
+- uses: actions/setup-node@v4
+  with: { node-version: 22 }
+- run: CHROME_PATH="$(command -v google-chrome)" node tools/samestate-ci.mjs "$PREVIEW_URL" --out=samestate-report
+- uses: actions/upload-artifact@v4
+  if: always()
+  with: { name: samestate-report, path: samestate-report }
+```
+
 ## Save and reopen a setup
 
 Open **Workspaces** in the sidebar, enter a name, and click **Save**. A workspace keeps the site, the selected devices and their rotation, scale and link state, the layout (mode, zoom, alignment, lock and dragged positions), **Views** settings and page steps, **Compare sites** columns, sync settings, themes and annotations. Click **Open** to return to it; Chrome asks once for any sites that need access. Saving under an existing name replaces it.
@@ -223,6 +250,7 @@ extension/
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
+tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
 ```
 
 Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`.
@@ -263,6 +291,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
 | **2026-11-15** | pending | pending | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
+| **2026-11-15** | pending | pending | **CI report** — `tools/samestate-ci.mjs` runs the difference report on any site in headless Chrome, writes Markdown, HTML, CSV and JSON, and fails on new issues ([details](changelogs/CHANGELOG-ci-report.md)) |
 | **2026-11-15** | pending | pending | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
 | **2026-11-15** | pending | pending | **Baseline** — save a scan as the site's baseline; later scans mark new findings and list fixed ones ([details](changelogs/CHANGELOG-baseline-report.md)) |
 | **2026-11-15** | pending | pending | **Journey report** — Check journey on every device measures every page step at each selected device's size ([details](changelogs/CHANGELOG-journey-report.md)) |

@@ -197,6 +197,9 @@ ${body}
     }
   }
 
+  // tools/samestate-ci.mjs reads the report through this in headless Chrome.
+  window.samestateReport = format => format === 'md' ? markdown(collect()) : format === 'csv' ? csv(collect()) : html(collect(), new Map());
+
   menu.addEventListener('click', event => {
     const format = event.target.closest('[data-export]')?.dataset.export;
     if (format) exportReport(format);
