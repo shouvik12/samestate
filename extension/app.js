@@ -17,7 +17,20 @@ const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
 let textSalt = null, wallRevision = 0;
 let videoRequest = null;
+// Screen settings show one page two ways side by side: every second screen on the wall gets the other setting.
+const SETTING_NAMES = { dark: 'Dark', light: 'Light', text200: '200% text', landscape: 'Landscape', portrait: 'Portrait' };
+let screenSettings = ''; // '', 'scheme', 'text' or 'orientation'
 let longText = false; // every preview's text about a third longer, as translations often are
+function screenSetting(d) {
+  if (!screenSettings || d.settingShown || d.site || d.step || d.label) return '';
+  const index = DEVICES.filter(x => x.on).indexOf(d);
+  if (index < 0) return '';
+  const second = index % 2 === 1;
+  if (screenSettings === 'scheme') return second ? 'dark' : 'light';
+  if (screenSettings === 'text') return second ? 'text200' : '';
+  return presetFor(d).kind === 'desktop' ? '' : second ? 'landscape' : 'portrait'; // desktops don't rotate
+}
+const screenVariant = d => { const setting = screenSetting(d); return ['dark', 'light', 'text200'].includes(setting) ? setting : ''; };
 const active = () => viewScreens().filter(d => d.el);
 const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
 const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
@@ -68,6 +81,8 @@ function deviceChrome(preset, landscape) {
 }
 
 function screenName(d) {
+  const setting = screenSetting(d);
+  if (setting) return screenName({ ...d, settingShown: true, label: null }) + ' · ' + SETTING_NAMES[setting];
   if (d.site) return sameDevice ? d.name + ' · ' + presetFor(d).name : d.name;
   if (d.step) return 'Step ' + d.step + ' · ' + presetFor(d).name;
   if (sameDevice) return 'Screen ' + (viewScreens().indexOf(d) + 1) + ' · ' + presetFor(d).name;
@@ -412,6 +427,7 @@ function refreshViews() {
   findings = [];
   renderFindings();
   updateWall();
+  applyScreenSettings();
 }
 
 function setPageSteps(enabled) {
@@ -1768,7 +1784,7 @@ function configure(device) {
   post(device, 'config', {
     touch: device.touch, inspect, textSalt: inspect ? textSalt : null,
     pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || '',
-    longText: inspect && longText
+    longText: inspect && longText, variant: inspect ? screenVariant(device) : ''
   });
 }
 const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
@@ -2311,6 +2327,28 @@ $('#report-view').addEventListener('click', e => {
   renderFindings();
 });
 /* ------------------------------ screen settings and long text ------------------------------ */
+function applyScreenSettings() {
+  let rotated = false;
+  for (const d of DEVICES) {
+    if (!d.el) continue;
+    const setting = screenSetting(d);
+    const rot = setting === 'landscape' && d.touch;
+    if ((screenSettings === 'orientation' || d.settingRot) && d.rot !== rot) { d.rot = rot; d.settingRot = rot; layout(d); rotated = true; }
+    if (d.ready) configure(d);
+    const name = screenName(d);
+    d.el.querySelector('.dev-name').textContent = name;
+    d.iframe.title = name + ' preview';
+  }
+  if (rotated) fitWall();
+  const reference = $('#ref');
+  for (const option of reference.options) { const d = DEVICES.find(x => x.id === option.value); if (d) option.textContent = screenName(d); }
+}
+$('#screen-settings').addEventListener('change', event => {
+  screenSettings = event.target.value;
+  $('#screen-settings-help').hidden = !screenSettings;
+  findings = []; renderFindings();
+  applyScreenSettings();
+});
 $('#long-text').addEventListener('change', event => {
   longText = event.target.checked;
   for (const d of connectedScreens()) if (d.ready) configure(d);

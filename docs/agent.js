@@ -729,6 +729,41 @@
     }
   }
 
+  // Screen settings: dark color scheme or 200% text. Dark rewrites the page's prefers-color-scheme rules in the
+  // stylesheets it can read (its own and inline ones); scripts that ask matchMedia() still get the computer's answer.
+  let variant = '', mediaEdits = [], textEdit = null;
+  const SCHEME = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/gi;
+  function forceScheme(text, scheme) { return text.replace(SCHEME, (match, value) => value.toLowerCase() === scheme ? '(min-width: 0px)' : '(max-width: 0px)'); }
+  function editMedia(scheme) {
+    const visit = rules => {
+      for (const rule of rules) {
+        if (rule.media && rule.cssRules && SCHEME.test(rule.media.mediaText)) { SCHEME.lastIndex = 0; mediaEdits.push([rule.media, rule.media.mediaText]); rule.media.mediaText = forceScheme(rule.media.mediaText, scheme); }
+        SCHEME.lastIndex = 0;
+        if (rule.cssRules) visit(rule.cssRules);
+        if (rule.styleSheet) { try { visit(rule.styleSheet.cssRules); } catch {} }
+      }
+    };
+    for (const sheet of document.styleSheets) { try { visit(sheet.cssRules); } catch {} } // other sites' stylesheets can't be read
+    for (const el of document.querySelectorAll('link[media],source[media],style[media]')) {
+      const media = el.getAttribute('media'); SCHEME.lastIndex = 0;
+      if (SCHEME.test(media)) { SCHEME.lastIndex = 0; mediaEdits.push([el, media]); el.setAttribute('media', forceScheme(media, scheme)); }
+    }
+  }
+  function setVariant(next) {
+    if (next === variant) return;
+    for (const [target, text] of mediaEdits.reverse()) { try { if (target instanceof Element) target.setAttribute('media', text); else target.mediaText = text; } catch {} }
+    mediaEdits = [];
+    if (textEdit) { const de = document.documentElement; if (textEdit.value) de.style.setProperty('font-size', textEdit.value, textEdit.priority); else de.style.removeProperty('font-size'); textEdit = null; }
+    document.documentElement.style.removeProperty('color-scheme');
+    variant = next;
+    if (variant === 'dark' || variant === 'light') { editMedia(variant); document.documentElement.style.setProperty('color-scheme', variant); }
+    if (variant === 'text200') {
+      const de = document.documentElement;
+      textEdit = { value: de.style.getPropertyValue('font-size'), priority: de.style.getPropertyPriority('font-size') };
+      de.style.setProperty('font-size', parseFloat(getComputedStyle(de).fontSize) * 2 + 'px', 'important'); // what a 200% browser text size does to rem and em
+    }
+  }
+
   /* ------------------------------ page weight ------------------------------ */
   // Reads only the browser's resource timing: each request's address, its type and its size.
   // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
@@ -906,7 +941,7 @@
       }
       applyTouchMode();
       applyPreviewTheme(m.themeCss);
-      if (document.body) setLongText(m.longText === true);
+      if (document.body) { setLongText(m.longText === true); setVariant(['dark', 'light', 'text200'].includes(m.variant) ? m.variant : ''); }
     }
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') reloadPage();
