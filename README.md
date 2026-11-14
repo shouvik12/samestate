@@ -4,8 +4,7 @@
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
-<p align="center">
-  <a href="https://shouvik12.github.io/samestate/"><b>▶ Live demo</b></a> ·
+<p align="center">·
   <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
   <a href="#install">Install the Chrome extension</a> ·
   <a href="#how-it-works">How it works</a> ·
