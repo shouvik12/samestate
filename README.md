@@ -35,6 +35,7 @@ that are too small, text that disappears.
 |---|---|
 | 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
 | 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
+| 📏 **Width sweep** | Resizes a screen from 320 to 1920px and reports the exact widths where each problem starts and stops. |
 | 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
@@ -67,6 +68,9 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
+- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it at each
+  width and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
+  **Widths**. Press the button again to stop.
 - **Journey report.** With **Page steps** on, **Check journey on every device** measures each step at the size of every
   selected device and compares it with the same step on the desktop, so the report says which step breaks on which screens.
 - **Fix previews.** Findings with a CSS fix (wide tables, cut-off text, small tap targets, small text, sideways
@@ -94,6 +98,7 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Input | Tap targets under 24px and 40px |
 | Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
 | Accessibility | Controls the Tab key reaches inside closed menus and panels, Tab order that jumps around the screen |
+| Widths | From **Sweep widths**: the widths where each problem appears, including WCAG 1.4.10 Reflow at 320px |
 | Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
 ## Install
@@ -233,6 +238,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - **Screen settings → Light and dark** rewrites the page's `prefers-color-scheme` rules in the stylesheets it can
   read. Stylesheets from other sites and scripts that ask `matchMedia()` still get your computer's setting.
 - **Long text** lengthens the text on the page as it is; text the page adds later is not lengthened.
+- **Sweep widths** keeps the screen's kind (touch or not) at every width, and **Check journey on every device**
+  resizes the steps without reloading them, so pages that pick a layout when they load can differ.
 - Fix previews set inline styles on the elements of one scan; a page reload removes them.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
@@ -259,6 +266,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | **2026-11-15** | pending | pending | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
 | **2026-11-15** | pending | pending | **Baseline** — save a scan as the site's baseline; later scans mark new findings and list fixed ones ([details](changelogs/CHANGELOG-baseline-report.md)) |
 | **2026-11-15** | pending | pending | **Journey report** — Check journey on every device measures every page step at each selected device's size ([details](changelogs/CHANGELOG-journey-report.md)) |
+| **2026-11-15** | pending | pending | **Width sweep** — Sweep widths reports the exact widths, from 320 to 1920px, where each problem starts and stops ([details](changelogs/CHANGELOG-width-sweep.md)) |
 | **2026-11-15** | pending | pending | **Screen settings** — every second screen in dark mode, at 200% text or in landscape, to compare one device both ways ([details](changelogs/CHANGELOG-screen-settings.md)) |
 | **2026-11-15** | pending | pending | **Long text** — every preview's text about a third longer, as translations often are, to find what gets cut off ([details](changelogs/CHANGELOG-long-text.md)) |
 | **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |

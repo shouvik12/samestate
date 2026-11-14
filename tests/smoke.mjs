@@ -211,6 +211,33 @@ const AFTER_TOUR = `(async () => {
     const zoomText = document.querySelector('#zoomv').textContent;
     record('Workspace save and open', !android.on && zoomText === '80%' && active().length === 6, 'Android selected: ' + android.on + ', zoom ' + zoomText + ', screens ' + active().length);
   } catch (error) { record('Workspace save and open', false, error.message); }
+  // The report tools added on top of the difference report, on the same sample site.
+  try {
+    await detect(true);
+    const cats = new Set(findings.map(f => f.cat));
+    record('Accessibility and network checks', cats.has('Accessibility') && cats.has('Network'), [...cats].join(', '));
+    localStorage.removeItem(baselineKey()); saveBaseline();
+    const table = () => issueGroups(findings).find(g => g.kind === 'Table is wider than its container');
+    toggleFix(table().items); await wait(300); await detect(true);
+    const state = compareBaseline();
+    record('Fix preview and baseline', !table() && state.fixed.some(item => item.kind === 'Table is wider than its container'), state.fixed.length + ' fixed since the baseline, ' + state.added + ' new');
+    undoAllFixes(); await detect(true); localStorage.removeItem(baselineKey());
+    record('Undo fix preview', !!table(), 'table issue back on ' + (table()?.screens.length || 0) + ' screens');
+    document.querySelector('#long-text').click(); await wait(400);
+    const long = active()[0].iframe.contentDocument.querySelector('h1').textContent;
+    document.querySelector('#long-text').click(); await wait(400);
+    const back = active()[0].iframe.contentDocument.querySelector('h1').textContent;
+    record('Long text', long.length > back.length * 1.25 && !back.includes('lörem'), back.length + ' → ' + long.length + ' characters, then back');
+    const settings = document.querySelector('#screen-settings');
+    settings.value = 'text'; settings.dispatchEvent(new Event('change')); await wait(400);
+    const sizes = active().slice(0, 2).map(d => d.iframe.contentWindow.getComputedStyle(d.iframe.contentDocument.documentElement).fontSize);
+    settings.value = ''; settings.dispatchEvent(new Event('change')); await wait(300);
+    record('Screen settings', sizes[1] === parseFloat(sizes[0]) * 2 + 'px', 'root font size ' + sizes.join(' and '));
+    document.querySelector('#ref').value = 'iphone';
+    await sweepWidths();
+    const swept = findings.filter(f => f.cat === 'Widths'), sideways = swept.find(f => f.kind === 'Page scrolls sideways');
+    record('Width sweep', sideways && /at 320–\\d+px/.test(sideways.title) && active().find(d => d.id === 'iphone').sweepW == null, (sideways?.title || 'no sideways finding') + '; ' + swept.length + ' findings');
+  } catch (error) { record('Report tools', false, error.message); }
   return results;
 })()`;
 

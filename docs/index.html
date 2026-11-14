@@ -210,7 +210,9 @@
       <div class="drawer-body">
         <button class="item" id="detect"><svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1M16 13h1"/></svg><span>Detect differences</span></button>
         <label class="item sel"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l-3 4 3 4M19 8l3 4-3 4"/></svg>Compare to <select id="ref"></select></label>
+        <button class="item" id="sweep" title="Resize the reference screen from 320 to 1920px and report the widths where each problem appears"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span>Sweep widths</span></button>
         <label class="row" title="Makes every preview's text about a third longer, with accented letters, as translations often do. Run Detect differences to see what breaks."><input type="checkbox" id="long-text">Long text (+35%)</label>
+        <p id="sweep-status" class="drawer-note" role="status"></p>
       </div>
     </details>
   </aside>

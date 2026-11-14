@@ -93,6 +93,7 @@ function screenName(d) {
 function size(d) {
   const { w, h, kind } = presetFor(d);
   if (d.fixedSize) return d.fixedSize; // a journey report screen: one step at one device's size
+  if (d.sweepW) return { w: d.sweepW, h: d.rot && kind !== 'desktop' ? w : h };
   return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
 }
 
@@ -2037,7 +2038,7 @@ function addResult(message, device) {
 }
 
 /* ----------------------------- difference engine ----------------------------- */
-const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Network'];
+const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Network', 'Widths'];
 // Network findings use resource timing sizes from each preview; request and response contents are never read.
 const API_TYPES = new Set(['fetch', 'xmlhttprequest']);
 const kb = bytes => !bytes ? '0 KB' : bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
@@ -2239,7 +2240,7 @@ function analyze(snaps, refId) {
 }
 
 async function detect(quiet) {
-  if (journeyRunning) return; // screens are being resized; their own report replaces this one
+  if (sweepRun || journeyRunning) return; // screens are being resized; their own report replaces this one
   const devs = workspaceScreens().filter(d => d.ready); if (devs.length < 1) return;
   $('#detect span').textContent = 'Measuring…';
   const rid = crypto.randomUUID(), snaps = [];
@@ -2251,7 +2252,7 @@ async function detect(quiet) {
     devs.forEach(d => post(d, 'snapshot', { rid })); setTimeout(done, 4000);
   });
   pendingSnap.delete(rid);
-  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
+  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || sweepRun || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
@@ -2290,6 +2291,7 @@ function renderFindings() {
   const counted = byIssue ? groups : findings;
   const count = cat => counted.filter(item => !cat || item.cat === cat).length;
   const cats = CATS.filter(c => findings.some(f => f.cat === c));
+  if (catFilter && !cats.includes(catFilter)) catFilter = null; // a filter left over from another scan
   $('#report-bar').hidden = !findings.length;
   document.querySelectorAll('#report-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === reportView)));
   $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
@@ -2305,7 +2307,7 @@ function renderFindings() {
       if (!own.length) continue;
       const c = s => own.filter(g => g.sev === s).length;
       const reference = own[0].items[0].reference;
-      const compared = reference.journeyRef ? 'Each step compared with ' + reference.journeyRef : 'Compared with ' + screenName(reference);
+      const compared = (reference.journeyRef ? 'Each step compared with ' + reference.journeyRef : 'Compared with ' + screenName(reference)) + (own[0].cat === 'Widths' ? ' · width sweep' : '');
       const name = site ? `Site ${sitePanels.indexOf(site) + 1} · ${site.url.origin === EXT ? 'Demo' : site.url.host} · ${compared}` : compared;
       html += `<div class="group">${esc(name)}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>`;
       for (const g of own) {
@@ -2443,6 +2445,70 @@ function snapshotScreens(screens, ms = 5000) {
 }
 const settle = ms => new Promise(done => setTimeout(done, ms)); // a snapshot forces layout; this gives the page's resize handlers time to run
 
+/* ------------------------------ breakpoint sweep ------------------------------ */
+// Resizes the reference screen from 320px to 1920px, checks it at each width and narrows every change down to
+// the pixel, so the report says where a problem starts and stops instead of which preset happens to show it.
+let sweepRun = 0;
+const SWEEP_WIDTHS = [...Array(35)].map((_, k) => 320 + k * 20).concat([...Array(23)].map((_, k) => 1000 + (k + 1) * 40)); // 320–1000 every 20px, then to 1920 every 40px
+async function sweepWidths() {
+  const button = $('#sweep'), label = button.querySelector('span');
+  if (sweepRun) { sweepRun = 0; return; } // a second press stops it
+  const d = active().find(x => x.id === $('#ref').value && x.ready) || active().find(x => x.ready);
+  if (!d || sitesMode) { label.textContent = sitesMode ? 'Turn off Compare sites to sweep' : 'Open a site first'; setTimeout(() => { label.textContent = 'Sweep widths'; }, 2500); return; }
+  const run = sweepRun = Date.now(), scan = openId, probes = new Map();
+  const probe = async w => {
+    if (probes.has(w)) return probes.get(w);
+    if (sweepRun !== run || scan !== openId || !d.el) throw new Error('stopped');
+    label.textContent = `Stop sweep · ${w}px`;
+    d.sweepW = w; layout(d);
+    await settle(160);
+    const data = (await snapshotScreens([d], 4000)).get(d);
+    const kinds = new Map();
+    if (data) {
+      const probeScreen = { ...d, sweepW: w }; // the screen keeps its own kind: touch checks don't switch on and off with width
+      for (const f of analyze([{ dev: probeScreen, data }], probeScreen.id)) if (f.cat !== 'Network' && !kinds.has(f.kind)) kinds.set(f.kind, f);
+    }
+    probes.set(w, kinds);
+    return kinds;
+  };
+  const same = (a, b) => a.size === b.size && [...a.keys()].every(k => b.has(k));
+  button.classList.add('busy');
+  try {
+    for (const w of SWEEP_WIDTHS) await probe(w);
+    let budget = 140; // bisect every change between two sampled widths, down to one pixel
+    const bisect = async (a, b) => {
+      if (b - a <= 1 || budget-- <= 0) return;
+      const m = (a + b) >> 1, mid = await probe(m);
+      if (!same(probes.get(a), mid)) await bisect(a, m);
+      if (!same(mid, probes.get(b))) await bisect(m, b);
+    };
+    for (let k = 1; k < SWEEP_WIDTHS.length; k++) if (!same(probes.get(SWEEP_WIDTHS[k - 1]), probes.get(SWEEP_WIDTHS[k]))) await bisect(SWEEP_WIDTHS[k - 1], SWEEP_WIDTHS[k]);
+  } catch {}
+  const finished = sweepRun === run && scan === openId;
+  d.sweepW = null;
+  if (d.el) { layout(d); fitWall(d.site); }
+  sweepRun = 0; button.classList.remove('busy'); label.textContent = 'Sweep widths';
+  if (!finished) return;
+  const widths = [...probes.keys()].sort((a, b) => a - b), kinds = new Map();
+  for (const w of widths) for (const [kind, f] of probes.get(w)) if (!kinds.has(kind)) kinds.set(kind, f);
+  const swept = [];
+  for (const [kind, sample] of kinds) {
+    const ranges = [];
+    for (const w of widths) {
+      const on = probes.get(w).has(kind), last = ranges[ranges.length - 1];
+      if (on && last && last.open) last.to = w; else if (on) ranges.push({ from: w, to: w, open: true }); else if (last) last.open = false;
+    }
+    const text = ranges.map(r => r.from === r.to ? r.from + 'px' : `${r.from}–${r.to}px`).join(', ');
+    const reflow = kind === 'Page scrolls sideways' && ranges.some(r => r.from <= 320) ? ' At 320px this fails WCAG 1.4.10 Reflow.' : '';
+    swept.push({ sev: sample.sev, cat: 'Widths', dev: d, kind, title: `${kind} at ${text}`, detail: `At ${ranges[0].from}px: ${sample.title}. ${sample.detail}${reflow}`, keys: [], refKeys: [], reference: d });
+  }
+  findings = [...findings.filter(f => f.cat !== 'Widths'), ...swept];
+  lastScan = lastScan || { at: new Date(), screens: [d] };
+  catFilter = swept.length ? 'Widths' : catFilter;
+  renderFindings(); showTab('diff');
+  $('#sweep-status').textContent = `Checked ${widths.length} widths from 320 to 1920px on ${screenName(d)}: ${plural(swept.length, 'finding')}.`;
+}
+
 /* ------------------------------ journey report ------------------------------ */
 // Page steps on every selected device: each step is measured at each device's size and compared with the same
 // step on the reference device, so the report says which step breaks on which screens.
@@ -2514,6 +2580,7 @@ $('#long-text').addEventListener('change', event => {
   longText = event.target.checked;
   for (const d of connectedScreens()) if (d.ready) configure(d);
 });
+$('#sweep').onclick = () => sweepWidths();
 $('#journey').onclick = () => journeyReport();
 
 // Outlines the findings in their previews, and the matching elements on the reference screen.
