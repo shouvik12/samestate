@@ -35,6 +35,7 @@ that are too small, text that disappears.
 |---|---|
 | 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
 | 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
+| 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
 | 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
@@ -69,6 +70,8 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Fix previews.** Findings with a CSS fix (wide tables, cut-off text, small tap targets, small text, sideways
   scrolling) show the CSS and a **Preview fix** button that applies it to every affected screen. **Check again**
   re-runs the report; **Undo** takes it off. Other findings show what to change in the site.
+- **Baseline.** **Save as baseline** in the Differences panel keeps this scan for the site. Later scans mark new
+  findings, list the fixed ones and can show **new** only.
 - **Long text.** **Compare → Long text (+35%)** makes every preview's text about a third longer, with accented
   letters, as translations often do. Run **Detect differences** to see what gets cut off or pushes the layout.
 - **Screen settings.** **Views → Screen settings** gives every second screen dark mode, 200% text or landscape.
@@ -252,6 +255,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 |------|-------------|---------|------------------|
 | **2026-11-15** | pending | pending | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
 | **2026-11-15** | pending | pending | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
+| **2026-11-15** | pending | pending | **Baseline** — save a scan as the site's baseline; later scans mark new findings and list fixed ones ([details](changelogs/CHANGELOG-baseline-report.md)) |
 | **2026-11-15** | pending | pending | **Screen settings** — every second screen in dark mode, at 200% text or in landscape, to compare one device both ways ([details](changelogs/CHANGELOG-screen-settings.md)) |
 | **2026-11-15** | pending | pending | **Long text** — every preview's text about a third longer, as translations often are, to find what gets cut off ([details](changelogs/CHANGELOG-long-text.md)) |
 | **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |

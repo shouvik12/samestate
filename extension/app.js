@@ -2279,6 +2279,7 @@ function issueGroups(list) {
 
 function renderFindings() {
   const order = SEVERITY;
+  renderBaseline(compareBaseline());
   const byIssue = reportView === 'issue';
   findings.forEach((f, i) => { f.i = i; });
   const groups = issueGroups(findings);
@@ -2289,12 +2290,12 @@ function renderFindings() {
   document.querySelectorAll('#report-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === reportView)));
   $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
   $('#diffn').textContent = counted.length || '';
-  const shown = findings.filter(f => !catFilter || f.cat === catFilter);
+  const shown = findings.filter(f => (!catFilter || f.cat === catFilter) && (!newOnly || f.isNew));
   if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
   const screens = sitesMode ? workspaceScreens() : viewScreens();
   let html = '';
   if (byIssue) {
-    reportGroups = groups.filter(g => !catFilter || g.cat === catFilter);
+    reportGroups = groups.filter(g => (!catFilter || g.cat === catFilter) && (!newOnly || g.items.some(f => f.isNew)));
     for (const site of sitesMode ? sitePanels : [null]) {
       const own = reportGroups.filter(g => g.site === site);
       if (!own.length) continue;
@@ -2305,7 +2306,8 @@ function renderFindings() {
       for (const g of own) {
         const pick = g.screens.includes(pickedScreen.get(g.key)) ? pickedScreen.get(g.key) : g.screens[0];
         const details = g.items.filter(f => f.dev === pick).map(f => (f.title === g.kind ? '' : f.title + '. ') + f.detail);
-        html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}<span class="c">${g.cat}</span></div>`
+        const fresh = g.items.filter(f => f.isNew).length;
+        html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}${fresh ? `<span class="new-tag">New${fresh < g.items.length ? ' on ' + fresh : ''}</span>` : ''}<span class="c">${g.cat}</span></div>`
           + `<div class="screens" role="group" aria-label="Screens with this finding">${g.screens.map((d, s) => `<button type="button" class="screen-chip${d === pick ? ' on' : ''}" data-s="${s}" aria-pressed="${d === pick}" title="Show details for ${esc(screenName(d))}">${esc(screenName(d))}</button>`).join('')}</div>`
           + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + fixHtml(g.kind, g.items) + '</div>';
       }
@@ -2317,7 +2319,7 @@ function renderFindings() {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
     html += `<div class="group">${esc(reportName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
-      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div>${fixHtml(f.kind, [f])}</div>`).join('');
+      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}${f.isNew ? '<span class="new-tag">New</span>' : ''}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div>${fixHtml(f.kind, [f])}</div>`).join('');
   }
   $('#findings').innerHTML = html;
 }
@@ -2379,6 +2381,49 @@ function undoAllFixes() {
   appliedFixes.clear();
   renderFindings();
 }
+
+/* ------------------------------ baseline ------------------------------ */
+// A saved scan for this site; later scans mark what is new and list what is gone.
+let newOnly = false;
+const baselineKey = () => 'samestate.baseline.' + (sitesMode ? sitePanels.map(site => site.url?.origin).join('|') : target);
+const findingId = f => reportName(f.dev) + '|' + f.kind;
+function loadBaseline() { try { return JSON.parse(localStorage.getItem(baselineKey()) || 'null'); } catch { return null; } }
+function saveBaseline() {
+  const items = findings.map(f => ({ id: findingId(f), kind: f.kind, screen: reportName(f.dev), sev: f.sev }));
+  try { localStorage.setItem(baselineKey(), JSON.stringify({ at: Date.now(), items })); } catch {}
+  newOnly = false;
+  renderFindings();
+}
+function clearBaseline() { try { localStorage.removeItem(baselineKey()); } catch {} newOnly = false; renderFindings(); }
+function compareBaseline() {
+  const baseline = findings.length ? loadBaseline() : null;
+  for (const f of findings) f.isNew = false;
+  if (!baseline) return null;
+  const before = new Set(baseline.items.map(item => item.id)), now = new Set(findings.map(findingId));
+  for (const f of findings) f.isNew = !before.has(findingId(f));
+  const fixed = baseline.items.filter(item => !now.has(item.id));
+  return { at: new Date(baseline.at), added: findings.filter(f => f.isNew).length, fixed, unchanged: findings.length - findings.filter(f => f.isNew).length };
+}
+function renderBaseline(state) {
+  const bar = $('#baseline');
+  bar.hidden = !findings.length;
+  if (!findings.length) return;
+  const fixes = appliedFixes.size ? `<p class="fix-line">${plural(appliedFixes.size, 'fix preview')} on. <button type="button" class="link" data-baseline="recheck">Check again</button> · <button type="button" class="link" data-baseline="undo-fixes">Undo all</button></p>` : '';
+  if (!state) { bar.innerHTML = `<button type="button" class="pill" data-baseline="save" title="Later scans of this site mark what is new and what is fixed">Save as baseline</button>` + fixes; return; }
+  const when = state.at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const gone = state.fixed.length ? `<details><summary>${state.fixed.length} fixed</summary><ul>${state.fixed.slice(0, 40).map(item => `<li>${esc(item.kind)} <span class="muted">· ${esc(item.screen)}</span></li>`).join('')}</ul></details>` : '<span>0 fixed</span>';
+  bar.innerHTML = `<div class="baseline-line"><b>Since baseline</b> <span class="muted">${esc(when)}</span></div>`
+    + `<div class="baseline-line"><button type="button" class="chip${newOnly ? ' on' : ''}" data-baseline="new"${state.added ? '' : ' disabled'}>${state.added} new</button>${gone}<span>${state.unchanged} unchanged</span></div>`
+    + `<div class="baseline-line"><button type="button" class="link" data-baseline="save">Replace baseline</button> · <button type="button" class="link" data-baseline="clear">Clear</button></div>` + fixes;
+}
+$('#baseline').addEventListener('click', e => {
+  const action = e.target.closest('[data-baseline]')?.dataset.baseline;
+  if (action === 'save') saveBaseline();
+  else if (action === 'clear') clearBaseline();
+  else if (action === 'new') { newOnly = !newOnly; renderFindings(); }
+  else if (action === 'recheck') detect(true);
+  else if (action === 'undo-fixes') undoAllFixes();
+});
 
 /* ------------------------------ screen settings and long text ------------------------------ */
 function applyScreenSettings() {

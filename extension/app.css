@@ -356,8 +356,14 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 .dev.display .dev-body{border-radius:8px;border:6px solid var(--bezel)}
 .dev.landscape .c-bottom{display:none}
 /* report: baseline, fix previews, new findings */
+.baseline{display:flex;flex-direction:column;gap:5px;margin-bottom:9px;padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-size:12px}
+.baseline .pill{align-self:flex-start;border:1px solid var(--line);color:var(--text);padding:3px 9px}
+.baseline-line{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;color:var(--mute)}.baseline-line b{color:var(--text)}
+.baseline details{color:var(--mute)}.baseline summary{cursor:pointer}.baseline ul{margin:4px 0 0 16px;padding:0}
+.baseline .chip:disabled{opacity:.55;cursor:default}
 button.link{color:var(--acc);text-decoration:underline;text-underline-offset:2px;font-size:12px}
 .fix-line{margin:0;color:var(--warn)}
+.new-tag{font-size:10px;font-weight:600;padding:0 6px;border-radius:9px;background:var(--acc);color:#10182b;white-space:nowrap}
 .finding .fix{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center;cursor:auto}
 .finding .fix code{flex:1 1 180px;font-size:11px;color:var(--text);background:var(--side);padding:3px 6px;border-radius:5px;user-select:all;word-break:break-word}
 .finding .fix .pill{border:1px solid var(--line);color:var(--text);padding:3px 9px;font-size:11.5px}.finding .fix .pill:disabled{opacity:.5;cursor:default}
