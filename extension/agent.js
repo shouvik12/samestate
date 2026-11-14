@@ -711,6 +711,24 @@
     return null;
   }
 
+  /* --------------------------- test modes and fix previews --------------------------- */
+  // Long text: every visible text node grows by about a third, with accented vowels, as translations often do.
+  let longText = null; // text node → its original text
+  const ACCENTS = { a: 'á', e: 'é', i: 'î', o: 'ö', u: 'ü', A: 'Á', E: 'É', I: 'Î', O: 'Ö', U: 'Ü' };
+  const FILLER = 'lörem ipsüm dölor sit amét cönsectetür adipiscing élit ';
+  function setLongText(on) {
+    if (on === !!longText) return;
+    if (!on) { for (const [node, text] of longText) if (node.isConnected) node.data = text; longText = null; return; }
+    longText = new Map();
+    const skip = privateContent + ',samestate-layer';
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: node => !node.data.trim() || node.parentElement?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    for (let node, n = 0; (node = walker.nextNode()) && n < 5000; n++) {
+      const text = node.data, extra = Math.max(2, Math.round(text.trim().length * .35));
+      longText.set(node, text);
+      node.data = text.replace(/[aeiouAEIOU]/g, c => ACCENTS[c]).replace(/(\S)(\s*)$/, '$1 ' + FILLER.repeat(Math.ceil(extra / FILLER.length)).slice(0, extra).trim() + '$2');
+    }
+  }
+
   /* ------------------------------ page weight ------------------------------ */
   // Reads only the browser's resource timing: each request's address, its type and its size.
   // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
@@ -888,6 +906,7 @@
       }
       applyTouchMode();
       applyPreviewTheme(m.themeCss);
+      if (document.body) setLongText(m.longText === true);
     }
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
     else if (m.type === 'reload') reloadPage();

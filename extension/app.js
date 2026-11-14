@@ -17,6 +17,7 @@ const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
 let textSalt = null, wallRevision = 0;
 let videoRequest = null;
+let longText = false; // every preview's text about a third longer, as translations often are
 const active = () => viewScreens().filter(d => d.el);
 const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
 const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
@@ -1766,7 +1767,8 @@ function configure(device) {
   const inspect = device !== device.site?.singleDevice;
   post(device, 'config', {
     touch: device.touch, inspect, textSalt: inspect ? textSalt : null,
-    pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || ''
+    pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || '',
+    longText: inspect && longText
   });
 }
 const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
@@ -2307,6 +2309,11 @@ $('#report-view').addEventListener('click', e => {
   reportView = view;
   try { localStorage.setItem('samestate.reportView', view); } catch {}
   renderFindings();
+});
+/* ------------------------------ screen settings and long text ------------------------------ */
+$('#long-text').addEventListener('change', event => {
+  longText = event.target.checked;
+  for (const d of connectedScreens()) if (d.ready) configure(d);
 });
 // Outlines the findings in their previews, and the matching elements on the reference screen.
 function showFindings(list) {

@@ -66,6 +66,8 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
+- **Long text.** **Compare → Long text (+35%)** makes every preview's text about a third longer, with accented
+  letters, as translations often do. Run **Detect differences** to see what gets cut off or pushes the layout.
 - **Sync log.** Shows which devices matched, skipped, or could not reach a control.
 - **Screenshots and recordings.** Save the visible device wall as a PNG or a silent WebM video.
 
@@ -218,6 +220,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - The server user-agent applies to page loads in phone and tablet previews, not to their images, scripts or API
   calls, and only to pages the preview opens itself (links, link sync, Align screens, reloads). A page a script
   opens with `location.href` gets the desktop user-agent. It needs the extension; the web demo has no server.
+- **Long text** lengthens the text on the page as it is; text the page adds later is not lengthened.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
@@ -240,6 +243,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
 | **2026-11-15** | pending | pending | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
+| **2026-11-15** | pending | pending | **Long text** — every preview's text about a third longer, as translations often are, to find what gets cut off ([details](changelogs/CHANGELOG-long-text.md)) |
 | **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
 | **2026-11-15** | pending | pending | **Above-the-fold check** — key controls and the main heading that the desktop shows on its first screen but phones push below the fold ([details](changelogs/CHANGELOG-fold-check.md)) |
 | **2026-11-15** | pending | pending | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |
