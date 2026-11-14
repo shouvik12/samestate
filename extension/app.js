@@ -81,6 +81,7 @@ function deviceChrome(preset, landscape) {
 }
 
 function screenName(d) {
+  if (d.label) return d.label;
   const setting = screenSetting(d);
   if (setting) return screenName({ ...d, settingShown: true, label: null }) + ' · ' + SETTING_NAMES[setting];
   if (d.site) return sameDevice ? d.name + ' · ' + presetFor(d).name : d.name;
@@ -91,6 +92,7 @@ function screenName(d) {
 
 function size(d) {
   const { w, h, kind } = presetFor(d);
+  if (d.fixedSize) return d.fixedSize; // a journey report screen: one step at one device's size
   return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
 }
 
@@ -428,6 +430,7 @@ function refreshViews() {
   renderFindings();
   updateWall();
   applyScreenSettings();
+  $('#journey').hidden = !journeyView;
 }
 
 function setPageSteps(enabled) {
@@ -2236,6 +2239,7 @@ function analyze(snaps, refId) {
 }
 
 async function detect(quiet) {
+  if (journeyRunning) return; // screens are being resized; their own report replaces this one
   const devs = workspaceScreens().filter(d => d.ready); if (devs.length < 1) return;
   $('#detect span').textContent = 'Measuring…';
   const rid = crypto.randomUUID(), snaps = [];
@@ -2247,7 +2251,7 @@ async function detect(quiet) {
     devs.forEach(d => post(d, 'snapshot', { rid })); setTimeout(done, 4000);
   });
   pendingSnap.delete(rid);
-  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision) return;
+  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
@@ -2300,7 +2304,8 @@ function renderFindings() {
       const own = reportGroups.filter(g => g.site === site);
       if (!own.length) continue;
       const c = s => own.filter(g => g.sev === s).length;
-      const compared = 'Compared with ' + screenName(own[0].items[0].reference);
+      const reference = own[0].items[0].reference;
+      const compared = reference.journeyRef ? 'Each step compared with ' + reference.journeyRef : 'Compared with ' + screenName(reference);
       const name = site ? `Site ${sitePanels.indexOf(site) + 1} · ${site.url.origin === EXT ? 'Demo' : site.url.host} · ${compared}` : compared;
       html += `<div class="group">${esc(name)}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>`;
       for (const g of own) {
@@ -2425,6 +2430,63 @@ $('#baseline').addEventListener('click', e => {
   else if (action === 'undo-fixes') undoAllFixes();
 });
 
+/* ------------------------------ snapshots of several screens ------------------------------ */
+function snapshotScreens(screens, ms = 5000) {
+  const rid = crypto.randomUUID(), out = new Map();
+  let answered = 0;
+  return new Promise(done => {
+    const finish = () => { pendingSnap.delete(rid); clearTimeout(timer); done(out); };
+    pendingSnap.set(rid, (d, data) => { if (data) out.set(d, data); if (++answered >= screens.length) finish(); });
+    const timer = setTimeout(finish, ms);
+    screens.forEach(d => post(d, 'snapshot', { rid }));
+  });
+}
+const settle = ms => new Promise(done => setTimeout(done, ms)); // a snapshot forces layout; this gives the page's resize handlers time to run
+
+/* ------------------------------ journey report ------------------------------ */
+// Page steps on every selected device: each step is measured at each device's size and compared with the same
+// step on the reference device, so the report says which step breaks on which screens.
+let journeyRunning = false;
+async function journeyReport() {
+  if (journeyRunning || !pageSteps || sitesMode) return;
+  const steps = pageScreens.filter(d => d.el && d.ready), devices = DEVICES.filter(d => d.on);
+  const status = $('#page-steps-status');
+  if (!steps.length || !devices.length) { status.textContent = 'Open a step and select devices first.'; return; }
+  journeyRunning = true;
+  const saved = sharedDeviceId, scan = openId, data = new Map(); // "step|device" → snapshot
+  const refDevice = devices.find(d => d.id === 'desktop') || devices.find(d => d.kind === 'desktop') || devices[0];
+  try {
+    for (const [n, device] of devices.entries()) {
+      if (scan !== openId || !pageSteps) throw new Error('stopped');
+      status.textContent = `Checking the journey on ${device.name} (${n + 1} of ${devices.length})…`;
+      sharedDeviceId = device.id; $('#shared-device').value = device.id;
+      for (const d of steps) d.rot = false;
+      refreshViews();
+      await settle(700);
+      const snaps = await snapshotScreens(steps, 6000);
+      for (const [d, snap] of snaps) data.set(d.id + '|' + device.id, snap);
+    }
+  } catch {}
+  sharedDeviceId = saved; $('#shared-device').value = saved;
+  refreshViews();
+  journeyRunning = false;
+  if (scan !== openId || !pageSteps) { status.textContent = ''; return; }
+  const screens = [];
+  const out = steps.flatMap((step, k) => {
+    const snaps = devices.map((device, j) => {
+      const dev = { ...step, id: step.id + '@' + device.id, kind: device.kind, os: device.os, touch: device.kind !== 'desktop', slot: k * 1000 + j, label: `Step ${step.step} · ${device.name}`, journeyRef: device.name, fixedSize: { w: device.w, h: device.h } };
+      screens.push(dev);
+      return { dev, data: data.get(step.id + '|' + device.id) };
+    }).filter(s => s.data);
+    return analyze(snaps, step.id + '@' + refDevice.id);
+  });
+  findings = out;
+  lastScan = { at: new Date(), screens };
+  const broken = new Set(out.filter(f => f.sev === 'issue').map(f => f.dev.label));
+  status.textContent = `Checked ${plural(steps.length, 'step')} on ${plural(devices.length, 'device')}. ${broken.size ? 'Issues on ' + [...broken].slice(0, 4).join(', ') + (broken.size > 4 ? ` +${broken.size - 4} more` : '') + '.' : 'No issues.'}`;
+  renderFindings(); showTab('diff');
+}
+
 /* ------------------------------ screen settings and long text ------------------------------ */
 function applyScreenSettings() {
   let rotated = false;
@@ -2452,6 +2514,7 @@ $('#long-text').addEventListener('change', event => {
   longText = event.target.checked;
   for (const d of connectedScreens()) if (d.ready) configure(d);
 });
+$('#journey').onclick = () => journeyReport();
 
 // Outlines the findings in their previews, and the matching elements on the reference screen.
 function showFindings(list) {
