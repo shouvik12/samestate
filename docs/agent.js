@@ -7,6 +7,7 @@
   if (!EXT || window.__samestate || window.parent === window || window.parent !== window.top) return;
   if (!location.ancestorOrigins || location.ancestorOrigins[0] !== EXT) return; // only inside a Samestate device frame
   window.__samestate = true;
+  try { performance.setResourceTimingBufferSize(1500); } catch {} // the default 250 entries fill up on busy pages
   const cfg = { touch: false, inspect: false };
   const privateContent = 'form,input,textarea,select,option,[contenteditable],[hidden],[aria-hidden=true],[data-samestate-private],script,style,noscript,template';
   const encoder = new TextEncoder();
@@ -674,6 +675,33 @@
     }
   };
 
+  /* ------------------------------ page weight ------------------------------ */
+  // Reads only the browser's resource timing: each request's address, its type and its size.
+  // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
+  // Request and response contents are never read.
+  const ownScript = tag?.src ? tag.src.split(/[?#]/)[0] : '';
+  function requestAddress(url) {
+    try {
+      const u = new URL(url, location.href);
+      if (!/^https?:$/.test(u.protocol)) return null;
+      const path = u.pathname.split('/').map(part => /^\d{3,}$|^[0-9a-f-]{16,}$|@|^[A-Za-z0-9_-]{24,}$/i.test(part) ? ':id' : part).join('/');
+      return u.origin + path;
+    } catch { return null; }
+  }
+  function requests() {
+    const out = [];
+    const add = (entry, type) => {
+      const url = requestAddress(entry.name);
+      if (!url || url === ownScript || (demo && /\/(agent|emulate)\.js$/.test(url))) return;
+      // encodedBodySize counts a body served from cache too; both are 0 for other sites without Timing-Allow-Origin.
+      out.push({ url, type, bytes: entry.encodedBodySize || entry.transferSize || 0 });
+    };
+    const page = performance.getEntriesByType('navigation')[0];
+    if (page) add(page, 'document');
+    for (const entry of performance.getEntriesByType('resource')) { if (out.length >= 800) break; add(entry, entry.initiatorType || 'other'); }
+    return out;
+  }
+
   /* --------------------------- snapshot for diffing --------------------------- */
   let snapMap = new Map();
   async function snapshot() {
@@ -710,7 +738,7 @@
       push(field ? 'input' : kind === 'link' ? 'link' : 'button', el, { kind, inline });
     });
     document.querySelectorAll('img').forEach(el => {
-      push('image', el, { natW: el.naturalWidth, broken: el.complete && el.naturalWidth === 0 && el.matches('img[src],img[srcset],picture img') });
+      push('image', el, { natW: el.naturalWidth, src: el.currentSrc ? requestAddress(el.currentSrc) : null, loaded: el.complete && el.naturalWidth > 0, boxed: el.getClientRects().length > 0, broken: el.complete && el.naturalWidth === 0 && el.matches('img[src],img[srcset],picture img') });
     });
     document.querySelectorAll('table').forEach(el => {
       let scroller = null;
@@ -761,6 +789,7 @@
     await Promise.all(textTasks);
     return {
       vw, docW: de.scrollWidth, metaViewport: !!document.querySelector('meta[name=viewport]'),
+      dpr: devicePixelRatio, requests: requests(),
       items, overflow, scrollers, fixed,
       menuToggle: Array.from(document.querySelectorAll('[aria-haspopup=menu],[aria-controls][aria-expanded]')).some(visible)
     };

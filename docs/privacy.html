@@ -59,7 +59,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   </header>
 
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated November 13, 2026</p>
+  <p class="updated">Last updated November 15, 2026</p>
 
   <div class="summary">
     <p>Samestate runs entirely in your browser. It does not collect, store on any server, sell, or share your personal data or browsing activity. There are no accounts, analytics, or tracking.</p>
@@ -76,6 +76,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
     <li><strong>Match visible text</strong> is off by default. When you turn it on, rendered text is read locally and compared using temporary fingerprints. Raw page text is kept out of the report and the sync log.</li>
     <li>Developers can mark elements with <code>data-samestate-private</code> to exclude their text from matching.</li>
     <li>Previews start with separate, temporary browser storage and do not reuse your existing sign-ins.</li>
+    <li>Network findings use the browser's resource timing: each request's address, type and size. Query strings are dropped, path segments that look like IDs are replaced, and request and response contents are never read.</li>
   </ul>
 
   <h2>How previews are allowed to load</h2>

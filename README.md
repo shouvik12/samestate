@@ -81,6 +81,7 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Tables | Tables wider than the screen, tables that need a sideways swipe |
 | Input | Tap targets under 24px and 40px |
 | Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
+| Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
 ## Install
 
@@ -179,6 +180,9 @@ is off when you open a preview. When enabled, the preview reads rendered text lo
 fingerprints for comparison. Raw page text stays out of the report and sync log. Visible text can contain
 personal data. Mark elements with `data-samestate-private` to exclude their text from matching.
 
+The **Network** findings use the browser's resource timing: each request's address, type and size. Query strings
+are dropped, path segments that look like IDs show as `:id`, and request and response contents are never read.
+
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
 and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
 or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
@@ -216,6 +220,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
 - Pixel ratio is 3 for phones and 2 for tablets, not each model's exact value.
+- Network sizes come from resource timing. Other sites report no size unless they send `Timing-Allow-Origin`,
+  so page weight undercounts third-party requests. Lazy-loaded files count only once a screen has loaded them.
 - Security headers are removed inside Samestate tabs so pages can be framed. Use those tabs for
   previewing, not for sensitive browsing. Other tabs are untouched.
 
@@ -231,6 +237,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-15** | pending | pending | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
 | **2026-11-13** | 22:17:23 +05:30 | `95c6a54` | **Ignore zip builds** — `*.zip` is ignored, so packaged extension zips are not committed ([details](changelogs/CHANGELOG-ignore-zip-builds.md)) |

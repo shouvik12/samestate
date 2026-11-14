@@ -2005,7 +2005,22 @@ function addResult(message, device) {
 }
 
 /* ----------------------------- difference engine ----------------------------- */
-const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability'];
+const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Network'];
+// Network findings use resource timing sizes from each preview; request and response contents are never read.
+const API_TYPES = new Set(['fetch', 'xmlhttprequest']);
+const kb = bytes => !bytes ? '0 KB' : bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
+const weight = requests => requests.reduce((sum, r) => sum + r.bytes, 0);
+const requestPath = url => url.replace(/^https?:\/\/[^/]+/, '') || '/';
+const fileName = url => requestPath(url).split('/').filter(Boolean).pop() || '/';
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+// Repeat requests for one address (video ranges, polling) count together, largest first.
+const byAddress = requests => {
+  const merged = new Map();
+  for (const r of requests) if (r.bytes) { const e = merged.get(r.url) || { url: r.url, bytes: 0, n: 0 }; e.bytes += r.bytes; e.n++; merged.set(r.url, e); }
+  return [...merged.values()].sort((a, b) => b.bytes - a.bytes);
+};
+const times = r => r.n > 1 ? ` (${r.n} requests)` : '';
+const more = (arr, n = 3) => arr.slice(0, n).join(', ') + (arr.length > n ? ` +${arr.length - n} more` : '');
 const q = s => '“' + (s.length > 38 ? s.slice(0, 36) + '…' : s) + '”';
 const list = (arr0, n = 3, arr = [...new Set(arr0)]) => arr.slice(0, n).map(q).join(', ') + (arr.length > n ? ` +${arr.length - n} more` : '');
 
@@ -2081,9 +2096,31 @@ function analyze(snaps, refId) {
     } else {
       const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, 'Sideways scroll areas', `${sw.length} sideways scroll area${sw.length > 1 ? 's' : ''}`, 'Mouse users need a scrollbar, shift-wheel or arrow buttons here.', sw.map(s => s.key));
     }
+    // ---- page weight
+    const requests = data.requests || [], total = weight(requests), sizeOf = new Map(requests.map(r => [r.url, r.bytes]));
+    const imageLabel = i => q(i.src ? fileName(i.src) : i.name) + (i.src && sizeOf.get(i.src) ? ` (${kb(sizeOf.get(i.src))})` : '');
+    if (requests.length) {
+      const api = requests.filter(r => API_TYPES.has(r.type)), origin = new URL(requests[0].url).origin;
+      const unsized = requests.filter(r => !r.bytes && !r.url.startsWith(origin + '/')).length; // other sites hide sizes without Timing-Allow-Origin
+      add('info', 'Network', dev, 'Page weight', `Downloads ${kb(total)} in ${plural(requests.length, 'request')}`,
+        `${plural(api.length, 'API call')}` + (unsized ? `. ${plural(unsized, 'request')} to other sites ${unsized === 1 ? 'has' : 'have'} no size, so the real total is higher.` : '.'));
+      const bigApi = api.filter(r => r.bytes >= 100 * 1024);
+      if (bigApi.length) add('info', 'Network', dev, 'Large API responses', `${plural(bigApi.length, 'API response')} over 100 KB`, more(byAddress(bigApi).map(r => `${q(requestPath(r.url))} ${kb(r.bytes)}${times(r)}`)));
+    }
+    const images = [...I.values()].filter(i => i.cat === 'image' && i.loaded);
+    const unseen = images.filter(i => !i.boxed);
+    if (unseen.length) add('warn', 'Network', dev, 'Hidden images still downloaded', `${plural(unseen.length, 'hidden image')} still downloaded`, 'Hidden on this screen but loaded anyway: ' + more(unseen.map(imageLabel)));
+    const ratio = dev.kind === 'phone' ? 3 : 2; // the sharpest screens of each kind
+    const oversized = vis.filter(i => i.cat === 'image' && i.loaded && i.natW && !/\.svg$/i.test(i.src || '') && i.natW > i.w * ratio * 1.5 && i.natW - i.w * ratio >= 400);
+    if (oversized.length) add('warn', 'Network', dev, 'Images larger than shown', `${plural(oversized.length, 'image')} much larger than shown`, more(oversized.map(i => `${imageLabel(i)} ${i.natW}px wide, shown at ${i.w}px (${Math.round(i.w * ratio)}px covers a ${ratio}× screen)`)), oversized.map(i => i.key));
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
     const rn = screenName(ref.dev);
+    const refRequests = ref.data.requests || [], refTotal = weight(refRequests);
+    if ((dev.kind === 'phone' || dev.kind === 'tablet') && ref.dev.kind === 'desktop' && refTotal >= 300 * 1024 && total >= refTotal * .85) {
+      const largest = byAddress(requests).map(r => `${q(fileName(r.url))} ${kb(r.bytes)}${times(r)}`);
+      add('warn', 'Network', dev, `Downloads as much as ${rn}`, `Downloads ${Math.round(total / refTotal * 100)}% of what ${rn} does`, `${kb(total)} here, ${kb(refTotal)} on ${rn}. Largest: ${more(largest)}`);
+    }
     const matches = matchItems(R, I);
     for (const [referenceItem, item] of matches) referenceKeys.set(item.key, referenceItem.key);
     const both = [...matches].filter(([r, i]) => r.visible && i.visible);
