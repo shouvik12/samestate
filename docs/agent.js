@@ -20,6 +20,21 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const now = () => Date.now();
 
+  // With phone and tablet identity on, the extension sends the device's user-agent to the server for page loads
+  // whose address carries samestate-ua (emulate.js removes it from the address before the page's scripts run).
+  // Pages this screen opens itself keep the mark, so the server keeps sending the phone or tablet page.
+  const UA_MARK = 'samestate-ua';
+  function uaMark() {
+    if (demo || !window.name.startsWith('samestate-device:')) return null;
+    try { const d = JSON.parse(window.name.slice(17)); return d.ios ? (d.mobile ? 'iphone' : 'ipad') : (d.mobile ? 'android' : 'android-tablet'); } catch { return null; }
+  }
+  function withUa(href) {
+    const mark = uaMark();
+    if (!mark) return href;
+    try { const u = new URL(href, location.href); if (u.origin !== location.origin) return href; u.searchParams.set(UA_MARK, mark); return u.href; } catch { return href; }
+  }
+  const reloadPage = () => { const href = withUa(location.href); if (href === location.href) location.reload(); else location.replace(href); };
+
   const ACTIONABLE = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=switch],[role=checkbox],[role=option],[onclick],[data-toggle],[data-bs-toggle],[aria-controls],[aria-expanded],[tabindex]:not([tabindex="-1"])';
 
   /* ------------------------------ semantics ------------------------------ */
@@ -385,25 +400,36 @@
     if (!event.userInitiated && now() - playbackGesture > 1000) return; // playbackGesture is the last trusted click or key
     let url;
     try { url = new URL(event.destination.url); } catch { return; }
-    if (url.origin !== location.origin || url.href === following) return;
+    // Only this screen adds samestate-ua, when it loads a page it already sent; the address is never passed on.
+    if (url.searchParams.has(UA_MARK) || url.origin !== location.origin || url.href === following) return;
     act('navigate', { url: url.href });
     // Loading a new page ends this document before the message above reaches Samestate, which then
     // drops it, so this screen goes there itself once the message is on its way.
     if (!event.destination.sameDocument && event.cancelable) {
       event.preventDefault();
       following = url.href;
-      setTimeout(() => location.assign(url.href), 120);
+      setTimeout(() => location.assign(withUa(url.href)), 120);
     }
+  });
+  // A link followed with link sync off keeps the server user-agent too.
+  window.navigation?.addEventListener('navigate', event => {
+    if (!uaMark() || !event.isTrusted || !event.cancelable || event.defaultPrevented || event.hashChange || event.downloadRequest != null || event.formData) return;
+    if (!event.sourceElement?.closest?.('a[href]')) return; // link clicks only; scripts and routers navigate on their own
+    const href = withUa(event.destination.url);
+    if (href === event.destination.url) return;
+    event.preventDefault();
+    location.assign(href);
   });
   function followAddress(address) {
     let url;
     try { url = new URL(address); } catch { return { status: 'none' }; }
     if (url.origin !== location.origin || url.username || url.password) return { status: 'none' };
+    url.searchParams.delete(UA_MARK); // another screen's device type never reaches this one
     if (url.href === location.href) return { status: 'skip' };
     following = url.href;
     const samePage = url.pathname === location.pathname && url.search === location.search;
     // After the result has been sent: a full page load ends this script.
-    setTimeout(() => { if (samePage && url.hash) location.hash = url.hash; else location.assign(url.href); }, 0);
+    setTimeout(() => { if (samePage && url.hash) location.hash = url.hash; else location.assign(withUa(url.href)); }, 0);
     return { status: 'navigated' };
   }
 
@@ -864,20 +890,20 @@
       applyPreviewTheme(m.themeCss);
     }
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
-    else if (m.type === 'reload') location.reload();
+    else if (m.type === 'reload') reloadPage();
     else if (m.type === 'identity' && typeof m.name === 'string' && (m.name === '' || m.name.startsWith('samestate-device:'))) {
       // The device identity emulate.js reads when a page loads. Only Samestate's own names are accepted.
       if (window.name !== m.name && (m.name || window.name.startsWith('samestate-device:'))) window.name = m.name;
-      if (m.reload) location.reload();
+      if (m.reload) reloadPage();
     }
     else if (m.type === 'state') send('state', { rid: m.rid, url: location.href, scroll: scrollState() });
     else if (m.type === 'align') {
       // Asked for by the user with "Align screens": go to the page the leading screen is on, then to its scroll position.
       let url = null;
-      try { url = new URL(m.url); } catch {}
+      try { url = new URL(m.url); url.searchParams.delete(UA_MARK); } catch {}
       if (m.navigate && url && url.origin === location.origin && (url.pathname !== location.pathname || url.search !== location.search)) {
         send('aligning');
-        location.assign(url.href);
+        location.assign(withUa(url.href));
       } else if (m.scroll) applyScroll(m.scroll);
     }
     else if (m.type === 'demo' && demo) runDemo(m);

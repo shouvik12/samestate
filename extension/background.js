@@ -3,9 +3,46 @@ const APP = chrome.runtime.getURL('app.html');
 const previewKey = tabId => 'preview-origin-' + tabId;
 const HEADERS = ['x-frame-options', 'content-security-policy', 'content-security-policy-report-only', 'cross-origin-opener-policy', 'cross-origin-embedder-policy', 'cross-origin-resource-policy'];
 
+// Phone and tablet previews ask for the device's user-agent with samestate-ua in a page load's address. One rule
+// per device type, for this tab's preview frames only; requests without the mark are untouched.
+const UA_TYPES = ['iphone', 'ipad', 'android', 'android-tablet'];
+// Rule ids are numbers no other session rule uses, kept per tab (the header rule's id is the tab id).
+const uaKey = tabId => 'ua-rules-' + tabId;
+async function uaRuleIds(tabId, create) {
+  const { [uaKey(tabId)]: stored } = await chrome.storage.session.get(uaKey(tabId));
+  if (stored || !create) return stored || [];
+  const used = new Set((await chrome.declarativeNetRequest.getSessionRules()).map(rule => rule.id));
+  const ids = [];
+  while (ids.length < UA_TYPES.length) {
+    const id = 1 + Math.floor(Math.random() * 2_000_000_000);
+    if (!used.has(id) && id !== tabId && !ids.includes(id)) ids.push(id);
+  }
+  await chrome.storage.session.set({ [uaKey(tabId)]: ids });
+  return ids;
+}
+const CLIENT_HINTS = ['sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform', 'sec-ch-ua-model', 'sec-ch-ua-platform-version', 'sec-ch-ua-full-version-list'];
+function uaRules(tabId, ids, origins, agents) {
+  const escaped = origins.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  return UA_TYPES.flatMap((type, i) => {
+    const ua = agents?.[type];
+    if (typeof ua !== 'string' || !/^Mozilla\/5\.0 [\x20-\x7e]{10,300}$/.test(ua)) return [];
+    const ios = type === 'iphone' || type === 'ipad';
+    const requestHeaders = [{ header: 'user-agent', operation: 'set', value: ua }];
+    // Safari sends no client hints; Chrome on Android says it is Android, and whether it is a phone.
+    if (ios) requestHeaders.push(...CLIENT_HINTS.map(header => ({ header, operation: 'remove' })));
+    else requestHeaders.push({ header: 'sec-ch-ua-mobile', operation: 'set', value: type === 'android' ? '?1' : '?0' }, { header: 'sec-ch-ua-platform', operation: 'set', value: '"Android"' });
+    return [{
+      id: ids[i], priority: 1,
+      action: { type: 'modifyHeaders', requestHeaders },
+      condition: { tabIds: [tabId], resourceTypes: ['sub_frame'], regexFilter: '^(?:' + escaped + ')/[^#]*[?&]samestate-ua=' + type + '(?:[&#]|$)', isUrlFilterCaseSensitive: true }
+    }];
+  });
+}
+
 async function unregister(tabId) {
-  await chrome.storage.session.remove(previewKey(tabId));
-  await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId] });
+  const ids = await uaRuleIds(tabId, false);
+  await chrome.storage.session.remove([previewKey(tabId), uaKey(tabId)]);
+  await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: [tabId, ...ids] });
   await syncEmulation();
 }
 
@@ -33,7 +70,7 @@ function syncEmulation() {
   return emulationQueue;
 }
 
-async function register(tabId, origin, sites) {
+async function register(tabId, origin, sites, agents) {
   const origins = [...new Set([...(origin === null ? [] : [origin]), ...sites])];
   if (!origins.length) return unregister(tabId);
   const permissions = origins.map(value => {
@@ -44,9 +81,10 @@ async function register(tabId, origin, sites) {
   if (!await chrome.permissions.contains({ origins: permissions })) throw new Error('Missing preview permission');
 
   const escaped = origins.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const ids = await uaRuleIds(tabId, true);
   await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [tabId],
-    addRules: [{
+    removeRuleIds: [tabId, ...ids],
+    addRules: [...uaRules(tabId, ids, origins, agents), {
       id: tabId,
       priority: 1,
       action: {
@@ -71,7 +109,7 @@ chrome.action.onClicked.addListener(tab => {
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type !== 'register' || sender.frameId !== 0 || sender.url !== APP || !sender.tab) return;
-  register(sender.tab.id, message.origin, message.sites || []).then(() => reply({ ok: true }), () => reply({ ok: false }));
+  register(sender.tab.id, message.origin, message.sites || [], message.agents).then(() => reply({ ok: true }), error => reply({ ok: false, error: String(error?.message || error) }));
   return true;
 });
 

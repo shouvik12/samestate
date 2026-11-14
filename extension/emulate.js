@@ -1,7 +1,7 @@
 /* Device identity for a Samestate preview. Runs in the page's own world before its scripts, and only inside a
    Samestate preview frame whose name carries a device: the page's JavaScript then sees that device's user-agent,
-   platform, touch support, pixel ratio, screen size and hover/pointer answers. Stylesheets and the server still see
-   the computer running Samestate. */
+   platform, touch support, pixel ratio, screen size and hover/pointer answers. Stylesheets still see the computer
+   running Samestate; page loads reach the server with the device's user-agent (see samestate-ua below). */
 (() => {
   'use strict';
   const PREFIX = 'samestate-device:';
@@ -13,6 +13,14 @@
   try { device = JSON.parse(window.name.slice(PREFIX.length)); } catch { return; }
   if (typeof device?.ua !== 'string' || !Number.isFinite(device.dpr) || !Number.isFinite(device.w) || !Number.isFinite(device.h)) return;
   window.__samestateDevice = true;
+
+  // samestate-ua asked the extension to send this device's user-agent to the server for this page load.
+  // It is taken out of the address before the page's scripts can see it.
+  if (location.search.includes('samestate-ua=')) {
+    const url = new URL(location.href);
+    url.searchParams.delete('samestate-ua');
+    try { history.replaceState(history.state, '', url.href); } catch {}
+  }
 
   const define = (target, name, value) => {
     try { Object.defineProperty(target, name, { get: () => value, configurable: true }); } catch {}

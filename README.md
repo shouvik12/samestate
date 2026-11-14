@@ -112,7 +112,7 @@ Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog u
 
 ## Compare devices and page steps
 
-- **Views → Phone and tablet identity** (off by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. Previews reload when you change it. It is off by default because a site whose server picks the layout (Google, for example) still sends desktop pages, and its scripts may then show a phone a different page from the other screens, so clicks there have nothing to match.
+- **Views → Phone and tablet identity** (off by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. In the extension, page loads in those previews also reach the server with the device's user-agent, so sites that choose the layout on the server (Google, for example) send their phone or tablet pages. Previews reload when you change it. It is off by default so that every screen starts from the same page and clicks have something to match.
 - In **Views → Device sizes**, choose **Different devices** to use the selected presets or **Same device on every screen** to give those previews one shared size. Select **Device for all previews** to resize them in place.
 - Turn on **Views → Page steps** to start a row with the page you originally opened. Follow a same-origin link or use a supported control, such as **Sign in**, to open the next state beside the current screen. Dialogs, menus and tabs can become steps even when the address stays the same. In the extension, you can also enter a path such as `/pricing` in the address bar. Close a step with **×** in its header.
 - To switch sites, enter a domain or full URL in the address bar. After Chrome grants access, the new site opens at Step 1 with the selected device size.
@@ -215,8 +215,9 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
 - In a single-page app, the other screens load the new address as a full page rather than through the app's
   router, so state kept only in memory (an open filter, a typed search) is not carried over.
-- Phone and tablet identity reaches the page's JavaScript only. Requests to the server still carry your
-  browser's own user-agent, so sites that pick a mobile layout on the server show desktop markup.
+- The server user-agent applies to page loads in phone and tablet previews, not to their images, scripts or API
+  calls, and only to pages the preview opens itself (links, link sync, Align screens, reloads). A page a script
+  opens with `location.href` gets the desktop user-agent. It needs the extension; the web demo has no server.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
@@ -230,7 +231,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 - **v2: suggested fixes** for findings in the difference report, not just detection
 - Chrome Web Store listing
-- Per-device user-agent on requests to the server (the page's scripts already see it)
+- Server user-agent for a preview's images, scripts and API calls, not only its page loads
 
 ## Release Notes
 
@@ -238,6 +239,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-15** | pending | pending | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
 | **2026-11-15** | pending | pending | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
 | **2026-11-15** | pending | pending | **Above-the-fold check** — key controls and the main heading that the desktop shows on its first screen but phones push below the fold ([details](changelogs/CHANGELOG-fold-check.md)) |
 | **2026-11-15** | pending | pending | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |

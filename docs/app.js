@@ -86,17 +86,23 @@ let emulateDevices = false;
 try { emulateDevices = localStorage.getItem('samestate.emulate') === 'on'; } catch {}
 const CHROME_MAJOR = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || '130';
 const IOS_VERSION = '17_5', SAFARI_VERSION = '17.5';
+// iPads have reported themselves as a Mac with touch since iPadOS 13.
+function userAgent(ios, phone) {
+  return ios
+    ? phone
+      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${IOS_VERSION} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Mobile/15E148 Safari/604.1`
+      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Safari/605.1.15`
+    : `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 ${phone ? 'Mobile ' : ''}Safari/537.36`;
+}
+// The background worker sends these to the server for page loads marked samestate-ua=<type> (see setPreviewSource).
+const SERVER_AGENTS = { iphone: userAgent(true, true), ipad: userAgent(true, false), android: userAgent(false, true), 'android-tablet': userAgent(false, false) };
+const uaType = identity => identity.ios ? (identity.mobile ? 'iphone' : 'ipad') : (identity.mobile ? 'android' : 'android-tablet');
 function deviceIdentity(d) {
   const preset = presetFor(d);
   if (!emulateDevices || preset.kind === 'desktop') return null;
   const { w, h } = size(d);
   const ios = preset.os === 'ios', phone = preset.kind === 'phone';
-  // iPads have reported themselves as a Mac with touch since iPadOS 13.
-  const ua = ios
-    ? phone
-      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${IOS_VERSION} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Mobile/15E148 Safari/604.1`
-      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Safari/605.1.15`
-    : `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 ${phone ? 'Mobile ' : ''}Safari/537.36`;
+  const ua = userAgent(ios, phone);
   return {
     ua, ios, mobile: phone, chrome: CHROME_MAJOR, w, h, dpr: phone ? 3 : 2,
     platform: ios ? (phone ? 'iPhone' : 'MacIntel') : 'Linux armv81',
@@ -196,10 +202,12 @@ function relayout() {
   refreshThemeTargets();
 }
 
-function setPreviewSource(frame, url) {
+function setPreviewSource(frame, url, d) {
   if (url.origin === EXT) frame.removeAttribute('sandbox');
   else frame.setAttribute('sandbox', PREVIEW_SANDBOX);
   frame.credentialless = url.origin !== EXT;
+  const identity = d && IS_EXT && url.origin !== EXT ? deviceIdentity(d) : null;
+  if (identity) { url = new URL(url); url.searchParams.set('samestate-ua', uaType(identity)); } // the server gets the device's user-agent
   frame.src = url.href;
 }
 
@@ -248,10 +256,10 @@ function addFrame(d) {
   d.themeTargetId = d.token = crypto.randomUUID();
   d.identity = d.iframe.name = identityName(d); // before the first load
   if (d.site) {
-    setPreviewSource(d.iframe, d.site.url);
+    setPreviewSource(d.iframe, d.site.url, d);
     d.site.frames.append(el);
   } else {
-    setPreviewSource(d.iframe, new URL(d.pageUrl || previewUrl));
+    setPreviewSource(d.iframe, new URL(d.pageUrl || previewUrl), d);
     const next = allScreens().find(item => item.slot > d.slot && item.el);
     $('#frames').insertBefore(el, next?.el || null);
   }
@@ -694,7 +702,7 @@ function register(origin, site) {
     const nextSites = new Map(registeredSites);
     if (site && origin) nextSites.set(site, origin);
     else if (site) nextSites.delete(site);
-    const reply = await chrome.runtime.sendMessage({ type: 'register', origin: nextWall, sites: [...new Set(nextSites.values())] });
+    const reply = await chrome.runtime.sendMessage({ type: 'register', origin: nextWall, sites: [...new Set(nextSites.values())], agents: SERVER_AGENTS });
     if (!reply?.ok) throw new Error('Preview registration failed');
     registeredWallOrigin = nextWall;
     registeredSites = nextSites;
@@ -960,7 +968,7 @@ async function openSite(site, url, alreadyAllowed = false) {
       d.ready = false;
       d.token = crypto.randomUUID();
       d.el.classList.remove('ready', 'leader');
-      setPreviewSource(d.iframe, url);
+      setPreviewSource(d.iframe, url, d);
     }
     site.status.textContent = '';
     fitSite(site);
