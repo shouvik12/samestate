@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/media/samestate-banner.png" alt="Samestate: one interaction, every device" width="100%"></p>
+
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
