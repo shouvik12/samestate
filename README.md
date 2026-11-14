@@ -232,6 +232,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-14** | 17:06:09 +05:30 | `811325c` | **Sample site default** — the extension starts on the bundled sample site instead of `claude.com`, requests no built-in site access, and has new icons ([details](changelogs/CHANGELOG-sample-site-default.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
 | **2026-11-13** | 22:17:23 +05:30 | `95c6a54` | **Ignore zip builds** — `*.zip` is ignored, so packaged extension zips are not committed ([details](changelogs/CHANGELOG-ignore-zip-builds.md)) |
