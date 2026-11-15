@@ -6,14 +6,14 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center">·
   <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
-  <a href="#install">Install the Chrome extension</a> ·
+  <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
 
 <p align="center">
   <img alt="Free" src="https://img.shields.io/badge/price-free-5eead4">
-  <img alt="Chrome extension" src="https://img.shields.io/badge/Chrome-extension-4285F4">
+  <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><img alt="Available in the Chrome Web Store" src="https://img.shields.io/badge/Chrome%20Web%20Store-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white"></a>
   <img alt="No server" src="https://img.shields.io/badge/server-none-111827">
   <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
@@ -86,6 +86,16 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 ## Install
 
 Samestate is a Chrome extension. No server and no terminal.
+
+### From the Chrome Web Store (recommended)
+
+1. Open **[Samestate on the Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha)**.
+2. Click **Add to Chrome**, then **Add extension**.
+3. Pin the Samestate icon from the puzzle-piece menu.
+
+Works in Chrome and other Chromium browsers (Edge, Brave, Arc) on desktop. Updates install automatically.
+
+### From source
 
 1. Download this repo (**Code → Download ZIP**) and unzip it.
 2. Open `chrome://extensions`.
@@ -223,7 +233,6 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 ## Roadmap
 
 - **v2: suggested fixes** for findings in the difference report, not just detection
-- Chrome Web Store listing
 - Per-device user-agent on requests to the server (the page's scripts already see it)
 
 ## Release Notes
@@ -232,6 +241,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |
 | **2026-11-14** | 17:06:09 +05:30 | `811325c` | **Sample site default** — the extension starts on the bundled sample site instead of `claude.com`, requests no built-in site access, and has new icons ([details](changelogs/CHANGELOG-sample-site-default.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
