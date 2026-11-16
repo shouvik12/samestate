@@ -34,10 +34,13 @@
   const shotInterval = () => shotUnit() === 'apart' ? shotValue() * 1000 : 1000 / shotValue();
   // The pace in words, the same whichever unit was chosen: "1 screenshot every 5 seconds", "2 screenshots every second".
   const fmt = n => String(+n.toFixed(2));
+  // Only whole screenshots: a whole number per second reads as a count ("3 screenshots every second"), anything else
+  // as the gap between them ("1.1 per second" is "1 screenshot every 0.91 seconds").
   function shotPace() {
-    const seconds = shotInterval() / 1000;
+    const seconds = shotInterval() / 1000, perSecond = 1 / seconds, count = Math.round(perSecond);
     if (Math.abs(seconds - 1) < 0.005) return '1 screenshot every second';
-    return seconds > 1 ? `1 screenshot every ${fmt(seconds)} seconds` : `${fmt(1 / seconds)} screenshots every second`;
+    if (perSecond > 1 && Math.abs(perSecond - count) < 0.01) return `${count} screenshots every second`;
+    return `1 screenshot every ${fmt(seconds)} seconds`;
   }
   const showPace = () => { shotHint.textContent = 'Takes ' + shotPace(); };
   function fitShotInput() {
