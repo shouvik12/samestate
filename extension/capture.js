@@ -8,12 +8,66 @@
   const screenshotButton = document.querySelector('#screenshot');
   const recordButton = document.querySelector('#record');
   const status = document.querySelector('#capture-status');
+  const autoButton = document.querySelector('#auto-shots');
+  const shotRateInput = document.querySelector('#shot-rate');
+  const recordRateInput = document.querySelector('#record-rate');
+  const folderButton = document.querySelector('#capture-folder');
+  const folderLabel = document.querySelector('#capture-folder-name');
+  const folderClear = document.querySelector('#capture-folder-clear');
   const canCapture = !!(navigator.mediaDevices?.getDisplayMedia && globalThis.CropTarget?.fromElement);
   const videoType = canCapture && typeof MediaRecorder === 'function' &&
     ['video/webm;codecs=vp8', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
 
   let busy = false;
   let recording = null;
+  let auto = null; // auto screenshots in progress
+  let partBytes = 10 * 1024 * 1024; // a recording starts a new file at about this size
+
+  // Rates are remembered per browser. Screenshots: 0.1–10 per second. Recording: 1–60 frames per second.
+  const clamp = (value, lo, hi, fallback) => Number.isFinite(value) ? Math.min(hi, Math.max(lo, value)) : fallback;
+  const shotRate = () => clamp(parseFloat(shotRateInput.value), 0.1, 10, 1);
+  const recordRate = () => Math.round(clamp(parseFloat(recordRateInput.value), 1, 60, 30));
+  const remember = (key, input) => {
+    try { const saved = localStorage.getItem(key); if (saved) input.value = saved; } catch {}
+    input.addEventListener('change', () => { try { localStorage.setItem(key, input.value); } catch {} });
+  };
+  remember('samestate.shotRate', shotRateInput);
+  remember('samestate.recordRate', recordRateInput);
+
+  // Save folder: a folder handle kept in IndexedDB, so Chrome can reuse it after a reload (it asks again for permission).
+  const canPickFolder = typeof showDirectoryPicker === 'function';
+  let folder = null, folderAllowed = false;
+  function folderStore(mode, value) {
+    return new Promise((resolve, reject) => {
+      const open = indexedDB.open('samestate-capture', 1);
+      open.onupgradeneeded = () => open.result.createObjectStore('settings');
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const store = open.result.transaction('settings', mode === 'get' ? 'readonly' : 'readwrite').objectStore('settings');
+        const request = mode === 'get' ? store.get('folder') : mode === 'put' ? store.put(value, 'folder') : store.delete('folder');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      };
+    });
+  }
+  function showFolder() {
+    folderLabel.textContent = folder ? folder.name : 'Downloads';
+    folderLabel.title = folder ? 'Screenshots and recordings are saved in this folder' : 'Screenshots and recordings start downloads';
+    folderClear.hidden = !folder;
+    folderButton.textContent = folder ? 'Change folder' : 'Save to folder…';
+  }
+  async function useFolder(handle) {
+    folder = handle || null;
+    folderAllowed = !!folder && await folder.queryPermission?.({ mode: 'readwrite' }) === 'granted';
+    try { await folderStore(folder ? 'put' : 'delete', folder); } catch {}
+    showFolder();
+  }
+  // Called at the start of a capture (a click), when Chrome can show its permission prompt.
+  async function folderReady() {
+    if (!folder || folderAllowed) return;
+    try { folderAllowed = (await folder.requestPermission({ mode: 'readwrite' })) === 'granted'; } catch { folderAllowed = false; }
+  }
+  const destination = () => folder && folderAllowed ? 'in ' + folder.name : 'to Downloads';
 
   function showStatus(message) {
     status.textContent = message;
@@ -27,11 +81,18 @@
     const canScreenshot = sites.hidden ? canCapture && typeof ImageCapture === 'function' : !!videoType;
     screenshotButton.disabled = !canScreenshot || !hasDevices || busy || !!recording?.stopping;
     recordButton.disabled = recording ? recording.stopping : !videoType || !hasDevices || busy;
+    // Auto screenshots read frames straight from the wall capture, which the comparison view does not support.
+    const canAuto = sites.hidden && canCapture && typeof ImageCapture === 'function';
+    autoButton.disabled = auto ? auto.stopping : !canAuto || !hasDevices || busy || !!recording?.stopping;
+    autoButton.textContent = auto ? 'Stop screenshots' : 'Auto screenshots';
+    autoButton.classList.toggle('recording', !!auto);
+    autoButton.title = auto ? 'Stop taking screenshots' : canAuto || !canCapture ? 'Save a screenshot of the device wall again and again, at the rate below' : 'Auto screenshots work on the device wall, not in Compare sites';
+    folderButton.hidden = !canPickFolder;
     recordButton.textContent = recording ? 'Stop' : 'Record';
     const view = sites.hidden ? 'device wall' : 'site comparison';
     screenshotButton.title = 'Save the visible ' + view + ' as a PNG';
     recordButton.setAttribute('aria-label', recording ? 'Stop recording' : 'Record the visible ' + view);
-    recordButton.title = recording ? 'Stop recording and download the video' : 'Record the visible ' + view + ' as a WebM';
+    recordButton.title = recording ? 'Stop recording and save the last part' : 'Record the visible ' + view + ' as WebM files of up to 10 MB each';
     recordButton.classList.toggle('recording', !!recording);
   }
 
@@ -39,10 +100,10 @@
     stream?.getTracks().forEach(track => track.stop());
   }
 
-  async function captureWall(element = wall) {
+  async function captureWall(element = wall, fps = 30) {
     showStatus('Choose this Samestate tab in Chrome.');
     const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'browser', frameRate: { ideal: 30, max: 30 } },
+      video: { displaySurface: 'browser', frameRate: { ideal: fps, max: fps } },
       audio: false,
       preferCurrentTab: true,
       selfBrowserSurface: 'include',
@@ -73,24 +134,42 @@
     }
   }
 
-  function download(blob, extension) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = () => new Date().toISOString().replace(/[:.]/g, '-');
+  const pad = (n, size) => String(n).padStart(size, '0');
+
+  function download(blob, name) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `samestate-${timestamp}.${extension}`;
+    link.download = name;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30_000);
   }
 
-  async function saveFrame(frame, width, height) {
+  // Writes into the chosen folder; without one (or if Chrome refuses), the file is downloaded instead.
+  async function save(blob, name) {
+    if (folder && folderAllowed) {
+      try {
+        const writable = await (await folder.getFileHandle(name, { create: true })).createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch {
+        folderAllowed = false;
+        showStatus(`Could not write to ${folder.name}. Saving to Downloads instead.`);
+      }
+    }
+    download(blob, name);
+  }
+
+  async function saveFrame(frame, width, height, name = `samestate-${stamp()}.png`) {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').drawImage(frame, 0, 0);
     const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     if (!png) throw new Error('Could not save the screenshot. Try again.');
-    download(png, 'png');
+    await save(png, name);
   }
 
   const frameFailure = () => new Error('Chrome could not capture a frame. Keep this tab visible and try again.');
@@ -160,13 +239,14 @@
   screenshotButton.addEventListener('click', async () => {
     busy = true;
     updateButtons();
-    const existing = recording?.stream;
+    await folderReady();
+    const existing = recording?.stream || auto?.stream;
     const comparison = !sites.hidden;
     let stream;
     try {
       stream = existing || await captureWall(comparison ? wall : canvasView);
       await screenshot(stream, comparison);
-      if (!recording?.stopping) showStatus(recording ? 'Screenshot download started. Recording…' : 'Screenshot download started.');
+      if (!recording?.stopping) showStatus(`Screenshot saved ${destination()}.` + (recording ? ' Recording…' : ''));
     } catch (error) {
       if (!recording?.stopping) showStatus(captureError(error));
     } finally {
@@ -183,6 +263,42 @@
     if (recording.recorder.state !== 'inactive') recording.recorder.stop();
   }
 
+  // One file of a recording. Near the size limit it stops and the next part starts on the same capture, so no
+  // file grows past about 10 MB; a long recording becomes part-01, part-02 and so on.
+  function recordPart(rec) {
+    const recorder = new MediaRecorder(rec.stream, { mimeType: videoType, videoBitsPerSecond: rec.bitrate });
+    const chunks = [];
+    let bytes = 0, failed = false;
+    recorder.addEventListener('dataavailable', event => {
+      if (!event.data.size) return;
+      chunks.push(event.data);
+      bytes += event.data.size;
+      const nextChunk = bytes / chunks.length;
+      if (bytes + nextChunk > partBytes && recorder.state === 'recording' && !rec.stopping) recorder.stop();
+    });
+    recorder.addEventListener('error', () => { failed = true; });
+    recorder.addEventListener('stop', async () => {
+      const live = rec.stream.getVideoTracks()[0]?.readyState === 'live';
+      const more = !rec.stopping && !failed && live;
+      if (more) recordPart(rec); // the next part starts before this one is written, so the gap is as short as possible
+      if (!failed && chunks.length) {
+        const part = ++rec.parts;
+        rec.saving++;
+        try { await save(new Blob(chunks, { type: recorder.mimeType }), `samestate-${rec.session}-part-${pad(part, 2)}.webm`); }
+        finally { rec.saving--; }
+        if (more) showStatus(`Recording at ${rec.fps} fps… ${rec.parts} ${rec.parts === 1 ? 'part' : 'parts'} saved ${destination()}.`);
+      }
+      if (more) return;
+      while (rec.saving) await new Promise(done => setTimeout(done, 50));
+      stopCapture(rec.stream);
+      recording = null;
+      updateButtons();
+      showStatus(rec.parts ? `Recording saved ${destination()}: ${rec.parts} ${rec.parts === 1 ? 'file' : 'files'}.` : 'No recording saved. Try again.');
+    }, { once: true });
+    recorder.start(500);
+    rec.recorder = recorder;
+  }
+
   recordButton.addEventListener('click', async () => {
     if (recording) {
       stopRecording();
@@ -192,36 +308,76 @@
     updateButtons();
     let stream;
     try {
-      stream = await captureWall();
-      const recorder = new MediaRecorder(stream, { mimeType: videoType, videoBitsPerSecond: 4_000_000 });
-      const chunks = [];
-      let failed = false;
-      recorder.addEventListener('dataavailable', event => {
-        if (event.data.size) chunks.push(event.data);
-      });
-      recorder.addEventListener('error', () => { failed = true; });
-      recorder.addEventListener('stop', () => {
-        stopCapture(stream);
-        recording = null;
-        updateButtons();
-        if (failed || chunks.length === 0) {
-          showStatus('No recording saved. Try again.');
-          return;
-        }
-        download(new Blob(chunks, { type: recorder.mimeType }), 'webm');
-        showStatus('Recording download started.');
-      }, { once: true });
-      recorder.start(1000);
-      recording = { stream, recorder, stopping: false };
-      showStatus('Recording the visible wall…');
+      await folderReady();
+      const fps = recordRate();
+      stream = await captureWall(undefined, fps);
+      // 4 Mbit/s at 30 fps, less at lower rates, so a lower frame rate also makes smaller files.
+      const bitrate = Math.max(400_000, Math.round(4_000_000 * Math.min(fps, 30) / 30));
+      recording = { stream, recorder: null, stopping: false, session: stamp(), parts: 0, saving: 0, fps, bitrate };
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => { if (recording && !recording.stopping) stopRecording(); });
+      recordPart(recording);
+      showStatus(`Recording at ${fps} fps…`);
     } catch (error) {
       stopCapture(stream);
+      recording = null;
       showStatus(captureError(error));
     } finally {
       busy = false;
       updateButtons();
     }
   });
+
+  // Auto screenshots: one PNG of the device wall at the chosen rate until stopped, numbered in one series.
+  autoButton.addEventListener('click', async () => {
+    if (auto) {
+      auto.stopping = true;
+      updateButtons();
+      return;
+    }
+    busy = true;
+    updateButtons();
+    const existing = recording?.stream;
+    let run;
+    try {
+      await folderReady();
+      const stream = existing || await captureWall(canvasView);
+      run = auto = { stream, own: !existing, count: 0, stopping: false, session: stamp() };
+    } catch (error) {
+      showStatus(captureError(error));
+      return;
+    } finally {
+      busy = false;
+      updateButtons();
+    }
+    showStatus(`Taking ${shotRate()} screenshots per second…`);
+    let failure = null;
+    try {
+      while (!run.stopping) {
+        const started = performance.now();
+        const image = await grabFrame(run.stream);
+        try { await saveFrame(image, image.width, image.height, `samestate-${run.session}-shot-${pad(run.count + 1, 4)}.png`); }
+        finally { image.close(); }
+        run.count++;
+        if (!run.stopping) showStatus(`Auto screenshots: ${run.count} saved ${destination()} (${shotRate()} per second).`);
+        // The rate is read each time, so changing it applies at once; a slow save delays the next shot rather than piling up.
+        const left = 1000 / shotRate() - (performance.now() - started);
+        if (left > 0) await new Promise(done => setTimeout(done, left));
+      }
+    } catch (error) {
+      failure = error;
+    } finally {
+      if (run.own) stopCapture(run.stream);
+      auto = null;
+      updateButtons();
+      showStatus(failure && !run.count ? captureError(failure) : `Auto screenshots stopped: ${run.count} saved ${destination()}.`);
+    }
+  });
+
+  folderButton.addEventListener('click', async () => {
+    try { await useFolder(await showDirectoryPicker({ id: 'samestate-capture', mode: 'readwrite' })); showStatus(`Captures will be saved in ${folder.name}.`); }
+    catch (error) { if (error.name !== 'AbortError') showStatus('Chrome did not allow that folder. Choose another one.'); }
+  });
+  folderClear.addEventListener('click', async () => { await useFolder(null); showStatus('Captures will start downloads.'); });
 
   // Used by report.js to take one screenshot per finding.
   globalThis.wallCapture = {
@@ -230,10 +386,20 @@
     frame: grabFrame,
     stop: stopCapture,
     error: captureError,
-    clearStatus: () => showStatus('')
+    clearStatus: () => showStatus(''),
+    useFolder, // tests pass a folder of their own (navigator.storage.getDirectory())
+    get partBytes() { return partBytes; },
+    set partBytes(bytes) { partBytes = bytes; } // tests use a smaller part size
   };
 
   if (!canCapture) showStatus('Wall capture requires desktop Chrome.');
+  if (canPickFolder) folderStore('get').then(async handle => {
+    if (!handle || folder) return;
+    folder = handle;
+    folderAllowed = await handle.queryPermission?.({ mode: 'readwrite' }) === 'granted';
+    showFolder();
+  }).catch(() => {});
+  showFolder();
   frames.addEventListener('wall-view-changed', updateButtons);
   updateButtons();
 })();

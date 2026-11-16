@@ -185,7 +185,13 @@ For your own design, choose **Custom CSS…**, paste the CSS export, and click *
 
 ## Capture the device wall
 
-With a preview open in desktop Chrome, click **Screenshot** or **Record**, then share the current Samestate tab in Chrome’s picker. **Screenshot** starts a PNG download. **Record** starts a silent video, and **Stop** downloads it as WebM. You can take screenshots while recording.
+With a preview open in desktop Chrome, click **Screenshot**, **Record** or **Auto screenshots**, then share the current Samestate tab in Chrome’s picker. **Screenshot** saves one PNG. **Record** starts a silent WebM video, and **Stop** saves it. You can take screenshots while recording.
+
+- **Auto screenshots** saves a PNG of the device wall again and again until you press **Stop screenshots**, at the rate in **Screenshots per second** (0.1 to 10; 0.1 is one every 10 seconds). The files are numbered in one series: `samestate-<time>-shot-0001.png`, `-0002.png`…
+- **Recording frames per second** (1 to 60, default 30) sets the video's frame rate. Lower rates also lower the bitrate, so files are smaller.
+- A recording starts a new file every 10 MB, with no pause: `samestate-<time>-part-01.webm`, `part-02.webm`… Each part plays on its own.
+- **Save to folder…** picks a folder, and every screenshot and recording part is written there as it is made. Chrome remembers the folder and asks again for permission after a restart; **Use Downloads** goes back to downloads. Without a folder, each file starts a download.
+- Both rates are remembered in this browser.
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
@@ -312,6 +318,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | 13:38:17 +09:00 | `d5321cf` | **Auto capture** — Auto screenshots at a chosen rate, a recording frame rate, recordings split into files of about 10 MB, and **Save to folder** for every screenshot and recording part ([details](changelogs/CHANGELOG-auto-capture.md)) |
 | **2026-11-16** | 13:16:42 +09:00 | `8b0ae8f` | **Report fixes** — screens a scan could not measure are listed instead of left out, clean reports export (and no longer stop the CI script), saved journeys reopen on their first page, the width sweep checks every 10px, and the baseline shows what was fixed when nothing is left ([details](changelogs/CHANGELOG-report-fixes.md)) |
 | **2026-11-16** | 11:01:40 +09:00 | `dd86d04` | **README media** — the demo GIF, screenshots and link-preview card are re-recorded from the current demo by the new `tools/readme-media.mjs` ([details](changelogs/CHANGELOG-readme-media.md)) |
 | **2026-11-16** | 10:52:30 +09:00 | `89a9aea` | **Identity check on CI** — the smoke test compares the Desktop preview with its own browser, so it passes on GitHub's runners, which have no mouse ([details](changelogs/CHANGELOG-identity-check-ci.md)) |

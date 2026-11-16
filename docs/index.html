@@ -44,6 +44,15 @@
           <button type="button" id="screenshot" class="pill" title="Save the visible device wall as a PNG" disabled>Screenshot</button>
           <button type="button" id="record" class="pill" title="Record the visible device wall as a WebM" disabled>Record</button>
         </div>
+        <div class="capture-actions">
+          <button type="button" id="auto-shots" class="pill" disabled>Auto screenshots</button>
+        </div>
+        <div class="capture-rates">
+          <label title="How many screenshots Auto screenshots saves each second (0.1 = one every 10 seconds)">Screenshots per second <input type="number" id="shot-rate" min="0.1" max="10" step="0.1" value="1"></label>
+          <label title="Frames per second in recordings; lower rates make smaller files">Recording frames per second <input type="number" id="record-rate" min="1" max="60" step="1" value="30"></label>
+        </div>
+        <div class="capture-folder"><button type="button" id="capture-folder" class="link">Save to folder…</button> <span class="muted">Saving to</span> <b id="capture-folder-name">Downloads</b> <button type="button" id="capture-folder-clear" class="link" hidden>Use Downloads</button></div>
+        <p class="drawer-note">Recordings start a new file every 10 MB.</p>
         <p id="capture-status" role="status" hidden></p>
       </div>
     </details>
