@@ -312,6 +312,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | 13:16:42 +09:00 | `8b0ae8f` | **Report fixes** — screens a scan could not measure are listed instead of left out, clean reports export (and no longer stop the CI script), saved journeys reopen on their first page, the width sweep checks every 10px, and the baseline shows what was fixed when nothing is left ([details](changelogs/CHANGELOG-report-fixes.md)) |
 | **2026-11-16** | 11:01:40 +09:00 | `dd86d04` | **README media** — the demo GIF, screenshots and link-preview card are re-recorded from the current demo by the new `tools/readme-media.mjs` ([details](changelogs/CHANGELOG-readme-media.md)) |
 | **2026-11-16** | 10:52:30 +09:00 | `89a9aea` | **Identity check on CI** — the smoke test compares the Desktop preview with its own browser, so it passes on GitHub's runners, which have no mouse ([details](changelogs/CHANGELOG-identity-check-ci.md)) |
 | **2026-11-16** | 10:34:10 +09:00 | `837131b`, `55fddce` | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar; the guided demo shows them ([details](changelogs/CHANGELOG-interface-themes.md)) |
