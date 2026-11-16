@@ -11,6 +11,7 @@
   const autoButton = document.querySelector('#auto-shots');
   const shotRateInput = document.querySelector('#shot-rate');
   const shotUnitInput = document.querySelector('#shot-unit');
+  const shotHint = document.querySelector('#shot-hint');
   const recordRateInput = document.querySelector('#record-rate');
   const folderButton = document.querySelector('#capture-folder');
   const folderLabel = document.querySelector('#capture-folder-name');
@@ -31,11 +32,19 @@
   const shotUnit = () => SHOT_UNITS[shotUnitInput.value] ? shotUnitInput.value : 'per-second';
   const shotValue = () => { const u = SHOT_UNITS[shotUnit()]; return clamp(parseFloat(shotRateInput.value), u.min, u.max, u.fallback); };
   const shotInterval = () => shotUnit() === 'apart' ? shotValue() * 1000 : 1000 / shotValue();
-  const shotPace = () => shotUnit() === 'apart' ? `one every ${shotValue()} s` : `${shotValue()} per second`;
+  // The pace in words, the same whichever unit was chosen: "1 screenshot every 5 seconds", "2 screenshots every second".
+  const fmt = n => String(+n.toFixed(2));
+  function shotPace() {
+    const seconds = shotInterval() / 1000;
+    if (Math.abs(seconds - 1) < 0.005) return '1 screenshot every second';
+    return seconds > 1 ? `1 screenshot every ${fmt(seconds)} seconds` : `${fmt(1 / seconds)} screenshots every second`;
+  }
+  const showPace = () => { shotHint.textContent = 'Takes ' + shotPace(); };
   function fitShotInput() {
     const u = SHOT_UNITS[shotUnit()];
     shotRateInput.min = u.min; shotRateInput.max = u.max; shotRateInput.step = shotUnit() === 'apart' ? 'any' : '0.1';
     shotRateInput.title = shotUnit() === 'apart' ? 'Seconds between screenshots (0.1 to 3600)' : 'Screenshots each second (0.1 to 10)';
+    showPace();
   }
   const recordRate = () => Math.round(clamp(parseFloat(recordRateInput.value), 1, 60, 30));
   const remember = (key, input) => {
@@ -45,6 +54,7 @@
   remember('samestate.shotUnit', shotUnitInput);
   remember('samestate.shotRate', shotRateInput);
   fitShotInput();
+  for (const type of ['input', 'change']) shotRateInput.addEventListener(type, showPace);
   // Switching unit keeps the same pace: 2 per second becomes 0.5 seconds apart, 5 seconds apart becomes 0.2 per second.
   let previousUnit = shotUnit();
   shotUnitInput.addEventListener('change', () => {
@@ -372,7 +382,7 @@
       busy = false;
       updateButtons();
     }
-    showStatus(`Taking screenshots, ${shotPace()}…`);
+    showStatus(`Taking ${shotPace()}…`);
     let failure = null;
     try {
       while (!run.stopping) {

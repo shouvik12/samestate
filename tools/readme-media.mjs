@@ -126,7 +126,8 @@ try {
     for (const d of active()) { try { d.iframe.contentDocument.querySelector('#cookies')?.remove(); } catch {} }
     for (let z = 100; z >= 20; z -= 2) { setZoom(z); await wait(15); if (cv.scrollWidth <= cv.clientWidth + 1 && cv.scrollHeight <= cv.clientHeight + 1) break; }
     await wallCapture.useFolder(await (await navigator.storage.getDirectory()).getDirectoryHandle('samestate-captures', { create: true }));
-    $('#shot-unit').value = 'per-second'; $('#shot-rate').value = '2'; $('#record-rate').value = '15';
+    const unit = $('#shot-unit'), pace = $('#shot-rate');
+    unit.value = 'apart'; unit.dispatchEvent(new Event('change')); pace.value = '0.5'; pace.dispatchEvent(new Event('change')); $('#record-rate').value = '15';
     $('#auto-shots').click();
     for (let i = 0; i < 100 && !/[5-9] saved|\\d\\d saved/.test($('#capture-status').textContent); i++) await wait(100);
     return $('#capture-status').textContent;
