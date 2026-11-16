@@ -273,8 +273,9 @@
     }
     hideCursor();
 
-    // Bars 11-12: compare sites.
+    // Bars 11-12: compare sites. Opening them clears the report, so its findings are kept for the montage.
     await until(at(10));
+    const report = findings;
     camera(null, 0.7);
     $('#panel').hidden = true;
     play('iphone', { do: 'click', sel: '.mob-only .mode-toggle' }); // back to light
@@ -287,24 +288,30 @@
     await until(at(12));
     for (const site of sitePanels) site.preview.scrollTo({ top: 0 });
     setSitesMode(false);
+    findings = report;
+    renderFindings();
     const theme = buildPreviewTheme(TOUR_THEME, 'light', true);
     for (const d of active()) { d.themeCss = theme; configure(d); }
+    screen('iphone').iframe.contentDocument.querySelector('#plans')?.scrollIntoView({ block: 'start' }); // the others follow
     caption('<span class="promo-grad">Themes.</span>');
     await until(at(12) + 940);
     for (const d of active()) { d.themeCss = ''; configure(d); }
-    play('desktop', { do: 'scroll', sel: '#tour-video' });
-    setTimeout(() => requestPlayback(true), 350);
-    caption('<span class="promo-grad">Video.</span>');
-    await until(at(13));
-    caption('<span class="promo-grad">Notes.</span>');
+    // Preview fix: the plan toggle's 18px buttons grow to 44px on every phone and tablet that reported them.
+    caption('<span class="promo-grad">Fixes.</span>');
     camera(screenRect('iphone'), 0.6, 20);
-    const notes = screen('iphone').annotations;
-    notes.draw('arrow', [{ x: 0.2, y: 0.22 }, { x: 0.55, y: 0.44 }]);
-    notes.note({ x: 0.08, y: 0.1 }, 'Looks great here');
-    await until(at(13) + 940);
+    await until(at(12) + 940 + 420);
+    toggleFix(findings.filter(f => f.kind === 'Tap targets under 24px'));
+    await until(at(13));
     camera(null, 0.6);
-    caption('<span class="promo-grad">Reports.</span>');
+    $('#panel').hidden = false;
     showTab('diff');
+    catFilter = 'Network';
+    renderFindings();
+    caption('<span class="promo-grad">Network.</span>');
+    await until(at(13) + 940);
+    catFilter = null;
+    renderFindings();
+    caption('<span class="promo-grad">Reports.</span>');
     $('#report-export').open = true;
 
     // Bars 15-16: end card.

@@ -5,7 +5,7 @@
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
 <p align="center">·
-  <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
+  <a href="docs/media/samestate-promo.mp4">Watch the 30s video</a> ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -304,6 +304,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | — | — | **New promo video** — the README video is re-recorded from the current demo and now shows Preview fix and the Network report ([details](changelogs/CHANGELOG-promo-refresh.md)) |
 | **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
 | **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |
 | **2026-11-15** | 02:58:14 +09:00 | `3e906de` | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |

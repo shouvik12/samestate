@@ -48,8 +48,8 @@ LINES = [
     (15.25, 18.60, 'Catch what breaks, before your users do.'),
     (19.05, 22.30, 'Compare pages, side by side.'),
     (22.80, 23.70, 'Themes.'),
-    (23.75, 24.65, 'Video.'),
-    (24.70, 25.55, 'Notes.'),
+    (23.75, 24.65, 'Fixes.'),
+    (24.70, 25.55, 'Network.'),
     (25.60, 26.45, 'Reports.'),
     (26.75, 29.70, 'Samestate. One interaction. Every device.'),
 ]
