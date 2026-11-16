@@ -114,8 +114,11 @@ const PROBE = `(() => {
       const phoneWindow = phone().iframe.contentWindow, deskWindow = byId('desktop').iframe.contentWindow;
       const phoneOk = /iPhone/.test(phoneWindow.navigator.userAgent) && phoneWindow.navigator.maxTouchPoints === 5 && phoneWindow.devicePixelRatio === 3
         && phoneWindow.matchMedia('(hover: none) and (pointer: coarse)').matches && phoneWindow.matchMedia('(min-resolution: 2dppx)').matches;
-      const deskOk = !deskWindow.matchMedia('(hover: none)').matches && !/iPhone|Android/.test(deskWindow.navigator.userAgent);
-      return [banners === 'android,iphone,pixel' && phoneOk && deskOk, 'app banner on: ' + banners + ', iPhone identity: ' + phoneOk + ', Desktop unchanged: ' + deskOk];
+      // Desktop keeps the browser's own identity. Its hover and pointer come from the computer, so they are compared
+      // with this page's rather than expected to be a mouse: CI runners have no pointing device, so hover: none there.
+      const media = w => ['(hover: none)', '(pointer: coarse)'].map(q => w.matchMedia(q).matches).join();
+      const deskOk = media(deskWindow) === media(window) && deskWindow.navigator.userAgent === navigator.userAgent && deskWindow.navigator.maxTouchPoints === navigator.maxTouchPoints;
+      return [banners === 'android,iphone,pixel' && phoneOk && deskOk, 'app banner on: ' + banners + ', iPhone identity: ' + phoneOk + ', Desktop unchanged: ' + deskOk + ' (hover none, coarse: ' + media(deskWindow) + ')'];
     },
     'Scroll sync': () => {
       const scrolled = workspaceScreens().filter(d => scrollOf(d) > 200).length, plans = top(byId('desktop'), '#plans');
