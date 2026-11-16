@@ -1,20 +1,21 @@
+<p align="center"><img src="docs/media/samestate-banner.png" alt="Samestate: one interaction, every device" width="100%"></p>
+
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
-<p align="center">
-  <a href="https://shouvik12.github.io/samestate/"><b>▶ Live demo</b></a> ·
+<p align="center">·
   <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
-  <a href="#install">Install the Chrome extension</a> ·
+  <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
 
 <p align="center">
   <img alt="Free" src="https://img.shields.io/badge/price-free-5eead4">
-  <img alt="Chrome extension" src="https://img.shields.io/badge/Chrome-extension-4285F4">
+  <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><img alt="Available in the Chrome Web Store" src="https://img.shields.io/badge/Chrome%20Web%20Store-Add%20to%20Chrome-4285F4?logo=googlechrome&logoColor=white"></a>
   <img alt="No server" src="https://img.shields.io/badge/server-none-111827">
-  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-blue">
+  <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
@@ -106,6 +107,16 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 
 Samestate is a Chrome extension. No server and no terminal.
 
+### From the Chrome Web Store (recommended)
+
+1. Open **[Samestate on the Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha)**.
+2. Click **Add to Chrome**, then **Add extension**.
+3. Pin the Samestate icon from the puzzle-piece menu.
+
+Works in Chrome and other Chromium browsers (Edge, Brave, Arc) on desktop. Updates install automatically.
+
+### From source
+
 1. Download this repo (**Code → Download ZIP**) and unzip it.
 2. Open `chrome://extensions`.
 3. Turn on **Developer mode** (top right).
@@ -116,7 +127,7 @@ Samestate is a Chrome extension. No server and no terminal.
 Click the Samestate icon on any page to open that page on every screen, in a new tab beside it. Previews share
 your Chrome sign-ins, so a page you are signed in to stays signed in (turn off **Use my sign-ins** to preview signed
 out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
-opens Samestate on `claude.com`; to preview another site, enter its address. The **Demo** button plays a guided demo on a
+opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
 Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.
 
@@ -285,7 +296,6 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 ## Roadmap
 
 - Fix previews for more findings (overlays, images), and fixes written as a stylesheet to copy
-- Chrome Web Store listing
 - Server user-agent for a preview's images, scripts and API calls, not only its page loads
 
 ## Release Notes
@@ -295,6 +305,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
 | **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
+| **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |
 | **2026-11-15** | 02:58:14 +09:00 | `3e906de` | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
 | **2026-11-15** | 02:58:21 +09:00 | `d9d2f89` | **CI report** — `tools/samestate-ci.mjs` runs the difference report on any site in headless Chrome, writes Markdown, HTML, CSV and JSON, and fails on new issues ([details](changelogs/CHANGELOG-ci-report.md)) |
 | **2026-11-15** | 02:58:17 +09:00 | `1ad570e` | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
@@ -306,6 +317,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 | **2026-11-15** | 02:58:12 +09:00 | `973314b` | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
 | **2026-11-15** | 02:58:13 +09:00 | `06bedc6` | **Above-the-fold check** — key controls and the main heading that the desktop shows on its first screen but phones push below the fold ([details](changelogs/CHANGELOG-fold-check.md)) |
 | **2026-11-15** | 02:57:56 +09:00 | `c1e4a94` | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |
+| **2026-11-14** | 17:06:09 +05:30 | `811325c` | **Sample site default** — the extension starts on the bundled sample site instead of `claude.com`, requests no built-in site access, and has new icons ([details](changelogs/CHANGELOG-sample-site-default.md)) |
 | **2026-11-14** | pending | pending | **Promo video** — scripts in `promo/` that record a 30-second promo from the live demo, with generated music and optional narration, in landscape and portrait ([details](changelogs/CHANGELOG-promo-video.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
@@ -360,4 +372,5 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 ## License
 
-MIT © Souvik Palit
+Samestate is licensed under the [Apache License 2.0](LICENSE). © 2026 Souvik Palit.
+The Samestate name and logo are not covered by this license.
