@@ -12,6 +12,7 @@
 - New agent messages `look` / `looked` and `step` / `stepped`; `hello` now counts page loads per screen (`device.loads`) so a run waits for screens that left their page.
 - New `tests/testrun.mjs`, run in the Smoke test workflow: a stand-in AI service writes a test on a small shop site in the extension, the test replays, and CI passes it and fails a wrong expectation.
 - `tests/testrun.mjs` live mode (`SAMESTATE_LIVE_AI=1` with `OPENROUTER_API_KEY`) writes the test with a real OpenRouter model instead of the stand-in; the key is read from the environment and never printed. Both modes check every request body the app sends to the AI service for field values, private text and the key.
+- Fixed: the **AI connection** arrow in Test runs now turns down when the section is open.
 - README, privacy policy and CONTRIBUTING describe test runs and what the AI service receives.
 
 ---

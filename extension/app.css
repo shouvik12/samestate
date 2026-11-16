@@ -144,6 +144,7 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 :is(.test-runs textarea,.test-ai-body input,.test-ai-body select):focus-visible{outline:2px solid var(--acc);outline-offset:-1px}
 .test-ai{margin:0 2px 7px;border:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-radius:7px}
 .test-ai>summary{padding:4px 8px;color:var(--mute);font-size:11.5px;cursor:pointer}
+.test-ai[open]>summary::before{transform:translateY(-2px) rotate(45deg)}
 .test-ai-body{display:flex;flex-direction:column;gap:6px;padding:4px 7px 7px}
 .test-ai-body>label:not(.row){color:var(--mute);font-size:11.5px}
 .test-ai-body>label:not(.row) :is(input,select){margin-top:2px}
