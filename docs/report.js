@@ -15,25 +15,29 @@
     if (clearAfter) sayTimer = setTimeout(() => say(''), clearAfter);
   }
 
-  const sizeOf = d => { const { w, h } = size(d); return w + ' × ' + h; };
+  const sizeOf = d => { if (!d) return ''; const { w, h } = size(d); return w + ' × ' + h; };
   // A journey report compares every step with the same step on one device.
-  const referenceName = d => d.journeyRef ? d.journeyRef + ', the same step' : screenName(d);
+  const referenceName = d => !d ? 'no screen measured' : d.journeyRef ? d.journeyRef + ', the same step' : screenName(d);
   const pageOf = d => d.site ? d.site.url.href : d.pageUrl || previewUrl;
   const showAddress = url => { const u = new URL(url); return u.origin === EXT ? 'Samestate sample site · ' + u.pathname.split('/').pop() : u.href; };
 
   // What every format shares: the scan, the sites, the screens and the problems grouped across screens.
   function collect() {
     const groups = issueGroups(findings);
-    const sites = sitesMode ? sitePanels.filter(site => groups.some(g => g.site === site)) : [null];
+    const scanned = lastScan?.screens || [];
+    const sites = sitesMode ? sitePanels.filter(site => groups.some(g => g.site === site) || scanned.some(d => d.site === site)) : [null];
     return {
       at: lastScan?.at || new Date(),
       groups,
       parts: sites.map(site => {
         const own = groups.filter(g => g.site === site);
-        const screens = (lastScan?.screens || []).filter(d => (d.site || null) === site);
-        const reference = own[0]?.items[0].reference;
+        const screens = scanned.filter(d => (d.site || null) === site);
+        const missing = (lastScan?.missing || []).filter(d => (d.site || null) === site);
+        // With no findings there is no finding to take the reference from: it is the chosen reference screen.
+        const refId = $('#ref').value;
+        const reference = own[0]?.items[0].reference || screens.find(d => d.id === refId || d.id.endsWith('@' + refId)) || screens[0] || null;
         const pages = [...new Set(screens.map(pageOf))].map(showAddress);
-        return { site, own, screens, reference, pages };
+        return { site, own, screens, missing, reference, pages };
       })
     };
   }
@@ -47,8 +51,9 @@
     for (const part of report.parts) {
       if (part.site) lines.push(`## Site ${sitePanels.indexOf(part.site) + 1}`, '');
       lines.push(`- **Page${part.pages.length > 1 ? 's' : ''}:** ${part.pages.join(', ')}`);
-      lines.push(`- **Compared with:** ${referenceName(part.reference)} (${sizeOf(part.reference)})`);
+      lines.push(`- **Compared with:** ${referenceName(part.reference)}${part.reference ? ` (${sizeOf(part.reference)})` : ''}`);
       lines.push(`- **Screens:** ${part.screens.map(d => `${screenName(d)} (${sizeOf(d)})`).join(', ')}`);
+      if (part.missing.length) lines.push(`- **Not measured:** ${part.missing.map(screenName).join(', ')} (no answer in time)`);
       lines.push(`- **Found:** ${counts(part.own)}`, '');
       const level = part.site ? '###' : '##';
       for (const [sev, name] of SECTIONS) {
@@ -87,6 +92,7 @@
         + `<dt>Page${part.pages.length > 1 ? 's' : ''}</dt><dd>${part.pages.map(esc).join('<br>')}</dd>`
         + `<dt>Compared with</dt><dd>${esc(referenceName(part.reference))} <span class="dim">${sizeOf(part.reference)}</span></dd>`
         + `<dt>Screens</dt><dd>${part.screens.map(d => `${esc(screenName(d))} <span class="dim">${sizeOf(d)}</span>`).join('<br>')}</dd>`
+        + (part.missing.length ? `<dt>Not measured</dt><dd>${part.missing.map(d => esc(screenName(d))).join('<br>')} <span class="dim">no answer in time</span></dd>` : '')
         + `<dt>Found</dt><dd>${counts(part.own)}</dd></dl>`;
       for (const [sev, name] of SECTIONS) {
         const own = part.own.filter(g => g.sev === sev);

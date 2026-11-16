@@ -117,13 +117,18 @@
       else buildFrames();
 
       // Page steps stay open while another view is shown, so the journey is rebuilt either way.
+      let skippedSteps = 0;
       const pages = Array.isArray(views.pages) ? views.pages.slice(0, 30) : [];
       if (target && pages.length) {
+        // Step 1 is the journey's first page, which need not be the page the site opened on (the first step may have been closed).
+        const first = unport(pages[0]?.url);
+        if (!pageScreens.length && first?.origin === target) addPage(first.href, Array.isArray(pages[0].actions) ? pages[0].actions : []);
         setPageSteps(true);
         pages.forEach((page, i) => {
           const url = unport(page?.url);
           const d = i === 0 ? pageScreens[0] : url?.origin === target ? addPage(url.href, Array.isArray(page.actions) ? page.actions : []) : null;
           if (d) Object.assign(d, { x: finite(page.x, 0, 1e5), y: finite(page.y, 0, 1e5) });
+          else skippedSteps++;
         });
         freePlacement.steps = !!layout.freeSteps;
         refreshViews();
@@ -153,7 +158,8 @@
       relayout();
       applyMarks(setup.marks);
       if ([...$('#ref').options].some(option => option.value === setup.reference)) $('#ref').value = setup.reference;
-      say(`Opened ${label}.` + (missing ? ` ${missing} saved ${missing === 1 ? 'device is' : 'devices are'} no longer in your list.` : ''));
+      say(`Opened ${label}.` + (missing ? ` ${missing} saved ${missing === 1 ? 'device is' : 'devices are'} no longer in your list.` : '')
+        + (skippedSteps ? ` ${skippedSteps} page ${skippedSteps === 1 ? 'step was' : 'steps were'} on another site and could not be reopened.` : ''));
     } catch {
       say(`Could not open ${label}. Try again.`);
     } finally {

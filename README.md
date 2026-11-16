@@ -70,8 +70,8 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
-- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it at each
-  width and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
+- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it every 10px
+  (every 20px above 1000px) and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
   **Widths**. Press the button again to stop.
 - **Journey report.** With **Page steps** on, **Check journey on every device** measures each step at the size of every
   selected device and compares it with the same step on the desktop, so the report says which step breaks on which screens.
@@ -208,7 +208,8 @@ and Chrome, and no packages.
 node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,ipad,desktop --sweep
 ```
 
-- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1.
+- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1. A screen that does not answer in time
+  also fails the run (unless `none`), and is listed as `notMeasured` in `report.json`.
 - `--baseline=old/report.json` compares with an earlier run, so only new findings fail the build.
 - `--identity` turns on phone and tablet identity, including the server user-agent.
 - `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
@@ -275,6 +276,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 ## Known limits
 
+- **Sweep widths** checks every 10px up to 1000px and every 20px above, so a problem that starts and stops between two
+  checked widths (narrower than that) is not reported.
 - With **Use my sign-ins** on, every screen acts on your real account: a synced click on Delete or Buy happens on
   each screen. Turn it off, or unlink screens, before testing actions like these.
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
