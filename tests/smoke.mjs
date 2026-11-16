@@ -175,7 +175,10 @@ const PROBE = `(() => {
       const pages = sitePanels.map(site => site.url?.pathname.split('/').pop()), screens = sitePanels.map(site => siteScreens(site).length);
       return [sitesMode && pages.join() === 'index.html,pricing.html' && screens.join() === '7,7', 'columns: ' + pages.join(' + ') + ', screens: ' + screens.join(' + ')];
     },
-    'Screenshot and Record': () => [!!document.querySelector('#screenshot') && !!document.querySelector('#record'), 'capture buttons present'],
+    'Screenshot and Record': () => {
+      const ids = ['#screenshot', '#record', '#auto-shots', '#shot-rate', '#record-rate'];
+      return [ids.every(id => document.querySelector(id)), 'capture controls present: ' + ids.filter(id => document.querySelector(id)).length + ' of ' + ids.length];
+    },
     'Day and night': () => {
       const shown = document.documentElement.dataset, saved = [localStorage.getItem('samestate.uiTheme') || 'samestate', localStorage.getItem('samestate.uiMode') || 'dark'];
       return [shown.uiTheme === 'hive' && shown.uiMode !== saved[1] && saved[0] === 'samestate', 'showing ' + shown.uiTheme + ' ' + shown.uiMode + ', saved ' + saved.join(' ')];
