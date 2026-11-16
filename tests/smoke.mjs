@@ -232,6 +232,11 @@ const AFTER_TOUR = `(async () => {
     settings.value = 'text'; settings.dispatchEvent(new Event('change')); await wait(400);
     const sizes = active().slice(0, 2).map(d => d.iframe.contentWindow.getComputedStyle(d.iframe.contentDocument.documentElement).fontSize);
     settings.value = ''; settings.dispatchEvent(new Event('change')); await wait(300);
+    const uiBg = () => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    const darkBg = uiBg(); document.querySelector('#ui-mode').click(); const lightBg = uiBg();
+    const themeSelect = document.querySelector('#ui-theme'); themeSelect.value = 'clay'; themeSelect.dispatchEvent(new Event('change')); const clayBg = uiBg();
+    themeSelect.value = 'samestate'; themeSelect.dispatchEvent(new Event('change')); document.querySelector('#ui-mode').click();
+    record('Interface themes', new Set([darkBg, lightBg, clayBg]).size === 3 && uiBg() === darkBg && themeSelect.options.length === 5, themeSelect.options.length + ' themes; background ' + darkBg + ' → ' + lightBg + ' (day) → ' + clayBg + ' (Clay day) → ' + uiBg());
     record('Sign-ins option hidden in the web demo', document.querySelector('#sign-ins-row').hidden, 'Use my sign-ins is extension-only');
     record('Screen settings', sizes[1] === parseFloat(sizes[0]) * 2 + 'px', 'root font size ' + sizes.join(' and '));
     document.querySelector('#ref').value = 'iphone';

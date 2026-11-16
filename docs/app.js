@@ -2674,6 +2674,20 @@ fillSharedDevices();
 renderLeft();
 refreshThemeTargets();
 $('#sign-ins-row').hidden = !IS_EXT;
+// Interface theme and day/night mode (ui-theme.js applies the saved choice before the page is drawn).
+{
+  const ui = window.samestateUiTheme, select = $('#ui-theme'), modeButton = $('#ui-mode');
+  select.innerHTML = Object.entries(ui.THEMES).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+  const show = () => {
+    select.value = ui.theme;
+    const next = ui.mode === 'dark' ? 'day' : 'night';
+    modeButton.title = `Switch to ${next} mode`;
+    modeButton.setAttribute('aria-label', modeButton.title);
+  };
+  select.addEventListener('change', () => { ui.save(select.value, ui.mode); show(); });
+  modeButton.addEventListener('click', () => { ui.save(ui.theme, ui.mode === 'dark' ? 'light' : 'dark'); show(); });
+  show();
+}
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the bundled sample site, which needs no site access, so no prompt is
 // needed and no outside site is requested in the manifest. The web demo starts with the tour.

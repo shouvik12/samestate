@@ -133,6 +133,11 @@ Page steps and Compare sites. A pointer performs each action, with the explanati
 
 ## Choose devices and options
 
+Pick the interface theme from the menu next to the reload button: **Samestate** (the original dark blue), **Neutral**,
+**Clay**, **Teal** or **Hive**. The sun and moon button beside it switches any theme between day and night mode.
+Both are remembered. They change Samestate's own colors, not the previews; to try colors on your site, see
+[Preview a color theme](#preview-a-color-theme).
+
 Open **Devices** to browse Android phones, Apple phones, tablets, and specials such as foldables, watches, and TVs. Search by model or dimensions, or turn on **Selected only** to edit the current wall. Under **My custom devices**, enter a name, width, height, and frame type to save a preset in this browser.
 
 Click **×** in a preview’s title bar to close it. Select the device again in **Devices** to reopen it.
@@ -304,6 +309,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | — | — | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar ([details](changelogs/CHANGELOG-interface-themes.md)) |
 | **2026-11-16** | — | — | **New promo video** — the README video is re-recorded from the current demo and now shows Preview fix and the Network report ([details](changelogs/CHANGELOG-promo-refresh.md)) |
 | **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
 | **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |
