@@ -28,7 +28,7 @@ Samestate's own interface can now be any of five themes, in day or night mode. P
 ---
 
 ## Testing
-- Web demo (`docs/`, served locally): every theme in day and night mode, with the report open; the menu and button update each other, the icon matches the mode, and the choice survives a reload
+- Web demo (`docs/`, served locally), with the report open: looked at Samestate night and day, Clay day, Teal night, Hive night and Neutral day (Clay night, Teal day, Hive day and Neutral night were not looked at); the menu and button update each other, the icon matches the mode, and the choice survives a reload
 - `node tests/smoke.mjs`: 36/36 checks passed, 0 page errors; the new check **Interface themes** switches to day, then Clay, then back, and compares the wall color
 - Fonts and corner radii from the tweakcn themes are not used: the fonts would load from Google, which the privacy policy rules out, and the layout is sized for the system font
 - Not checked inside the installed extension; the extension loads the same files
