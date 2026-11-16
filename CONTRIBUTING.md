@@ -29,6 +29,8 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 - `extension/agent.js`: captures interactions and replays them by meaning
 - `extension/app.js`, `app.html`, `app.css`: the device wall, sync log, difference engine and guided tour
 - `extension/report.js`: report export; `extension/workspaces.js`: saved setups
+- `extension/testrun.js`: test runs (recording, test files, running steps on every screen, writing tests with AI)
+- `tests/testrun.mjs`: checks test runs in the extension with a stand-in AI service
 - `docs/`: the live demo
 - `tests/smoke.mjs`: the end-to-end smoke test
 - `tools/samestate-ci.mjs`: runs the difference report on any site in headless Chrome, for CI

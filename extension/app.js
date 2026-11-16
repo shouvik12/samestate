@@ -1828,6 +1828,8 @@ $('#match-text').onchange = event => {
 
 /* ------------------------------ message routing ------------------------------ */
 const pendingSnap = new Map(), entries = new Map();
+const pendingTest = new Map(); // test runs (testrun.js): answers to look and step, by request id
+let testRecorder = null; // set by testrun.js while it records clicks and pages
 function configure(device) {
   const inspect = device !== device.site?.singleDevice;
   post(device, 'config', {
@@ -1844,6 +1846,7 @@ function handleMessage(device, message) {
   switch (message.type) {
     case 'hello': {
       device.ready = true;
+      device.loads = (device.loads || 0) + 1; // test runs wait for a screen that left its page to load the next one
       device.el.classList.add('ready');
       configure(device);
       if (device.identity !== undefined) post(device, 'identity', { name: device.identity }); // in case it changed while loading
@@ -1886,6 +1889,10 @@ function handleMessage(device, message) {
     case 'snapshot':
       pendingSnap.get(message.rid)?.(device, message.data);
       break;
+    case 'looked':
+    case 'stepped':
+      if (typeof message.rid === 'string') pendingTest.get(message.rid)?.(message);
+      break;
     case 'fixed':
       if (Number.isInteger(message.count)) fixCounts.set(message.id, (fixCounts.get(message.id) || 0) + message.count);
       break;
@@ -1897,6 +1904,7 @@ function handleMessage(device, message) {
       if ((!device.site && pageSteps) || !workspaceScreens().includes(device)) return;
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;
       setLeader(device);
+      testRecorder?.(device, message);
       if (!device.linked) return; // an unlinked screen moves on its own
       const id = ['click', 'swipe', 'media', 'navigate'].includes(message.kind) ? ++aid : 0;
       if (id) startEntry(id, device, message);

@@ -224,6 +224,46 @@
         <p id="sweep-status" class="drawer-note" role="status"></p>
       </div>
     </details>
+
+    <details class="sidebar-drawer" id="tests-drawer">
+      <summary>Test runs <span id="test-count" class="drawer-count" aria-label="Test steps" hidden></span></summary>
+      <div class="drawer-body test-runs">
+        <label class="test-label" for="test-plan">Test plan</label>
+        <textarea id="test-plan" rows="4" maxlength="4000" placeholder="For example: Open Pricing, switch to yearly billing and check that the yearly prices show."></textarea>
+        <div class="capture-actions">
+          <button type="button" id="test-write" class="pill" title="An AI follows the plan on the reference screen; every step also runs on the other screens">Write test with AI</button>
+          <button type="button" id="test-stop" class="pill" hidden>Stop</button>
+        </div>
+        <details class="test-ai" id="test-ai">
+          <summary>AI connection</summary>
+          <div class="test-ai-body">
+            <p class="drawer-note" id="test-ai-web" hidden>Writing tests with AI is in the Chrome extension. Here you can open, run and record tests.</p>
+            <label>Service <select id="ai-provider"><option value="openrouter">OpenRouter</option><option value="custom">Other (OpenAI-compatible)</option></select></label>
+            <label>Address <input id="ai-base" type="url" spellcheck="false" autocomplete="off"></label>
+            <label>Model <input id="ai-model" spellcheck="false" autocomplete="off"></label>
+            <label>API key <input id="ai-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-or-…"></label>
+            <label class="row"><input type="checkbox" id="ai-remember">Remember the key in this browser</label>
+            <p class="drawer-note">While the AI writes a test, the reference screen's address, visible text and control names go to this service. Field values are never read. Running a saved test sends nothing.</p>
+          </div>
+        </details>
+        <div class="capture-actions">
+          <button type="button" id="test-record" class="pill" title="Add your clicks and the pages you open as steps">Record clicks</button>
+          <button type="button" id="test-run" class="pill" title="Run every step on every linked screen" disabled>Run test</button>
+        </div>
+        <form id="test-check-form" class="workspace-form">
+          <input id="test-check" maxlength="200" placeholder="Text that should show" aria-label="Text that should show" autocomplete="off" required>
+          <button class="pill" type="submit" title="Add a step that checks every screen shows this text">Add check</button>
+        </form>
+        <ol id="test-steps" class="test-steps"></ol>
+        <div class="test-files">
+          <button type="button" id="test-open" class="link">Open test file…</button>
+          <button type="button" id="test-save" class="link" disabled>Save test file</button>
+          <button type="button" id="test-clear" class="link" disabled>Clear</button>
+          <input type="file" id="test-file" accept=".json,application/json" hidden>
+        </div>
+        <p id="test-status" class="drawer-note" role="status" aria-live="polite"></p>
+      </div>
+    </details>
   </aside>
 
   <div class="wall">
@@ -345,5 +385,6 @@
 <script src="capture.js"></script>
 <script src="report.js"></script>
 <script src="workspaces.js"></script>
+<script src="testrun.js"></script>
 </body>
 </html>

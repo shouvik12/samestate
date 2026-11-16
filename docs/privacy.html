@@ -62,7 +62,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   <p class="updated">Last updated November 16, 2026</p>
 
   <div class="summary">
-    <p>Samestate runs entirely in your browser. It does not collect, store on any server, sell, or share your personal data or browsing activity. There are no accounts, analytics, or tracking.</p>
+    <p>Samestate runs entirely in your browser. It does not collect, store on any server, sell, or share your personal data or browsing activity. There are no accounts, analytics, or tracking. The one exception is optional and yours to start: when you use <strong>Write test with AI</strong>, Samestate sends what that needs to the AI service you set up (see <a href="#ai">Writing tests with AI</a>).</p>
   </div>
 
   <h2>What Samestate does</h2>
@@ -83,14 +83,23 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   <p>Many sites block being shown inside a frame. For the sites you approve, Samestate removes framing-related response headers so they can load in its device previews. This only applies inside the Samestate tab, only to frames, only for the sites you opened, and stops when you close that tab. It does not change how those sites behave in any other tab.</p>
 
   <h2>Data stored on your device</h2>
-  <p>Samestate saves a small amount of data in your browser so your setup is there next time: saved workspaces, custom devices, and your preferred report view. It also keeps the list of sites open in the current Samestate tab in temporary session storage. This data stays on your device. Uninstalling the extension removes it.</p>
+  <p>Samestate saves a small amount of data in your browser so your setup is there next time: saved workspaces, custom devices, your preferred report view, the last test you worked on, and your AI service settings. It also keeps the list of sites open in the current Samestate tab in temporary session storage. This data stays on your device. Uninstalling the extension removes it.</p>
   <p>Screenshots, recordings, and exported reports are created locally and only saved where you choose to download them.</p>
 
   <h2>Theme presets</h2>
-  <p>When you open the Theme panel, Samestate downloads the list of tweakcn presets from <a href="https://tweakcn.com">tweakcn.com</a>, and when you pick a preset, it downloads that preset's theme data. These requests send no cookies and no referrer, and include nothing about you or the sites you preview. If you don't open the Theme panel, Samestate makes no outside requests of its own.</p>
+  <p>When you open the Theme panel, Samestate downloads the list of tweakcn presets from <a href="https://tweakcn.com">tweakcn.com</a>, and when you pick a preset, it downloads that preset's theme data. These requests send no cookies and no referrer, and include nothing about you or the sites you preview. If you don't open the Theme panel or write a test with AI, Samestate makes no outside requests of its own.</p>
+
+  <h2 id="ai">Writing tests with AI</h2>
+  <p><strong>Write test with AI</strong> (in <strong>Test runs</strong>) is off until you enter an AI service and your own API key and press the button. By default the service is <a href="https://openrouter.ai">OpenRouter</a>; you can choose any OpenAI-compatible address instead, including one that runs on your own computer. Chrome asks for your permission before Samestate first contacts it.</p>
+  <ul>
+    <li>While the AI writes a test, Samestate sends that service your test plan, the screen sizes, and, for each step, the reference preview's address on the site, its visible text and the names of its buttons, links and fields. That service's own privacy policy applies to what it receives.</li>
+    <li>Values typed into fields, passwords, cookies, site storage and text marked <code>data-samestate-private</code> are never read or sent.</li>
+    <li>Your API key is kept in the extension's own storage until the browser closes, or on this computer if you tick <strong>Remember the key</strong>. It is sent only to the service you entered, is never synced, and is never written to a test file.</li>
+    <li>Running, recording, opening or saving a test sends nothing anywhere. Test files are saved only where you download them, and contain the steps and any test data you or the AI typed into them.</li>
+  </ul>
 
   <h2>Sharing and selling</h2>
-  <p>Samestate does not sell, rent, or transfer any user data to third parties, and does not use data for advertising, credit decisions, or any purpose unrelated to its single function.</p>
+  <p>Samestate does not sell, rent, or transfer any user data to third parties, other than sending to your chosen AI service what you ask it to when you write a test with AI, and does not use data for advertising, credit decisions, or any purpose unrelated to its single function.</p>
 
   <h2>Changes</h2>
   <p>If this policy changes, the updated version will be posted on this page with a new date.</p>

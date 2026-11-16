@@ -932,6 +932,240 @@
     }
   }
 
+  /* -------------------------------- test steps -------------------------------- */
+  // A test step names a control the way a person reading the test would: its role and its visible name.
+  // Every screen finds its own copy, so one step works across layouts. Only "look" sends page text out of
+  // this frame, and Samestate asks for it only while an AI is writing a test the tester started.
+  const FIELD = 'input:not([type=hidden]),textarea,select,[contenteditable=""],[contenteditable=true],[role=textbox],[role=searchbox],[role=combobox]';
+  const STEP_POOL = ACTIONABLE + ',' + FIELD;
+  const clean = (text, n = 80) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  function roleOf(el) {
+    const role = el.getAttribute('role');
+    if (role) return role.split(' ')[0];
+    const tag = el.tagName.toLowerCase(), type = (el.getAttribute('type') || '').toLowerCase();
+    if (tag === 'a') return 'link';
+    if (tag === 'select') return 'combobox';
+    if (tag === 'textarea' || el.isContentEditable) return 'textbox';
+    if (tag === 'input') {
+      if (['button', 'submit', 'reset', 'image'].includes(type)) return 'button';
+      return { checkbox: 'checkbox', radio: 'radio', search: 'searchbox', range: 'slider' }[type] || 'textbox';
+    }
+    return 'button';
+  }
+  // The accessible name, simplified. A field's typed value is never part of it.
+  function nameOf(el) {
+    if (el.closest('[data-samestate-private]')) return '';
+    const by = el.getAttribute('aria-labelledby');
+    if (by) { const text = clean(by.split(/\s+/).map(id => document.getElementById(id)?.innerText || '').join(' ')); if (text) return text; }
+    const label = clean(el.getAttribute('aria-label'));
+    if (label) return label;
+    if (el.labels?.length) { const text = clean([...el.labels].map(l => l.innerText).join(' ')); if (text) return text; }
+    if (el.matches('input[type=button],input[type=submit],input[type=reset]')) return clean(el.value);
+    if (!el.matches(FIELD)) {
+      const text = clean(el.innerText);
+      if (text) return text;
+      const img = el.querySelector('img[alt]');
+      if (img && clean(img.alt)) return clean(img.alt);
+    }
+    return clean(el.getAttribute('title') || el.getAttribute('placeholder') || el.getAttribute('name'));
+  }
+  const stepTargetOf = el => ({ role: roleOf(el), name: nameOf(el), ...describe(el) });
+
+  let refs = new Map(); // the controls of the last look, by number, so the AI can name one exactly
+  function pageText(limit = 4000) {
+    let text = '';
+    const walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
+        if (node.matches(privateContent) || node.matches('samestate-layer')) return NodeFilter.FILTER_REJECT;
+        const style = getComputedStyle(node);
+        return style.display === 'none' || style.visibility === 'hidden' ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP;
+      }
+    });
+    for (let node = walker.nextNode(); node && text.length < limit; node = walker.nextNode()) {
+      const part = clean(node.data, 400);
+      if (part) text += (/^[,.;:!?)]/.test(part) ? '' : ' ') + part;
+    }
+    return text.trim().slice(0, limit);
+  }
+  function look() {
+    refs = new Map();
+    const controls = [];
+    for (const el of document.querySelectorAll(STEP_POOL)) {
+      if (controls.length >= 150) break;
+      if (!visible(el) || el.closest('samestate-layer')) continue;
+      if (!el.matches(FIELD) && el.parentElement?.closest(ACTIONABLE)?.matches('a[href],button')) continue; // a part of a link or button
+      const control = { ref: controls.length + 1, role: roleOf(el), name: nameOf(el) };
+      if (el.type === 'password') control.password = true;
+      if (el.matches('input[type=checkbox],input[type=radio]')) control.checked = el.checked;
+      if (el.hasAttribute('aria-expanded')) control.expanded = el.getAttribute('aria-expanded') === 'true';
+      if (el.getAttribute('aria-selected') === 'true' || el.getAttribute('aria-pressed') === 'true') control.selected = true;
+      if (el.disabled || el.getAttribute('aria-disabled') === 'true') control.disabled = true;
+      if (el.matches('select') && !el.closest('[data-samestate-private]')) control.options = [...el.options].slice(0, 12).map(o => clean(o.text, 40));
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > innerHeight) control.offscreen = true;
+      refs.set(control.ref, el);
+      controls.push(control);
+    }
+    const de = document.documentElement;
+    return { url: location.href, controls, text: pageText(), scroll: { y: Math.round(scrollY), max: Math.max(0, de.scrollHeight - innerHeight) } };
+  }
+
+  function namedControl(target) {
+    const want = clean(target.name).toLowerCase();
+    if (!want) return null;
+    const pool = Array.from(document.querySelectorAll(STEP_POOL)).filter(el => visible(el) && !el.closest('samestate-layer'));
+    const same = pool.filter(el => nameOf(el).toLowerCase() === want);
+    const sameRole = same.filter(el => roleOf(el) === target.role);
+    const hits = sameRole.length ? sameRole : same;
+    if (hits.length) return { el: hits.find(el => target.path && elementPath(el) === target.path) || hits[0], status: sameRole.length ? 'direct' : 'semantic' };
+    const loose = pool.filter(el => (!target.role || roleOf(el) === target.role) && nameOf(el).toLowerCase().includes(want));
+    return loose.length === 1 ? { el: loose[0], status: 'semantic' } : null;
+  }
+  async function stepControl(target, ref) {
+    const own = ref && refs.get(ref);
+    if (own?.isConnected && visible(own)) return { el: own, status: 'direct' };
+    if (!target || typeof target !== 'object') return { el: null, status: 'none' };
+    if (target.name) {
+      const named = namedControl(target);
+      if (named) return named;
+      // A screen that labels the control differently: the control at the same place, if it has the same role.
+      const el = target.path && locate(target.path);
+      return el && visible(el) && el.matches(STEP_POOL) && (!target.role || roleOf(el) === target.role) ? { el, status: 'semantic' } : { el: null, status: 'none' };
+    }
+    // A recorded click has no name (page text stays in the frame), only the control's place and attributes.
+    const { textKey, ...description } = target;
+    return findTarget(description);
+  }
+  async function findStepControl(target, ref) {
+    let { el, status } = await stepControl(target, ref);
+    for (let tries = 0; !el && tries < 8; tries++) {
+      await sleep(150);
+      finishAnimations();
+      ({ el, status } = await stepControl(target, ref));
+    }
+    // Like a synced click: a navigation item may sit behind this screen's menu button.
+    let opened = null;
+    if (!el && (target?.nav || ['link', 'button', 'menuitem'].includes(target?.role)) && (opened = menuToggle())) {
+      press(opened);
+      for (let tries = 0; !el && tries < 6; tries++) {
+        await sleep(150);
+        finishAnimations();
+        ({ el, status } = await stepControl(target, ref));
+      }
+      if (el) status = 'revealed';
+      else closeMenu(opened);
+    }
+    return { el, status };
+  }
+  // Runs a click or key press and says whether it started loading another page. A page load ends this document
+  // and can drop the answer, so a link's load is held back until the answer is on its way. A form that posts
+  // data cannot be held back; its answer goes at once.
+  function actAndWatch(fn) {
+    let leaving = false, resume = null, settle;
+    const decided = new Promise(done => { settle = done; });
+    const watch = event => {
+      if (event.defaultPrevented || event.destination.sameDocument || event.downloadRequest != null) return;
+      leaving = true;
+      if (event.formData || !event.cancelable) { settle(); return; }
+      event.preventDefault();
+      const url = event.destination.url;
+      resume = () => location.assign(withUa(url));
+      settle();
+    };
+    window.navigation?.addEventListener('navigate', watch);
+    try { fn(); } catch {}
+    setTimeout(settle, 60); // a form submission starts its page load in a later task
+    return decided.then(() => {
+      window.navigation?.removeEventListener('navigate', watch);
+      if (resume) setTimeout(resume, 120);
+      return leaving;
+    });
+  }
+  function setValue(el, value) {
+    const text = String(value ?? '');
+    if (el.matches('select')) {
+      const want = text.toLowerCase();
+      const option = [...el.options].find(o => o.value.toLowerCase() === want || clean(o.text).toLowerCase() === want);
+      if (!option) return false;
+      el.value = option.value;
+    } else if (el.matches('input[type=checkbox],input[type=radio],[role=checkbox],[role=switch]')) {
+      const on = !/^(false|off|no|0|unchecked)$/i.test(text);
+      const now = el.matches('input') ? el.checked : el.getAttribute('aria-checked') === 'true';
+      if (now !== on) press(el);
+      return true;
+    } else if (el.isContentEditable) {
+      el.focus();
+      el.textContent = text;
+    } else {
+      // The native setter, so pages that track the value themselves (React and others) see the change.
+      const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      el.focus();
+      Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, text);
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  }
+  function pressKey(el, key) {
+    const keys = { Enter: 13, Escape: 27, Tab: 9, ArrowDown: 40, ArrowUp: 38, Space: 32 };
+    const target = el || document.activeElement || document.body;
+    const init = { key: key === 'Space' ? ' ' : key, code: key, keyCode: keys[key], which: keys[key], bubbles: true, cancelable: true, composed: true };
+    const go = target.dispatchEvent(new KeyboardEvent('keydown', init));
+    target.dispatchEvent(new KeyboardEvent('keyup', init));
+    if (!go) return;
+    // What the browser would do for a real key: Enter in a field sends its form; Enter on a button or link presses it.
+    if (key === 'Enter' && target.form && target.matches('input')) target.form.requestSubmit();
+    else if (key === 'Enter' && target.matches('a[href],button,[role=button],[role=link],summary')) press(target);
+  }
+  const textShown = text => {
+    const want = clean(text, 400).toLowerCase();
+    return !!want && pageText(200000).replace(/\s+/g, ' ').toLowerCase().includes(want);
+  };
+  async function runStep(step, ref) {
+    const kind = step?.do;
+    if (kind === 'open') {
+      let url;
+      try { url = new URL(step.path, location.origin); } catch { return { status: 'none', note: 'not an address on this site' }; }
+      if (url.origin !== location.origin) return { status: 'none', note: 'another site' };
+      if (step.fresh) { following = url.href; setTimeout(() => location.assign(withUa(url.href)), 0); return { status: 'navigated', leaving: true }; }
+      const result = followAddress(url.href);
+      return { ...result, leaving: result.status === 'navigated' && (url.pathname !== location.pathname || url.search !== location.search) };
+    }
+    if (kind === 'scroll') {
+      const de = document.documentElement, max = de.scrollHeight - innerHeight;
+      const y = { top: 0, bottom: max, up: scrollY - innerHeight * 0.8 }[step.to] ?? scrollY + innerHeight * 0.8;
+      suppressUntil = now() + 500;
+      scrollTo({ top: Math.max(0, Math.min(max, y)), behavior: 'instant' });
+      return { status: 'direct' };
+    }
+    if (kind === 'expect') {
+      const absent = step.absent === true;
+      const deadline = now() + 3000;
+      let shown = textShown(step.text);
+      while (shown === absent && now() < deadline) { await sleep(150); shown = textShown(step.text); }
+      return { status: shown !== absent ? 'pass' : 'fail' };
+    }
+    if (!['click', 'fill', 'press'].includes(kind)) return { status: 'none', note: 'unknown step' };
+    let el = null, status = 'direct';
+    if (step.target || ref) {
+      ({ el, status } = await findStepControl(step.target, ref));
+      if (!el) return { status };
+    }
+    const target = el ? stepTargetOf(el) : null;
+    if (el) { try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {} flash(el); }
+    if (kind === 'fill') {
+      if (!el || !el.matches(FIELD + ',[role=checkbox],[role=switch]')) return { status: 'none', note: 'not a field' };
+      return setValue(el, step.value) ? { status, target } : { status: 'none', note: 'no such option', target };
+    }
+    if (kind === 'press') {
+      const key = ['Enter', 'Escape', 'Tab', 'ArrowDown', 'ArrowUp', 'Space'].includes(step.key) ? step.key : 'Enter';
+      if (el) el.focus?.();
+      return { status, target, leaving: await actAndWatch(() => pressKey(el, key)) };
+    }
+    return { status, target, leaving: await actAndWatch(() => press(el)) };
+  }
+
   /* ------------------------------ shell messages ------------------------------ */
   let themeStyle;
   function applyPreviewTheme(css) {
@@ -981,6 +1215,16 @@
       } else if (m.scroll) applyScroll(m.scroll);
     }
     else if (m.type === 'demo' && demo) runDemo(m);
+    else if (m.type === 'look' && typeof m.rid === 'string') {
+      let data = null;
+      try { data = look(); } catch {}
+      send('looked', { rid: m.rid, data });
+    }
+    else if (m.type === 'step' && typeof m.rid === 'string') {
+      let result;
+      try { result = await runStep(m.step, Number.isInteger(m.ref) ? m.ref : null); } catch { result = { status: 'none' }; }
+      send('stepped', { rid: m.rid, ...result });
+    }
     else if (m.type === 'snapshot') {
       let data = null;
       try { data = await snapshot(); } catch {}

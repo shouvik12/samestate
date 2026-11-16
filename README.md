@@ -38,6 +38,7 @@ that are too small, text that disappears.
 | 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
 | 📏 **Width sweep** | Resizes a screen from 320 to 1920px and reports the exact widths where each problem starts and stops. |
 | 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
+| 🧪 **Test runs** | Write a test plan; an AI (OpenRouter or any OpenAI-compatible service, with your key) turns it into steps on one screen while every screen follows. Save the test and replay it without the AI, in Chrome or in CI. |
 | 🤖 **CI** | `node tools/samestate-ci.mjs <url>` writes the report from headless Chrome and fails the build on new issues. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
@@ -222,6 +223,9 @@ node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,i
   Older reports with no element keys compare counts for grouped findings.
 - `--identity` turns on phone and tablet identity, including the server user-agent.
 - `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
+- `--test=test.json` runs a saved test file on every screen before the report and writes `test-results.json`.
+  A step that fails on any screen fails the run (unless `--fail-on=none`). With `--test`, the url can be left out: the
+  test's own site is used. The AI is never called in CI.
 
 In GitHub Actions, run it after the preview deploy and attach the folder as an artifact:
 
@@ -233,6 +237,38 @@ In GitHub Actions, run it after the preview deploy and attach the folder as an a
   if: always()
   with: { name: samestate-report, path: samestate-report }
 ```
+
+## Test runs
+
+Open **Test runs** in the sidebar. A test is a list of steps that runs on every linked screen at once, and passes
+when every step works on every screen.
+
+- **Write test with AI.** Describe what to do and what should happen in **Test plan** ("Sign up with
+  test@example.com and check the thank-you message, then open About"). Under **AI connection**, keep **OpenRouter**
+  or pick **Other (OpenAI-compatible)** for another service, such as Ollama on your computer
+  (`http://localhost:11434/v1`). Enter the model (default `anthropic/claude-sonnet-5.5`) and your API key, then
+  press **Write test with AI**. Chrome asks once for access to the service. The AI drives the screen chosen in
+  **Compare → Compare to**, one step at a time, and each step also runs on the other screens. It adds checks for the
+  outcomes in your plan, and can run the difference report at a step. Press **Stop** at any time.
+- **Record clicks.** Your clicks on buttons and menus, and the pages you open, become steps.
+- **Add check.** Adds a step that passes on a screen when the text you enter is visible on it.
+- **Run test.** Opens the start page on every screen, runs every step and shows, per step, on how many screens
+  it worked (hover for each screen). A step that found no control on a screen names the screen.
+- **Save test file** and **Open test file…** keep tests as JSON. A saved test runs without the AI, so it takes the
+  same steps every time.
+
+Steps find each control by its role and visible name (button "Sign in"), so the same step works across layouts.
+On a screen where a navigation item sits behind a menu button, the step opens the menu first.
+
+Safety:
+- With **Use my sign-ins** on, Samestate asks before a test runs: every step acts on your real account, on each screen.
+- Before the AI clicks something like Delete, Buy, Pay or Unsubscribe, Samestate asks you.
+- The AI can only open pages on the site you opened. Page text is passed to it as untrusted content.
+- Only the reference screen's address, visible text and control names go to the AI service, and only while it
+  writes. Field values and `data-samestate-private` text never do. Your key stays in the extension's storage for the
+  browser session (or on this computer with **Remember the key**) and is never written to a test file.
+
+Writing with AI needs the extension. The web demo can open, record and run tests.
 
 ## Save and reopen a setup
 
@@ -259,6 +295,8 @@ are dropped, path segments that look like IDs show as `:id`, and request and res
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
 and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
 or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
+**Write test with AI** sends the reference screen's address, visible text and control names (never field values) to
+the AI service you set up, only while it writes a test; see [Test runs](#test-runs).
 **Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Previews use your Chrome cookies and site storage for the site, so a page you are signed in to opens signed in on every screen. Turn off **Use my sign-ins** under **Views** to start each preview signed out, with separate, temporary storage.
 
 ## How it works
@@ -275,13 +313,15 @@ extension/
   capture.js      Local screenshots and recordings of the device wall.
   report.js       Exports the difference report as Markdown, CSV or HTML.
   workspaces.js   Saves and reopens setups in the browser's local storage.
+  testrun.js      Test runs: recording, test files, running steps on every screen, and writing tests with AI.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
+tests/testrun.mjs Writes a test with a stand-in AI service in the extension, replays it, and runs it in CI.
 tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
 ```
 
-Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`.
+Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`. `node tests/testrun.mjs` checks test runs in the extension, with a stand-in for the AI service, and needs no key.
 
 ## Known limits
 
@@ -301,6 +341,10 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - **Sweep widths** keeps the screen's kind (touch or not) at every width, and **Check journey on every device**
   resizes the steps without reloading them, so pages that pick a layout when they load can differ.
 - Fix previews set inline styles on the elements of one scan; a page reload removes them.
+- Test steps use synthetic clicks and key presses. Pages that ignore events that are not from a real user, and
+  controls inside other sites' frames, cannot be driven. Recorded clicks are matched by their place in the page, so
+  they can miss on layouts with different markup; steps written by the AI or by hand use the control's name.
+- A link a test step follows loads as a full page, also in single-page apps.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
@@ -321,6 +365,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | | | **Test runs** — write a test plan and let an AI (OpenRouter or any OpenAI-compatible service, with your key) turn it into steps that run on every screen; record clicks, add text checks, save and open test files, and replay them in CI with `--test` ([details](changelogs/CHANGELOG-test-runs.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **Incomplete reports** — Difference and Journey reports list previews that have yet to load. Only measured previews can contribute fixes to the baseline comparison. ([details](changelogs/CHANGELOG-incomplete-reports.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **CI baseline** — catches regressions that affect new elements under an existing finding. ([details](changelogs/CHANGELOG-ci-baseline-elements.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **Stop auto screenshots** — cancels the wait between screenshots immediately. ([details](changelogs/CHANGELOG-stop-auto-screenshots.md)) |
