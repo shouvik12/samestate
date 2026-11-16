@@ -367,6 +367,7 @@
   autoButton.addEventListener('click', async () => {
     if (auto) {
       auto.stopping = true;
+      auto.wake?.();
       updateButtons();
       return;
     }
@@ -397,7 +398,13 @@
         if (!run.stopping) showStatus(`Auto screenshots: ${run.count} saved ${destination()} (${shotPace()}).`);
         // The rate is read each time, so changing it applies at once; a slow save delays the next shot rather than piling up.
         const left = shotInterval() - (performance.now() - started);
-        if (left > 0) await new Promise(done => setTimeout(done, left));
+        if (left > 0 && !run.stopping) {
+          await new Promise(done => {
+            const timer = setTimeout(done, left);
+            run.wake = () => { clearTimeout(timer); done(); };
+          });
+          run.wake = null;
+        }
       }
     } catch (error) {
       failure = error;

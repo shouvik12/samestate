@@ -2286,23 +2286,19 @@ function analyze(snaps, refId) {
 
 async function detect(quiet) {
   if (sweepRun || journeyRunning) return; // screens are being resized; their own report replaces this one
-  const devs = workspaceScreens().filter(d => d.ready); if (devs.length < 1) return;
+  const devs = workspaceScreens();
+  if (!devs.length) return;
   $('#detect span').textContent = 'Measuring…';
-  const rid = crypto.randomUUID(), snaps = [];
   const scanSalt = textSalt;
   const scanPreview = openId;
   const scanWall = wallRevision;
-  await new Promise(done => {
-    pendingSnap.set(rid, (d, data) => { if (data) snaps.push({ dev: d, data }); if (snaps.length === devs.length) done(); });
-    devs.forEach(d => post(d, 'snapshot', { rid })); setTimeout(done, 4000);
-  });
-  pendingSnap.delete(rid);
+  const ready = devs.filter(d => d.ready);
+  const measured = ready.length ? await snapshotScreens(ready, 4000) : new Map();
   if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || sweepRun || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
-  snaps.sort((a, b) => a.dev.slot - b.dev.slot);
+  const snaps = [...measured].map(([dev, data]) => ({ dev, data })).sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
-  // A screen that does not answer in time is left out; the report names it rather than looking complete.
-  lastScan = { at: new Date(), screens: snaps.map(s => s.dev), missing: devs.filter(d => !snaps.some(s => s.dev === d)) };
+  lastScan = { at: new Date(), screens: snaps.map(s => s.dev), missing: devs.filter(d => !measured.has(d)) };
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
 // The report lists each problem once with the screens it affects ("By issue"), or every screen's own list ("By device").
@@ -2458,12 +2454,14 @@ function saveBaseline() {
 }
 function clearBaseline() { try { localStorage.removeItem(baselineKey()); } catch {} newOnly = false; renderFindings(); }
 function compareBaseline() {
-  const baseline = lastScan && target ? loadBaseline() : null; // with no findings left, every baseline item is fixed
+  const baseline = lastScan && target ? loadBaseline() : null;
   for (const f of findings) f.isNew = false;
   if (!baseline) return null;
   const before = new Set(baseline.items.map(item => item.id)), now = new Set(findings.map(findingId));
   for (const f of findings) f.isNew = !before.has(findingId(f));
-  const fixed = baseline.items.filter(item => !now.has(item.id));
+  const measured = new Set(lastScan.screens.map(reportName));
+  const missing = new Set((lastScan.missing || []).map(reportName));
+  const fixed = baseline.items.filter(item => measured.has(item.screen) && !missing.has(item.screen) && !now.has(item.id));
   return { at: new Date(baseline.at), added: findings.filter(f => f.isNew).length, fixed, unchanged: findings.length - findings.filter(f => f.isNew).length };
 }
 function renderBaseline(state) {
@@ -2572,7 +2570,7 @@ async function sweepWidths() {
 let journeyRunning = false;
 async function journeyReport() {
   if (journeyRunning || !pageSteps || sitesMode) return;
-  const steps = pageScreens.filter(d => d.el && d.ready), devices = DEVICES.filter(d => d.on);
+  const steps = pageScreens.filter(d => d.el), devices = DEVICES.filter(d => d.on);
   const status = $('#page-steps-status');
   if (!steps.length || !devices.length) { status.textContent = 'Open a step and select devices first.'; return; }
   journeyRunning = true;
@@ -2586,7 +2584,9 @@ async function journeyReport() {
       for (const d of steps) d.rot = false;
       refreshViews();
       await settle(700);
-      const snaps = await snapshotScreens(steps, 6000);
+      const ready = steps.filter(d => d.ready);
+      if (!ready.length) continue;
+      const snaps = await snapshotScreens(ready, 6000);
       for (const [d, snap] of snaps) data.set(d.id + '|' + device.id, snap);
     }
   } catch {}
@@ -2607,7 +2607,8 @@ async function journeyReport() {
   findings = out;
   lastScan = { at: new Date(), screens, missing };
   const broken = new Set(out.filter(f => f.sev === 'issue').map(f => f.dev.label));
-  status.textContent = `Checked ${plural(steps.length, 'step')} on ${plural(devices.length, 'device')}. ${broken.size ? 'Issues on ' + [...broken].slice(0, 4).join(', ') + (broken.size > 4 ? ` +${broken.size - 4} more` : '') + '.' : 'No issues.'}`;
+  status.textContent = `Checked ${plural(steps.length, 'step')} on ${plural(devices.length, 'device')}. ${broken.size ? 'Issues on ' + [...broken].slice(0, 4).join(', ') + (broken.size > 4 ? ` +${broken.size - 4} more` : '') + '.' : 'No issues on measured previews.'}`
+    + (missing.length ? ` Could not measure ${plural(missing.length, 'preview')}.` : '');
   renderFindings(); showTab('diff');
 }
 
