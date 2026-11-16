@@ -70,8 +70,8 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
-- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it at each
-  width and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
+- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it every 10px
+  (every 20px above 1000px) and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
   **Widths**. Press the button again to stop.
 - **Journey report.** With **Page steps** on, **Check journey on every device** measures each step at the size of every
   selected device and compares it with the same step on the desktop, so the report says which step breaks on which screens.
@@ -208,7 +208,8 @@ and Chrome, and no packages.
 node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,ipad,desktop --sweep
 ```
 
-- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1.
+- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1. A screen that does not answer in time
+  also fails the run (unless `none`), and is listed as `notMeasured` in `report.json`.
 - `--baseline=old/report.json` compares with an earlier run, so only new findings fail the build.
 - `--identity` turns on phone and tablet identity, including the server user-agent.
 - `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
@@ -275,6 +276,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 ## Known limits
 
+- **Sweep widths** checks every 10px up to 1000px and every 20px above, so a problem that starts and stops between two
+  checked widths (narrower than that) is not reported.
 - With **Use my sign-ins** on, every screen acts on your real account: a synced click on Delete or Buy happens on
   each screen. Turn it off, or unlink screens, before testing actions like these.
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
@@ -309,6 +312,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | 13:16:42 +09:00 | `8b0ae8f` | **Report fixes** — screens a scan could not measure are listed instead of left out, clean reports export (and no longer stop the CI script), saved journeys reopen on their first page, the width sweep checks every 10px, and the baseline shows what was fixed when nothing is left ([details](changelogs/CHANGELOG-report-fixes.md)) |
 | **2026-11-16** | 11:01:40 +09:00 | `dd86d04` | **README media** — the demo GIF, screenshots and link-preview card are re-recorded from the current demo by the new `tools/readme-media.mjs` ([details](changelogs/CHANGELOG-readme-media.md)) |
 | **2026-11-16** | 10:52:30 +09:00 | `89a9aea` | **Identity check on CI** — the smoke test compares the Desktop preview with its own browser, so it passes on GitHub's runners, which have no mouse ([details](changelogs/CHANGELOG-identity-check-ci.md)) |
 | **2026-11-16** | 10:34:10 +09:00 | `837131b`, `55fddce` | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar; the guided demo shows them ([details](changelogs/CHANGELOG-interface-themes.md)) |

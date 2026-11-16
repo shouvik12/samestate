@@ -383,7 +383,7 @@ function selectDevice(d, selected) {
   else removeFrame(d);
   if (leader === d && !d.el) setLeader(active().find(item => item.ready) || null);
   updateReference();
-  findings = [];
+  findings = []; lastScan = null;
   renderFindings();
   updateWall();
   if (wasEmpty) { cvAllow = Date.now() + 300; cv.scrollLeft = cv.scrollTop = 0; cvPos = [0, 0]; updateWallScroll(); }
@@ -427,7 +427,7 @@ function refreshViews() {
   document.querySelectorAll('#synclist input').forEach(input => { input.disabled = pageSteps && !sitesMode; });
   if (!active().includes(leader)) setLeader(active().find(d => d.ready) || null);
   updateReference();
-  findings = [];
+  findings = []; lastScan = null;
   renderFindings();
   updateWall();
   applyScreenSettings();
@@ -809,7 +809,7 @@ async function open(url, alreadyAllowed = false) {
   // Keep the opened site in the address bar so it shows what is previewing, not the placeholder.
   $('#src').value = isDemo || pageSteps ? '' : url.href;
   buildFrames();
-  findings = [];
+  findings = []; lastScan = null;
   renderFindings();
   setTimeout(() => { if (id === openId) detect(true); }, 3500);
 }
@@ -859,7 +859,7 @@ async function followRedirect(message) {
   target = previewUrl = textSalt = null;
   $('#match-text').checked = false;
   buildFrames();
-  findings = [];
+  findings = []; lastScan = null;
   renderFindings();
   register(null).catch(() => {});
   $('#src').value = url.href;
@@ -899,7 +899,7 @@ function toggleDevice(d, selected) {
 function updateSiteTools() {
   if (!sitesMode) return;
   wallRevision++;
-  findings = [];
+  findings = []; lastScan = null;
   refreshDevicePicker();
   updateReference();
   renderFindings();
@@ -1813,7 +1813,7 @@ function endTour(clear) {
   $('#tour').hidden = $('#tour-callout').hidden = $('#tour-ring').hidden = tourPointer.hidden = true;
   $('#frames').classList.remove('tour-glide');
   document.querySelectorAll('.tour-badge').forEach(badge => badge.remove());
-  if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
+  if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; lastScan = null; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
 }
 $('#tourpause').onclick = () => setTourPaused(!tourPaused);
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with
@@ -2301,7 +2301,8 @@ async function detect(quiet) {
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
-  lastScan = { at: new Date(), screens: snaps.map(s => s.dev) };
+  // A screen that does not answer in time is left out; the report names it rather than looking complete.
+  lastScan = { at: new Date(), screens: snaps.map(s => s.dev), missing: devs.filter(d => !snaps.some(s => s.dev === d)) };
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
 // The report lists each problem once with the screens it affects ("By issue"), or every screen's own list ("By device").
@@ -2327,6 +2328,13 @@ function issueGroups(list) {
   return [...groups.values()].sort((a, b) => SEVERITY[a.sev] - SEVERITY[b.sev] || b.screens.length - a.screens.length || CATS.indexOf(a.cat) - CATS.indexOf(b.cat));
 }
 
+// Screens the last scan could not measure (no answer in time). Without this a partial scan reads as a clean one.
+function scanNote() {
+  const missing = lastScan?.missing || [];
+  if (!missing.length) return '';
+  const names = missing.map(d => esc(reportName(d)));
+  return `<p class="scan-note"><b>Not measured:</b> ${names.slice(0, 6).join(', ')}${names.length > 6 ? ` +${names.length - 6} more` : ''}. ${missing.length === 1 ? 'It' : 'They'} did not answer in time, so ${missing.length === 1 ? 'it is' : 'they are'} not in this report. <button type="button" class="link" data-rescan>Detect again</button></p>`;
+}
 function renderFindings() {
   const order = SEVERITY;
   renderBaseline(compareBaseline());
@@ -2342,9 +2350,10 @@ function renderFindings() {
   $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
   $('#diffn').textContent = counted.length || '';
   const shown = findings.filter(f => (!catFilter || f.cat === catFilter) && (!newOnly || f.isNew));
-  if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
+  const note = scanNote();
+  if (!shown.length) { $('#findings').innerHTML = note + `<p class="muted">No differences found ${note ? 'on the screens that were measured' : 'for this view'}.</p>`; return; }
   const screens = sitesMode ? workspaceScreens() : viewScreens();
-  let html = '';
+  let html = note;
   if (byIssue) {
     reportGroups = groups.filter(g => (!catFilter || g.cat === catFilter) && (!newOnly || g.items.some(f => f.isNew)));
     for (const site of sitesMode ? sitePanels : [null]) {
@@ -2375,6 +2384,7 @@ function renderFindings() {
   }
   $('#findings').innerHTML = html;
 }
+$('#findings').addEventListener('click', e => { if (e.target.closest('[data-rescan]')) detect(); });
 $('#chips').addEventListener('click', e => { if (e.target.dataset.cat !== undefined) { catFilter = e.target.dataset.cat || null; renderFindings(); } });
 $('#report-view').addEventListener('click', e => {
   const view = e.target.closest('button')?.dataset.view;
@@ -2448,7 +2458,7 @@ function saveBaseline() {
 }
 function clearBaseline() { try { localStorage.removeItem(baselineKey()); } catch {} newOnly = false; renderFindings(); }
 function compareBaseline() {
-  const baseline = findings.length ? loadBaseline() : null;
+  const baseline = lastScan && target ? loadBaseline() : null; // with no findings left, every baseline item is fixed
   for (const f of findings) f.isNew = false;
   if (!baseline) return null;
   const before = new Set(baseline.items.map(item => item.id)), now = new Set(findings.map(findingId));
@@ -2458,8 +2468,8 @@ function compareBaseline() {
 }
 function renderBaseline(state) {
   const bar = $('#baseline');
-  bar.hidden = !findings.length;
-  if (!findings.length) return;
+  bar.hidden = !findings.length && !state; // nothing to save, and nothing to compare with
+  if (bar.hidden) return;
   const fixes = appliedFixes.size ? `<p class="fix-line">${plural(appliedFixes.size, 'fix preview')} on. <button type="button" class="link" data-baseline="recheck">Check again</button> · <button type="button" class="link" data-baseline="undo-fixes">Undo all</button></p>` : '';
   if (!state) { bar.innerHTML = `<button type="button" class="pill" data-baseline="save" title="Later scans of this site mark what is new and what is fixed">Save as baseline</button>` + fixes; return; }
   const when = state.at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -2494,7 +2504,9 @@ const settle = ms => new Promise(done => setTimeout(done, ms)); // a snapshot fo
 // Resizes the reference screen from 320px to 1920px, checks it at each width and narrows every change down to
 // the pixel, so the report says where a problem starts and stops instead of which preset happens to show it.
 let sweepRun = 0;
-const SWEEP_WIDTHS = [...Array(35)].map((_, k) => 320 + k * 20).concat([...Array(23)].map((_, k) => 1000 + (k + 1) * 40)); // 320–1000 every 20px, then to 1920 every 40px
+// 320–1000 every 10px, then to 1920 every 20px. Changes between two sampled widths are narrowed to the pixel; a problem that
+// starts and stops between two of them (narrower than 10px, or 20px above 1000px) is not seen.
+const SWEEP_WIDTHS = [...Array(69)].map((_, k) => 320 + k * 10).concat([...Array(46)].map((_, k) => 1000 + (k + 1) * 20));
 async function sweepWidths() {
   const button = $('#sweep'), label = button.querySelector('span');
   if (sweepRun) { sweepRun = 0; return; } // a second press stops it
@@ -2520,7 +2532,7 @@ async function sweepWidths() {
   button.classList.add('busy');
   try {
     for (const w of SWEEP_WIDTHS) await probe(w);
-    let budget = 140; // bisect every change between two sampled widths, down to one pixel
+    let budget = 200; // bisect every change between two sampled widths, down to one pixel
     const bisect = async (a, b) => {
       if (b - a <= 1 || budget-- <= 0) return;
       const m = (a + b) >> 1, mid = await probe(m);
@@ -2582,17 +2594,18 @@ async function journeyReport() {
   refreshViews();
   journeyRunning = false;
   if (scan !== openId || !pageSteps) { status.textContent = ''; return; }
-  const screens = [];
+  const screens = [], missing = [];
   const out = steps.flatMap((step, k) => {
     const snaps = devices.map((device, j) => {
       const dev = { ...step, id: step.id + '@' + device.id, kind: device.kind, os: device.os, touch: device.kind !== 'desktop', slot: k * 1000 + j, label: `Step ${step.step} · ${device.name}`, journeyRef: device.name, fixedSize: { w: device.w, h: device.h } };
-      screens.push(dev);
-      return { dev, data: data.get(step.id + '|' + device.id) };
+      const snap = data.get(step.id + '|' + device.id);
+      (snap ? screens : missing).push(dev);
+      return { dev, data: snap };
     }).filter(s => s.data);
     return analyze(snaps, step.id + '@' + refDevice.id);
   });
   findings = out;
-  lastScan = { at: new Date(), screens };
+  lastScan = { at: new Date(), screens, missing };
   const broken = new Set(out.filter(f => f.sev === 'issue').map(f => f.dev.label));
   status.textContent = `Checked ${plural(steps.length, 'step')} on ${plural(devices.length, 'device')}. ${broken.size ? 'Issues on ' + [...broken].slice(0, 4).join(', ') + (broken.size > 4 ? ` +${broken.size - 4} more` : '') + '.' : 'No issues.'}`;
   renderFindings(); showTab('diff');
@@ -2618,7 +2631,7 @@ function applyScreenSettings() {
 $('#screen-settings').addEventListener('change', event => {
   screenSettings = event.target.value;
   $('#screen-settings-help').hidden = !screenSettings;
-  findings = []; renderFindings();
+  findings = []; lastScan = null; renderFindings();
   applyScreenSettings();
 });
 $('#long-text').addEventListener('change', event => {

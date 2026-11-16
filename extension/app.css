@@ -389,3 +389,4 @@ button.link{color:var(--acc);text-decoration:underline;text-underline-offset:2px
 #ui-theme:hover,#ui-mode:hover{background:var(--raise);color:var(--text)}
 #ui-theme option{background:var(--side);color:var(--text)}
 :root[data-ui-mode=dark] #ui-mode .moon,:root[data-ui-mode=light] #ui-mode .sun{display:none}
+.scan-note{margin:0 0 8px;padding:7px 10px;border-radius:7px;border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 12%,var(--side));color:var(--text);font-size:12px}

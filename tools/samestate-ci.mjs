@@ -10,7 +10,8 @@
 //   --sweep           also resize the reference screen from 320 to 1920px and report where problems start and stop
 //   --identity        phones and tablets tell the page's scripts and the server what they are
 //   --out=dir         where to write report.md, report.html, report.csv and report.json (default: samestate-report)
-//   --fail-on=level   exit with code 1 when the report has an issue (default), a warning or above (warn), or never (none)
+//   --fail-on=level   exit with code 1 when the report has an issue (default), a warning or above (warn), or never (none);
+//                     a screen that did not answer in time also fails the run, except with none
 //   --baseline=file   compare with an earlier report.json: only findings that are new make the run fail
 //   --timeout=seconds how long to wait for the previews to load (default: 60)
 // Environment: CHROME_PATH to pick Chrome, SAMESTATE_HEADED=1 to watch it run.
@@ -133,11 +134,12 @@ async function run() {
   const report = await evaluate(`({
     findings: findings.map(f => ({ id: reportName(f.dev) + '|' + f.kind, severity: f.sev, category: f.cat, issue: f.kind, screen: reportName(f.dev), title: f.title, detail: f.detail })),
     screens: (lastScan?.screens || []).map(d => reportName(d)),
+    missing: (lastScan?.missing || []).map(d => reportName(d)),
     md: samestateReport('md'), csv: samestateReport('csv'), html: samestateReport('html')
   })`);
 
   mkdirSync(outDir, { recursive: true });
-  const json = { site: site.href, at: new Date().toISOString(), screens: report.screens, findings: report.findings };
+  const json = { site: site.href, at: new Date().toISOString(), screens: report.screens, notMeasured: report.missing, findings: report.findings };
   writeFileSync(join(outDir, 'report.md'), report.md);
   writeFileSync(join(outDir, 'report.html'), report.html);
   writeFileSync(join(outDir, 'report.csv'), report.csv);
@@ -155,7 +157,9 @@ async function run() {
   console.log(`${site.href} on ${report.screens.length} screens: ${count('issue')} issues, ${count('warn')} warnings, ${count('info')} adaptations${typeof baselineFile === 'string' ? ' (new only)' : ''}.`);
   for (const f of judged.filter(f => f.severity === 'issue').slice(0, 20)) console.log(`  issue  ${f.screen}: ${f.title}`);
   console.log(`Report written to ${outDir}`);
-  return failOn === 'none' ? 0 : (count('issue') || (failOn === 'warn' && count('warn'))) ? 1 : 0;
+  // An incomplete scan is not a clean one: screens that did not answer fail the run like an issue does.
+  if (report.missing.length) console.log(`  Not measured (no answer in time): ${report.missing.join(', ')}`);
+  return failOn === 'none' ? 0 : (count('issue') || report.missing.length || (failOn === 'warn' && count('warn'))) ? 1 : 0;
 }
 
 let code = 2;
