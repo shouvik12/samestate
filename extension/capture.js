@@ -10,6 +10,8 @@
   const status = document.querySelector('#capture-status');
   const autoButton = document.querySelector('#auto-shots');
   const shotRateInput = document.querySelector('#shot-rate');
+  const shotUnitInput = document.querySelector('#shot-unit');
+  const shotHint = document.querySelector('#shot-hint');
   const recordRateInput = document.querySelector('#record-rate');
   const folderButton = document.querySelector('#capture-folder');
   const folderLabel = document.querySelector('#capture-folder-name');
@@ -25,13 +27,47 @@
 
   // Rates are remembered per browser. Screenshots: 0.1–10 per second. Recording: 1–60 frames per second.
   const clamp = (value, lo, hi, fallback) => Number.isFinite(value) ? Math.min(hi, Math.max(lo, value)) : fallback;
-  const shotRate = () => clamp(parseFloat(shotRateInput.value), 0.1, 10, 1);
+  // Screenshots are set either as a rate (0.1–10 per second) or as a gap (0.1–3600 seconds apart).
+  const SHOT_UNITS = { 'per-second': { min: 0.1, max: 10, fallback: 1 }, apart: { min: 0.1, max: 3600, fallback: 5 } };
+  const shotUnit = () => SHOT_UNITS[shotUnitInput.value] ? shotUnitInput.value : 'per-second';
+  const shotValue = () => { const u = SHOT_UNITS[shotUnit()]; return clamp(parseFloat(shotRateInput.value), u.min, u.max, u.fallback); };
+  const shotInterval = () => shotUnit() === 'apart' ? shotValue() * 1000 : 1000 / shotValue();
+  // The pace in words, the same whichever unit was chosen: "1 screenshot every 5 seconds", "2 screenshots every second".
+  const fmt = n => String(+n.toFixed(2));
+  // Only whole screenshots: a whole number per second reads as a count ("3 screenshots every second"), anything else
+  // as the gap between them ("1.1 per second" is "1 screenshot every 0.91 seconds").
+  function shotPace() {
+    const seconds = shotInterval() / 1000, perSecond = 1 / seconds, count = Math.round(perSecond);
+    if (Math.abs(seconds - 1) < 0.005) return '1 screenshot every second';
+    if (perSecond > 1 && Math.abs(perSecond - count) < 0.01) return `${count} screenshots every second`;
+    return `1 screenshot every ${fmt(seconds)} seconds`;
+  }
+  const showPace = () => { shotHint.textContent = 'Takes ' + shotPace(); };
+  function fitShotInput() {
+    const u = SHOT_UNITS[shotUnit()];
+    shotRateInput.min = u.min; shotRateInput.max = u.max; shotRateInput.step = shotUnit() === 'apart' ? 'any' : '0.1';
+    shotRateInput.title = shotUnit() === 'apart' ? 'Seconds between screenshots (0.1 to 3600)' : 'Screenshots each second (0.1 to 10)';
+    showPace();
+  }
   const recordRate = () => Math.round(clamp(parseFloat(recordRateInput.value), 1, 60, 30));
   const remember = (key, input) => {
     try { const saved = localStorage.getItem(key); if (saved) input.value = saved; } catch {}
     input.addEventListener('change', () => { try { localStorage.setItem(key, input.value); } catch {} });
   };
+  remember('samestate.shotUnit', shotUnitInput);
   remember('samestate.shotRate', shotRateInput);
+  fitShotInput();
+  for (const type of ['input', 'change']) shotRateInput.addEventListener(type, showPace);
+  // Switching unit keeps the same pace: 2 per second becomes 0.5 seconds apart, 5 seconds apart becomes 0.2 per second.
+  let previousUnit = shotUnit();
+  shotUnitInput.addEventListener('change', () => {
+    const before = SHOT_UNITS[previousUnit], value = clamp(parseFloat(shotRateInput.value), before.min, before.max, before.fallback);
+    previousUnit = shotUnit();
+    const u = SHOT_UNITS[previousUnit];
+    shotRateInput.value = String(+clamp(1 / value, u.min, u.max, u.fallback).toFixed(2));
+    fitShotInput();
+    try { localStorage.setItem('samestate.shotRate', shotRateInput.value); } catch {}
+  });
   remember('samestate.recordRate', recordRateInput);
 
   // Save folder: a folder handle kept in IndexedDB, so Chrome can reuse it after a reload (it asks again for permission).
@@ -86,7 +122,7 @@
     autoButton.disabled = auto ? auto.stopping : !canAuto || !hasDevices || busy || !!recording?.stopping;
     autoButton.textContent = auto ? 'Stop screenshots' : 'Auto screenshots';
     autoButton.classList.toggle('recording', !!auto);
-    autoButton.title = auto ? 'Stop taking screenshots' : canAuto || !canCapture ? 'Save a screenshot of the device wall again and again, at the rate below' : 'Auto screenshots work on the device wall, not in Compare sites';
+    autoButton.title = auto ? 'Stop taking screenshots' : canAuto || !canCapture ? 'Save a screenshot of the device wall again and again, at the pace below' : 'Auto screenshots work on the device wall, not in Compare sites';
     folderButton.hidden = !canPickFolder;
     recordButton.textContent = recording ? 'Stop' : 'Record';
     const view = sites.hidden ? 'device wall' : 'site comparison';
@@ -349,7 +385,7 @@
       busy = false;
       updateButtons();
     }
-    showStatus(`Taking ${shotRate()} screenshots per second…`);
+    showStatus(`Taking ${shotPace()}…`);
     let failure = null;
     try {
       while (!run.stopping) {
@@ -358,9 +394,9 @@
         try { await saveFrame(image, image.width, image.height, `samestate-${run.session}-shot-${pad(run.count + 1, 4)}.png`); }
         finally { image.close(); }
         run.count++;
-        if (!run.stopping) showStatus(`Auto screenshots: ${run.count} saved ${destination()} (${shotRate()} per second).`);
+        if (!run.stopping) showStatus(`Auto screenshots: ${run.count} saved ${destination()} (${shotPace()}).`);
         // The rate is read each time, so changing it applies at once; a slow save delays the next shot rather than piling up.
-        const left = 1000 / shotRate() - (performance.now() - started);
+        const left = shotInterval() - (performance.now() - started);
         if (left > 0) await new Promise(done => setTimeout(done, left));
       }
     } catch (error) {

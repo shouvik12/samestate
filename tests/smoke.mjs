@@ -176,7 +176,7 @@ const PROBE = `(() => {
       return [sitesMode && pages.join() === 'index.html,pricing.html' && screens.join() === '7,7', 'columns: ' + pages.join(' + ') + ', screens: ' + screens.join(' + ')];
     },
     'Screenshot and Record': () => {
-      const ids = ['#screenshot', '#record', '#auto-shots', '#shot-rate', '#record-rate'];
+      const ids = ['#screenshot', '#record', '#auto-shots', '#shot-rate', '#shot-unit', '#record-rate'];
       return [ids.every(id => document.querySelector(id)), 'capture controls present: ' + ids.filter(id => document.querySelector(id)).length + ' of ' + ids.length];
     },
     'Day and night': () => {

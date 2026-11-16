@@ -1,10 +1,13 @@
 // Re-records the README's images from the current web demo (docs/) in headless Chrome:
 //
-//   node tools/readme-media.mjs        →  docs/media/samestate-demo.gif, screenshot-sync.png, screenshot-report.png, card.png
+//   node tools/readme-media.mjs        →  docs/media/samestate-demo.gif, screenshot-sync.png, screenshot-report.png,
+//                                          screenshot-capture.png, card.png
 //
 // Needs Node 22, Chrome (CHROME_PATH to pick one) and ffmpeg. The GIF is the guided demo's first step, the Products
 // click on every device; the sync screenshot and card.png are its last frame; the report screenshot is the
-// difference report on the pricing table. The sidebar is hidden and the zoom set so every device fits.
+// difference report on the pricing table. The sidebar is hidden and the zoom set so every device fits. The capture
+// screenshot keeps the sidebar and shows Auto screenshots running into a save folder (Chrome's tab-sharing prompt is
+// accepted by a command-line switch, and the folder is the browser's private storage, named like a real one).
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -31,7 +34,8 @@ const base = `http://127.0.0.1:${server.address().port}/docs/index.html`;
 
 const profile = mkdtempSync(join(tmpdir(), 'samestate-media-'));
 const chrome = spawn(process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
-  '--no-first-run', '--window-size=1600,900', '--hide-scrollbars', '--autoplay-policy=no-user-gesture-required', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  '--no-first-run', '--window-size=1600,900', '--hide-scrollbars', '--autoplay-policy=no-user-gesture-required',
+  '--auto-accept-this-tab-capture', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
 let log = '';
 const port = await new Promise(done => chrome.stderr.on('data', c => { log += c; const m = log.match(/DevTools listening on ws:\/\/[^:]+:(\d+)/); if (m) done(m[1]); }));
 const target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page');
@@ -45,7 +49,7 @@ ws.onmessage = event => {
 };
 const send = (method, params = {}) => { const id = ++next; ws.send(JSON.stringify({ id, method, params })); return new Promise((done, fail) => pending.set(id, { done, fail })); };
 const evaluate = async expression => {
-  const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+  const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true, userGesture: true }); // a click, for capture
   if (exceptionDetails) throw new Error(exceptionDetails.exception?.description || exceptionDetails.text);
   return result.value;
 };
@@ -106,6 +110,30 @@ try {
     return findings.length + ' findings; chips: ' + [...document.querySelectorAll('#chips .chip')].map(c => c.textContent).join(' | ');
   })()`));
   await shot('screenshot-report.png');
+
+  // 3. The Capture drawer while Auto screenshots saves into a folder.
+  await load(1200, 675);
+  console.log('capture:', await evaluate(`(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    for (let i = 0; i < 100 && !tourRunning; i++) await wait(100);
+    endTour(false);
+    for (let i = 0; i < 150 && !(active().length && active().every(d => d.ready)); i++) await wait(100);
+    // Four devices, so the wall fits beside the sidebar at this size.
+    for (const d of DEVICES) if (d.on !== ['iphone', 'pixel', 'ipad', 'desktop'].includes(d.id)) selectDevice(d, !d.on);
+    refreshDevicePicker();
+    for (let i = 0; i < 150 && !(active().length && active().every(d => d.ready)); i++) await wait(100);
+    await wait(800);
+    for (const d of active()) { try { d.iframe.contentDocument.querySelector('#cookies')?.remove(); } catch {} }
+    for (let z = 100; z >= 20; z -= 2) { setZoom(z); await wait(15); if (cv.scrollWidth <= cv.clientWidth + 1 && cv.scrollHeight <= cv.clientHeight + 1) break; }
+    await wallCapture.useFolder(await (await navigator.storage.getDirectory()).getDirectoryHandle('samestate-captures', { create: true }));
+    const unit = $('#shot-unit'), pace = $('#shot-rate');
+    unit.value = 'apart'; unit.dispatchEvent(new Event('change')); pace.value = '0.5'; pace.dispatchEvent(new Event('change')); $('#record-rate').value = '15';
+    $('#auto-shots').click();
+    for (let i = 0; i < 100 && !/[5-9] saved|\\d\\d saved/.test($('#capture-status').textContent); i++) await wait(100);
+    return $('#capture-status').textContent;
+  })()`));
+  await shot('screenshot-capture.png');
+  await evaluate(`($('#auto-shots').click(), 1)`);
 } finally {
   chrome.kill(); server.close(); await wait(300); rmSync(profile, { recursive: true, force: true });
 }
