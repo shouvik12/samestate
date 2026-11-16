@@ -224,7 +224,7 @@ function relayout() {
 function setPreviewSource(frame, url, d) {
   if (url.origin === EXT) frame.removeAttribute('sandbox');
   else frame.setAttribute('sandbox', PREVIEW_SANDBOX);
-  frame.credentialless = url.origin !== EXT;
+  frame.credentialless = url.origin !== EXT && !useSignIns; // a credentialless frame has no cookies and throwaway storage
   const identity = d && IS_EXT && url.origin !== EXT ? deviceIdentity(d) : null;
   if (identity) { url = new URL(url); url.searchParams.set('samestate-ua', uaType(identity)); } // the server gets the device's user-agent
   frame.src = url.href;
@@ -490,6 +490,36 @@ function setDeviceIdentity(on, save) {
     setIdentity(d, true);
   }
 }
+// Previews share Chrome's cookies and storage for the site unless the user turns this off. The frame's credentialless
+// state is fixed when it starts loading a page, so the screens are opened again on their current pages.
+let useSignIns = true;
+try { useSignIns = localStorage.getItem('samestate.signins') !== 'off'; } catch {}
+async function setSignIns(on) {
+  useSignIns = on;
+  $('#sign-ins').checked = on;
+  try { localStorage.setItem('samestate.signins', on ? 'on' : 'off'); } catch {}
+  const screens = connectedScreens().filter(d => d.iframe && previewOrigin(d) && previewOrigin(d) !== EXT);
+  const pages = await Promise.all(screens.map(screenAddress));
+  if (useSignIns !== on) return;
+  screens.forEach((d, i) => {
+    if (!pages[i]) return;
+    d.ready = false; d.el?.classList.remove('ready');
+    setPreviewSource(d.iframe, pages[i], d);
+  });
+}
+// The page a screen shows now (its agent knows; the frame's src is only where it started).
+async function screenAddress(d) {
+  let address = null;
+  if (d.ready) {
+    const rid = crypto.randomUUID();
+    const state = await new Promise(done => { pendingState.set(rid, done); post(d, 'state', { rid }); setTimeout(() => done(null), 800); });
+    pendingState.delete(rid);
+    address = state?.url;
+  }
+  try { const url = new URL(address || d.iframe.src); url.searchParams.delete('samestate-ua'); return url; } catch { return null; }
+}
+$('#sign-ins').checked = useSignIns;
+$('#sign-ins').addEventListener('change', event => setSignIns(event.target.checked));
 const savedDeviceIdentity = () => { try { return localStorage.getItem('samestate.emulate') === 'on'; } catch { return false; } };
 function restoreDeviceIdentity() {
   if (emulateDevices !== savedDeviceIdentity()) setDeviceIdentity(savedDeviceIdentity(), false);
@@ -2643,6 +2673,7 @@ const refreshDevicePicker = mountDevicePicker(DEVICES, {
 fillSharedDevices();
 renderLeft();
 refreshThemeTargets();
+$('#sign-ins-row').hidden = !IS_EXT;
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the default site, which the manifest already has access to, so no prompt is
 // needed. The web demo can only show the bundled sample site, so it starts with the tour.
@@ -2656,4 +2687,19 @@ async function openDefault() {
   $('#src').value = DEFAULT_SITE;
   $('#joblog').textContent = `Press Enter to open ${url.host}.`;
 }
-if (IS_EXT) openDefault(); else startTour();
+// The toolbar icon passes the page it was clicked on. Sites Chrome already allows open straight away; for a new site
+// Chrome only shows its access prompt after a click or key press, so the address is filled in for the user.
+async function openClickedPage(address) {
+  history.replaceState(null, '', location.pathname); // a reload starts fresh instead of reopening this page
+  const url = parseAddress(address);
+  if (!url) return openDefault();
+  let allowed = false;
+  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
+  if (target || openId) return;
+  if (allowed) return open(url, true);
+  $('#src').value = url.href;
+  $('#src').focus();
+  $('#joblog').textContent = `Press Enter to open ${url.host}. Chrome asks once for access to the site.`;
+}
+const clickedPage = IS_EXT && new URLSearchParams(location.search).get('open');
+if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else startTour();

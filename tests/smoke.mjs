@@ -232,6 +232,7 @@ const AFTER_TOUR = `(async () => {
     settings.value = 'text'; settings.dispatchEvent(new Event('change')); await wait(400);
     const sizes = active().slice(0, 2).map(d => d.iframe.contentWindow.getComputedStyle(d.iframe.contentDocument.documentElement).fontSize);
     settings.value = ''; settings.dispatchEvent(new Event('change')); await wait(300);
+    record('Sign-ins option hidden in the web demo', document.querySelector('#sign-ins-row').hidden, 'Use my sign-ins is extension-only');
     record('Screen settings', sizes[1] === parseFloat(sizes[0]) * 2 + 'px', 'root font size ' + sizes.join(' and '));
     document.querySelector('#ref').value = 'iphone';
     await sweepWidths();

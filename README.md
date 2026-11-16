@@ -113,8 +113,10 @@ Samestate is a Chrome extension. No server and no terminal.
    (the one that contains `manifest.json`), not the repo's top-level folder.
 5. Pin the Samestate icon from the puzzle-piece menu.
 
-Click the Samestate icon to open the preview tab. It starts with `claude.com` on every screen. To preview
-another site, enter its address and grant Chrome access to that site. The **Demo** button plays a guided demo on a
+Click the Samestate icon on any page to open that page on every screen, in a new tab beside it. Previews share
+your Chrome sign-ins, so a page you are signed in to stays signed in (turn off **Use my sign-ins** to preview signed
+out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
+opens Samestate on `claude.com`; to preview another site, enter its address. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
 Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.
 
@@ -231,7 +233,7 @@ are dropped, path segments that look like IDs show as `:id`, and request and res
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
 and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
 or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
-**Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
+**Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Previews use your Chrome cookies and site storage for the site, so a page you are signed in to opens signed in on every screen. Turn off **Use my sign-ins** under **Views** to start each preview signed out, with separate, temporary storage.
 
 ## How it works
 
@@ -257,6 +259,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 ## Known limits
 
+- With **Use my sign-ins** on, every screen acts on your real account: a synced click on Delete or Buy happens on
+  each screen. Turn it off, or unlink screens, before testing actions like these.
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
 - In a single-page app, the other screens load the new address as a full page rather than through the app's
   router, so state kept only in memory (an open filter, a typed search) is not carried over.
@@ -290,6 +294,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
 | **2026-11-15** | 02:58:14 +09:00 | `3e906de` | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
 | **2026-11-15** | 02:58:21 +09:00 | `d9d2f89` | **CI report** — `tools/samestate-ci.mjs` runs the difference report on any site in headless Chrome, writes Markdown, HTML, CSV and JSON, and fails on new issues ([details](changelogs/CHANGELOG-ci-report.md)) |
 | **2026-11-15** | 02:58:17 +09:00 | `1ad570e` | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |

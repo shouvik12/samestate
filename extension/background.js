@@ -1,5 +1,6 @@
 // Only explicitly opened origins can be framed and connect preview agents in a Samestate tab.
 const APP = chrome.runtime.getURL('app.html');
+const isApp = url => typeof url === 'string' && url.split(/[?#]/)[0] === APP; // app.html?open=… when opened from a page
 const previewKey = tabId => 'preview-origin-' + tabId;
 const HEADERS = ['x-frame-options', 'content-security-policy', 'content-security-policy-report-only', 'cross-origin-opener-policy', 'cross-origin-embedder-policy', 'cross-origin-resource-policy'];
 
@@ -103,12 +104,16 @@ async function register(tabId, origin, sites, agents) {
   await syncEmulation();
 }
 
+// Clicking the icon on a web page opens that page in Samestate (activeTab lets the click read the tab's address).
+// The previews share the browser's cookies and storage for the site, so a page you are signed in to stays signed in.
 chrome.action.onClicked.addListener(tab => {
-  chrome.tabs.create({ url: APP, index: tab.index + 1 });
+  let url = APP;
+  try { if (/^https?:$/.test(new URL(tab.url).protocol)) url += '?open=' + encodeURIComponent(tab.url); } catch {}
+  chrome.tabs.create({ url, index: tab.index + 1, openerTabId: tab.id });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (message?.type !== 'register' || sender.frameId !== 0 || sender.url !== APP || !sender.tab) return;
+  if (message?.type !== 'register' || sender.frameId !== 0 || !isApp(sender.url) || !sender.tab) return;
   register(sender.tab.id, message.origin, message.sites || [], message.agents).then(() => reply({ ok: true }), error => reply({ ok: false, error: String(error?.message || error) }));
   return true;
 });
@@ -151,7 +156,7 @@ chrome.webNavigation.onCommitted.addListener(async details => {
   const { [key]: preview } = await chrome.storage.session.get(key);
   if (!preview) return;
   if (details.frameId === 0) {
-    if (details.url !== APP) await unregister(details.tabId).catch(() => {});
+    if (!isApp(details.url)) await unregister(details.tabId).catch(() => {});
     return;
   }
   if (from) reportRedirect(details, preview.origins, from);
