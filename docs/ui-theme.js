@@ -13,6 +13,8 @@
     apply(theme, mode);
     try { localStorage.setItem('samestate.uiTheme', root.dataset.uiTheme); localStorage.setItem('samestate.uiMode', root.dataset.uiMode); } catch {}
   }
-  apply(read('samestate.uiTheme', 'samestate'), read('samestate.uiMode', 'dark'));
-  window.samestateUiTheme = { THEMES, save, get theme() { return root.dataset.uiTheme; }, get mode() { return root.dataset.uiMode; } };
+  const restore = () => apply(read('samestate.uiTheme', 'samestate'), read('samestate.uiMode', 'dark'));
+  restore();
+  // preview() shows a theme without saving it (the guided demo uses it); restore() returns to the saved choice.
+  window.samestateUiTheme = { THEMES, save, preview: apply, restore, get theme() { return root.dataset.uiTheme; }, get mode() { return root.dataset.uiMode; } };
 })();

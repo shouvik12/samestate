@@ -173,7 +173,14 @@ const PROBE = `(() => {
       return [sitesMode && pages.join() === 'index.html,pricing.html' && screens.join() === '7,7', 'columns: ' + pages.join(' + ') + ', screens: ' + screens.join(' + ')];
     },
     'Screenshot and Record': () => [!!document.querySelector('#screenshot') && !!document.querySelector('#record'), 'capture buttons present'],
-    'That is the tour': () => [!sitesMode && !pageSteps, 'back on the device wall: ' + (!sitesMode && !pageSteps)]
+    'Day and night': () => {
+      const shown = document.documentElement.dataset, saved = [localStorage.getItem('samestate.uiTheme') || 'samestate', localStorage.getItem('samestate.uiMode') || 'dark'];
+      return [shown.uiTheme === 'hive' && shown.uiMode !== saved[1] && saved[0] === 'samestate', 'showing ' + shown.uiTheme + ' ' + shown.uiMode + ', saved ' + saved.join(' ')];
+    },
+    'That is the tour': () => {
+      const back = !sitesMode && !pageSteps, theme = document.documentElement.dataset.uiTheme + ' ' + document.documentElement.dataset.uiMode;
+      return [back && theme === 'samestate dark', 'back on the device wall: ' + back + ', theme ' + theme];
+    }
   };
   document.addEventListener('samestate-tour-step', event => {
     const { step, title } = event.detail;

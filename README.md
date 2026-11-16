@@ -129,7 +129,7 @@ your Chrome sign-ins, so a page you are signed in to stays signed in (turn off *
 out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
 opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
-Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.
+Page steps, Compare sites, and the interface themes in day and night mode. A pointer performs each action, with the explanation beside the control it uses.
 
 ## Choose devices and options
 
@@ -309,7 +309,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
-| **2026-11-16** | — | — | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar ([details](changelogs/CHANGELOG-interface-themes.md)) |
+| **2026-11-16** | — | — | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar; the guided demo shows them ([details](changelogs/CHANGELOG-interface-themes.md)) |
 | **2026-11-16** | — | — | **New promo video** — the README video is re-recorded from the current demo and now shows Preview fix and the Network report ([details](changelogs/CHANGELOG-promo-refresh.md)) |
 | **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
 | **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |

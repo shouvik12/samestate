@@ -1711,11 +1711,26 @@ const STEPS = [
     run: async t => { if (await t.point('#screenshot') && await t.nap(1100)) await t.point('#record'); }
   },
   {
+    title: 'Day and night', at: '#ui-mode', wait: 1400,
+    text: 'The sun and moon button switches Samestate between <b>day</b> and <b>night</b> mode. The menu beside it picks the theme: Samestate, Neutral, Clay, Teal or Hive. Your choice is remembered.',
+    run: async t => {
+      if (!await t.point('#ui-mode')) return;
+      const mode = uiTheme.mode === 'dark' ? 'light' : 'dark';
+      uiTheme.preview(uiTheme.theme, mode); showUiTheme();
+      if (!await t.nap(1300) || !await t.point('#ui-theme')) return;
+      for (const id of ['neutral', 'clay', 'teal', 'hive']) {
+        uiTheme.preview(id, mode); showUiTheme();
+        if (!await t.nap(900)) return;
+      }
+    }
+  },
+  {
     title: 'That is the tour', wait: 0,
     text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
     run: () => {
       setSitesMode(false);
       restoreDeviceIdentity();
+      restoreUiTheme();
       scrollWall(0, 0);
       tourPointer.hidden = true;
       $('#tourpause').hidden = true;
@@ -1789,7 +1804,7 @@ async function startTour() {
   tourRunning = false;
 }
 function endTour(clear) {
-  if (tourRunning) restoreDeviceIdentity(); // skipped part-way, possibly after the identity step
+  if (tourRunning) { restoreDeviceIdentity(); restoreUiTheme(); } // skipped part-way, possibly after the identity or theme step
   tour++;
   tourRunning = false;
   setTourPaused(false);
@@ -2675,19 +2690,19 @@ renderLeft();
 refreshThemeTargets();
 $('#sign-ins-row').hidden = !IS_EXT;
 // Interface theme and day/night mode (ui-theme.js applies the saved choice before the page is drawn).
-{
-  const ui = window.samestateUiTheme, select = $('#ui-theme'), modeButton = $('#ui-mode');
-  select.innerHTML = Object.entries(ui.THEMES).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
-  const show = () => {
-    select.value = ui.theme;
-    const next = ui.mode === 'dark' ? 'day' : 'night';
-    modeButton.title = `Switch to ${next} mode`;
-    modeButton.setAttribute('aria-label', modeButton.title);
-  };
-  select.addEventListener('change', () => { ui.save(select.value, ui.mode); show(); });
-  modeButton.addEventListener('click', () => { ui.save(ui.theme, ui.mode === 'dark' ? 'light' : 'dark'); show(); });
-  show();
+const uiTheme = window.samestateUiTheme;
+$('#ui-theme').innerHTML = Object.entries(uiTheme.THEMES).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+function showUiTheme() {
+  $('#ui-theme').value = uiTheme.theme;
+  const button = $('#ui-mode');
+  button.title = `Switch to ${uiTheme.mode === 'dark' ? 'day' : 'night'} mode`;
+  button.setAttribute('aria-label', button.title);
 }
+// The guided demo previews themes without saving them; this puts the visitor's own choice back.
+function restoreUiTheme() { uiTheme.restore(); showUiTheme(); }
+$('#ui-theme').addEventListener('change', event => { uiTheme.save(event.target.value, uiTheme.mode); showUiTheme(); });
+$('#ui-mode').addEventListener('click', () => { uiTheme.save(uiTheme.theme, uiTheme.mode === 'dark' ? 'light' : 'dark'); showUiTheme(); });
+showUiTheme();
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the bundled sample site, which needs no site access, so no prompt is
 // needed and no outside site is requested in the manifest. The web demo starts with the tour.
