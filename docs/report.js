@@ -16,6 +16,8 @@
   }
 
   const sizeOf = d => { const { w, h } = size(d); return w + ' × ' + h; };
+  // A journey report compares every step with the same step on one device.
+  const referenceName = d => d.journeyRef ? d.journeyRef + ', the same step' : screenName(d);
   const pageOf = d => d.site ? d.site.url.href : d.pageUrl || previewUrl;
   const showAddress = url => { const u = new URL(url); return u.origin === EXT ? 'Samestate sample site · ' + u.pathname.split('/').pop() : u.href; };
 
@@ -45,7 +47,7 @@
     for (const part of report.parts) {
       if (part.site) lines.push(`## Site ${sitePanels.indexOf(part.site) + 1}`, '');
       lines.push(`- **Page${part.pages.length > 1 ? 's' : ''}:** ${part.pages.join(', ')}`);
-      lines.push(`- **Compared with:** ${screenName(part.reference)} (${sizeOf(part.reference)})`);
+      lines.push(`- **Compared with:** ${referenceName(part.reference)} (${sizeOf(part.reference)})`);
       lines.push(`- **Screens:** ${part.screens.map(d => `${screenName(d)} (${sizeOf(d)})`).join(', ')}`);
       lines.push(`- **Found:** ${counts(part.own)}`, '');
       const level = part.site ? '###' : '##';
@@ -83,7 +85,7 @@
     for (const part of report.parts) {
       body += `<section class="part">${part.site ? `<h2>Site ${sitePanels.indexOf(part.site) + 1}</h2>` : ''}<dl class="facts">`
         + `<dt>Page${part.pages.length > 1 ? 's' : ''}</dt><dd>${part.pages.map(esc).join('<br>')}</dd>`
-        + `<dt>Compared with</dt><dd>${esc(screenName(part.reference))} <span class="dim">${sizeOf(part.reference)}</span></dd>`
+        + `<dt>Compared with</dt><dd>${esc(referenceName(part.reference))} <span class="dim">${sizeOf(part.reference)}</span></dd>`
         + `<dt>Screens</dt><dd>${part.screens.map(d => `${esc(screenName(d))} <span class="dim">${sizeOf(d)}</span>`).join('<br>')}</dd>`
         + `<dt>Found</dt><dd>${counts(part.own)}</dd></dl>`;
       for (const [sev, name] of SECTIONS) {
@@ -194,6 +196,9 @@ ${body}
       exporting = false;
     }
   }
+
+  // tools/samestate-ci.mjs reads the report through this in headless Chrome.
+  window.samestateReport = format => format === 'md' ? markdown(collect()) : format === 'csv' ? csv(collect()) : html(collect(), new Map());
 
   menu.addEventListener('click', event => {
     const format = event.target.closest('[data-export]')?.dataset.export;

@@ -5,7 +5,7 @@
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
 <p align="center">·
-  <a href="docs/media/samestate-demo-x.mp4">Watch the 36s video</a> ·
+  <a href="docs/media/samestate-promo.mp4">Watch the 30s video</a> ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -35,7 +35,10 @@ that are too small, text that disappears.
 | | |
 |---|---|
 | 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
-| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input and usability, per device. |
+| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
+| 📏 **Width sweep** | Resizes a screen from 320 to 1920px and reports the exact widths where each problem starts and stops. |
+| 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
+| 🤖 **CI** | `node tools/samestate-ci.mjs <url>` writes the report from headless Chrome and fails the build on new issues. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
 | 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
@@ -67,6 +70,20 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 - **Difference report.** Every device is measured against a reference device. **By issue** lists each problem
   once with the screens it affects; click it to outline the elements on all of them, or click a screen to see
   its details. **By device** lists every screen's findings separately.
+- **Width sweep.** **Compare → Sweep widths** resizes the reference screen from 320 to 1920px, checks it at each
+  width and narrows every change down to the pixel: "Page scrolls sideways at 320–660px". Findings appear under
+  **Widths**. Press the button again to stop.
+- **Journey report.** With **Page steps** on, **Check journey on every device** measures each step at the size of every
+  selected device and compares it with the same step on the desktop, so the report says which step breaks on which screens.
+- **Fix previews.** Findings with a CSS fix (wide tables, cut-off text, small tap targets, small text, sideways
+  scrolling) show the CSS and a **Preview fix** button that applies it to every affected screen. **Check again**
+  re-runs the report; **Undo** takes it off. Other findings show what to change in the site.
+- **Baseline.** **Save as baseline** in the Differences panel keeps this scan for the site. Later scans mark new
+  findings, list the fixed ones and can show **new** only.
+- **Long text.** **Compare → Long text (+35%)** makes every preview's text about a third longer, with accented
+  letters, as translations often do. Run **Detect differences** to see what gets cut off or pushes the layout.
+- **Screen settings.** **Views → Screen settings** gives every second screen dark mode, 200% text or landscape.
+  With **Same device on every screen**, that shows one device both ways side by side.
 - **Sync log.** Shows which devices matched, skipped, or could not reach a control.
 - **Screenshots and recordings.** Save the visible device wall as a PNG or a silent WebM video.
 
@@ -74,7 +91,7 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 
 | Category | Examples |
 |---|---|
-| Layout | Page scrolls sideways, side-by-side blocks that stack, text touching the screen edge |
+| Layout | Page scrolls sideways, side-by-side blocks that stack, text touching the screen edge, key controls and the main heading pushed below the fold |
 | Navigation | Nav collapses behind a menu button, or items that vanish with no way to reach them |
 | Content | Text and controls hidden on smaller screens, cut-off text |
 | Images | Changed shape, stretched or broken images |
@@ -82,6 +99,9 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Tables | Tables wider than the screen, tables that need a sideways swipe |
 | Input | Tap targets under 24px and 40px |
 | Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
+| Accessibility | Controls the Tab key reaches inside closed menus and panels, Tab order that jumps around the screen |
+| Widths | From **Sweep widths**: the widths where each problem appears, including WCAG 1.4.10 Reflow at 320px |
+| Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
 ## Install
 
@@ -104,12 +124,19 @@ Works in Chrome and other Chromium browsers (Edge, Brave, Arc) on desktop. Updat
    (the one that contains `manifest.json`), not the repo's top-level folder.
 5. Pin the Samestate icon from the puzzle-piece menu.
 
-Click the Samestate icon to open the preview tab. It starts with the bundled sample site on every screen. To preview
-another site, enter its address and grant Chrome access to that site. The **Demo** button plays a guided demo on a
+Click the Samestate icon on any page to open that page on every screen, in a new tab beside it. Previews share
+your Chrome sign-ins, so a page you are signed in to stays signed in (turn off **Use my sign-ins** to preview signed
+out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
+opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo on a
 sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
-Page steps and Compare sites. A pointer performs each action, with the explanation beside the control it uses.
+Page steps, Compare sites, and the interface themes in day and night mode. A pointer performs each action, with the explanation beside the control it uses.
 
 ## Choose devices and options
+
+Pick the interface theme from the menu next to the reload button: **Samestate** (the original dark blue), **Neutral**,
+**Clay**, **Teal** or **Hive**. The sun and moon button beside it switches any theme between day and night mode.
+Both are remembered. They change Samestate's own colors, not the previews; to try colors on your site, see
+[Preview a color theme](#preview-a-color-theme).
 
 Open **Devices** to browse Android phones, Apple phones, tablets, and specials such as foldables, watches, and TVs. Search by model or dimensions, or turn on **Selected only** to edit the current wall. Under **My custom devices**, enter a name, width, height, and frame type to save a preset in this browser.
 
@@ -121,7 +148,7 @@ Dimensions are CSS viewport presets for testing layouts in Chrome. The catalog u
 
 ## Compare devices and page steps
 
-- **Views → Phone and tablet identity** (off by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. Previews reload when you change it. It is off by default because a site whose server picks the layout (Google, for example) still sends desktop pages, and its scripts may then show a phone a different page from the other screens, so clicks there have nothing to match.
+- **Views → Phone and tablet identity** (off by default) makes phone and tablet previews tell the page's scripts what they are: an iPhone or Android user-agent and platform, touch support, a 3× (phones) or 2× (tablets) pixel ratio, the device's screen size, and touch answers to `matchMedia()` hover and pointer queries. iPads report themselves as a Mac with touch, as real iPads do. Desktop presets keep your browser's own identity. In the extension, page loads in those previews also reach the server with the device's user-agent, so sites that choose the layout on the server (Google, for example) send their phone or tablet pages. Previews reload when you change it. It is off by default so that every screen starts from the same page and clicks have something to match.
 - In **Views → Device sizes**, choose **Different devices** to use the selected presets or **Same device on every screen** to give those previews one shared size. Select **Device for all previews** to resize them in place.
 - Turn on **Views → Page steps** to start a row with the page you originally opened. Follow a same-origin link or use a supported control, such as **Sign in**, to open the next state beside the current screen. Dialogs, menus and tabs can become steps even when the address stays the same. In the extension, you can also enter a path such as `/pricing` in the address bar. Close a step with **×** in its header.
 - To switch sites, enter a domain or full URL in the address bar. After Chrome grants access, the new site opens at Step 1 with the selected device size.
@@ -171,6 +198,32 @@ After **Detect differences**, open **Export** in the Differences panel and choos
 - **HTML page**, a single file that opens in any browser.
 - **HTML with screenshots** adds a cropped screenshot of the affected screen to each finding, with the elements outlined. Share the current Samestate tab when Chrome asks. Samestate shows each screen on its own in Focus mode while it takes the screenshots, then returns to your layout. This option is on the device wall only, not in **Compare sites**.
 
+## Run it in CI
+
+`tools/samestate-ci.mjs` loads the extension in headless Chrome, opens a site on the device wall, runs the
+difference report and writes `report.md`, `report.html`, `report.csv` and `report.json`. It needs Node 22 or later
+and Chrome, and no packages.
+
+```
+node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,ipad,desktop --sweep
+```
+
+- `--fail-on=issue` (default), `warn` or `none` sets when it exits with code 1.
+- `--baseline=old/report.json` compares with an earlier run, so only new findings fail the build.
+- `--identity` turns on phone and tablet identity, including the server user-agent.
+- `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
+
+In GitHub Actions, run it after the preview deploy and attach the folder as an artifact:
+
+```yaml
+- uses: actions/setup-node@v4
+  with: { node-version: 22 }
+- run: CHROME_PATH="$(command -v google-chrome)" node tools/samestate-ci.mjs "$PREVIEW_URL" --out=samestate-report
+- uses: actions/upload-artifact@v4
+  if: always()
+  with: { name: samestate-report, path: samestate-report }
+```
+
 ## Save and reopen a setup
 
 Open **Workspaces** in the sidebar, enter a name, and click **Save**. A workspace keeps the site, the selected devices and their rotation, scale and link state, the layout (mode, zoom, alignment, lock and dragged positions), **Views** settings and page steps, **Compare sites** columns, sync settings, themes and annotations. Click **Open** to return to it; Chrome asks once for any sites that need access. Saving under an existing name replaces it.
@@ -190,10 +243,13 @@ is off when you open a preview. When enabled, the preview reads rendered text lo
 fingerprints for comparison. Raw page text stays out of the report and sync log. Visible text can contain
 personal data. Mark elements with `data-samestate-private` to exclude their text from matching.
 
+The **Network** findings use the browser's resource timing: each request's address, type and size. Query strings
+are dropped, path segments that look like IDs show as `:id`, and request and response contents are never read.
+
 Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
 and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
 or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
-**Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Live previews start with separate, temporary browser storage and do not reuse existing sign-ins.
+**Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Previews use your Chrome cookies and site storage for the site, so a page you are signed in to opens signed in on every screen. Turn off **Use my sign-ins** under **Views** to start each preview signed out, with separate, temporary storage.
 
 ## How it works
 
@@ -212,28 +268,40 @@ extension/
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
+tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
 ```
 
 Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`.
 
 ## Known limits
 
+- With **Use my sign-ins** on, every screen acts on your real account: a synced click on Delete or Buy happens on
+  each screen. Turn it off, or unlink screens, before testing actions like these.
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
 - In a single-page app, the other screens load the new address as a full page rather than through the app's
   router, so state kept only in memory (an open filter, a typed search) is not carried over.
-- Phone and tablet identity reaches the page's JavaScript only. Requests to the server still carry your
-  browser's own user-agent, so sites that pick a mobile layout on the server show desktop markup.
+- The server user-agent applies to page loads in phone and tablet previews, not to their images, scripts or API
+  calls, and only to pages the preview opens itself (links, link sync, Align screens, reloads). A page a script
+  opens with `location.href` gets the desktop user-agent. It needs the extension; the web demo has no server.
+- **Screen settings → Light and dark** rewrites the page's `prefers-color-scheme` rules in the stylesheets it can
+  read. Stylesheets from other sites and scripts that ask `matchMedia()` still get your computer's setting.
+- **Long text** lengthens the text on the page as it is; text the page adds later is not lengthened.
+- **Sweep widths** keeps the screen's kind (touch or not) at every width, and **Check journey on every device**
+  resizes the steps without reloading them, so pages that pick a layout when they load can differ.
+- Fix previews set inline styles on the elements of one scan; a page reload removes them.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
 - Pixel ratio is 3 for phones and 2 for tablets, not each model's exact value.
+- Network sizes come from resource timing. Other sites report no size unless they send `Timing-Allow-Origin`,
+  so page weight undercounts third-party requests. Lazy-loaded files count only once a screen has loaded them.
 - Security headers are removed inside Samestate tabs so pages can be framed. Use those tabs for
   previewing, not for sensitive browsing. Other tabs are untouched.
 
 ## Roadmap
 
-- **v2: suggested fixes** for findings in the difference report, not just detection
-- Per-device user-agent on requests to the server (the page's scripts already see it)
+- Fix previews for more findings (overlays, images), and fixes written as a stylesheet to copy
+- Server user-agent for a preview's images, scripts and API calls, not only its page loads
 
 ## Release Notes
 
@@ -241,8 +309,23 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-16** | — | — | **Interface themes** — five themes for Samestate itself (Samestate, Neutral, Clay, Teal, Hive), each with a day and night mode, from a menu and a sun/moon button in the top bar; the guided demo shows them ([details](changelogs/CHANGELOG-interface-themes.md)) |
+| **2026-11-16** | — | — | **New promo video** — the README video is re-recorded from the current demo and now shows Preview fix and the Network report ([details](changelogs/CHANGELOG-promo-refresh.md)) |
+| **2026-11-16** | — | — | **Open the current page, signed in** — the toolbar icon opens the page you are on, and previews share your Chrome sign-ins (**Use my sign-ins**, on by default) ([details](changelogs/CHANGELOG-signed-in-previews.md)) |
 | **2026-11-15** | — | — | **Chrome Web Store** — Samestate 0.1.3 is published on the [Chrome Web Store](https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha); the README links to it and the install steps put the store first ([details](changelogs/CHANGELOG-chrome-web-store.md)) |
+| **2026-11-15** | 02:58:14 +09:00 | `3e906de` | **Server user-agent** — with Phone and tablet identity on, phone and tablet previews load pages with the device's user-agent, so sites that pick the layout on the server send their phone pages ([details](changelogs/CHANGELOG-server-user-agent.md)) |
+| **2026-11-15** | 02:58:21 +09:00 | `d9d2f89` | **CI report** — `tools/samestate-ci.mjs` runs the difference report on any site in headless Chrome, writes Markdown, HTML, CSV and JSON, and fails on new issues ([details](changelogs/CHANGELOG-ci-report.md)) |
+| **2026-11-15** | 02:58:17 +09:00 | `1ad570e` | **Fix previews** — findings show the CSS that usually fixes them and a Preview fix button that applies it on every affected screen, with Undo ([details](changelogs/CHANGELOG-fix-previews.md)) |
+| **2026-11-15** | 02:58:18 +09:00 | `f9ac524` | **Baseline** — save a scan as the site's baseline; later scans mark new findings and list fixed ones ([details](changelogs/CHANGELOG-baseline-report.md)) |
+| **2026-11-15** | 02:58:19 +09:00 | `4ebdabc` | **Journey report** — Check journey on every device measures every page step at each selected device's size ([details](changelogs/CHANGELOG-journey-report.md)) |
+| **2026-11-15** | 02:58:20 +09:00 | `1080757` | **Width sweep** — Sweep widths reports the exact widths, from 320 to 1920px, where each problem starts and stops ([details](changelogs/CHANGELOG-width-sweep.md)) |
+| **2026-11-15** | 02:58:16 +09:00 | `6fa7d6e` | **Screen settings** — every second screen in dark mode, at 200% text or in landscape, to compare one device both ways ([details](changelogs/CHANGELOG-screen-settings.md)) |
+| **2026-11-15** | 02:58:15 +09:00 | `c081043` | **Long text** — every preview's text about a third longer, as translations often are, to find what gets cut off ([details](changelogs/CHANGELOG-long-text.md)) |
+| **2026-11-15** | 02:58:12 +09:00 | `973314b` | **Accessibility checks** — a new category: controls the Tab key reaches inside closed menus, and Tab order that jumps around ([details](changelogs/CHANGELOG-accessibility-checks.md)) |
+| **2026-11-15** | 02:58:13 +09:00 | `06bedc6` | **Above-the-fold check** — key controls and the main heading that the desktop shows on its first screen but phones push below the fold ([details](changelogs/CHANGELOG-fold-check.md)) |
+| **2026-11-15** | 02:57:56 +09:00 | `c1e4a94` | **Network report** — a Network category in the difference report: page weight per screen, phones downloading as much as the desktop, hidden images that still download, oversized images and large API responses ([details](changelogs/CHANGELOG-network-report.md)) |
 | **2026-11-14** | 17:06:09 +05:30 | `811325c` | **Sample site default** — the extension starts on the bundled sample site instead of `claude.com`, requests no built-in site access, and has new icons ([details](changelogs/CHANGELOG-sample-site-default.md)) |
+| **2026-11-14** | pending | pending | **Promo video** — scripts in `promo/` that record a 30-second promo from the live demo, with generated music and optional narration, in landscape and portrait ([details](changelogs/CHANGELOG-promo-video.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Link buttons** — clicks on links that the page handles as buttons (menus, tabs, dialogs) reach every screen ([details](changelogs/CHANGELOG-link-buttons.md)) |
 | **2026-11-14** | 01:54:50 +09:00 | `d41dde3` | **Device identity off by default** — Phone and tablet identity is now opt-in, so every screen gets the same page; the guided demo turns it on for its own step ([details](changelogs/CHANGELOG-device-identity-default-off.md)) |
 | **2026-11-13** | 22:17:23 +05:30 | `95c6a54` | **Ignore zip builds** — `*.zip` is ignored, so packaged extension zips are not committed ([details](changelogs/CHANGELOG-ignore-zip-builds.md)) |

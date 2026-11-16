@@ -59,7 +59,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   </header>
 
   <h1>Privacy policy</h1>
-  <p class="updated">Last updated November 14, 2026</p>
+  <p class="updated">Last updated November 16, 2026</p>
 
   <div class="summary">
     <p>Samestate runs entirely in your browser. It does not collect, store on any server, sell, or share your personal data or browsing activity. There are no accounts, analytics, or tracking.</p>
@@ -69,13 +69,14 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   <p>Samestate is a Chrome extension that shows a website on a wall of device previews, keeps those previews in the same state as you interact with one of them, and reports layout differences between devices.</p>
 
   <h2>Pages you preview</h2>
-  <p>Samestate only works with sites you choose to open in it. Chrome asks for your permission the first time you open each site, and you can remove that permission at any time from the extension's settings in Chrome.</p>
+  <p>Samestate only works with sites you choose to open in it, by entering an address or clicking its icon on a page. Clicking the icon lets Samestate read that tab's address once, to open it. Chrome asks for your permission the first time you open each site, and you can remove that permission at any time from the extension's settings in Chrome.</p>
   <p>To build its difference report, Samestate measures element structure, visibility, and layout inside the previews. This happens locally on your device and is never sent anywhere.</p>
   <ul>
     <li>Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection.</li>
     <li><strong>Match visible text</strong> is off by default. When you turn it on, rendered text is read locally and compared using temporary fingerprints. Raw page text is kept out of the report and the sync log.</li>
     <li>Developers can mark elements with <code>data-samestate-private</code> to exclude their text from matching.</li>
-    <li>Previews start with separate, temporary browser storage and do not reuse your existing sign-ins.</li>
+    <li>Previews use your Chrome cookies and site storage for the site you open, so pages you are signed in to stay signed in. Samestate never reads or stores them. Turn off <strong>Use my sign-ins</strong> to start previews signed out, with separate, temporary storage.</li>
+    <li>Network findings use the browser's resource timing: each request's address, type and size. Query strings are dropped, path segments that look like IDs are replaced, and request and response contents are never read.</li>
   </ul>
 
   <h2>How previews are allowed to load</h2>

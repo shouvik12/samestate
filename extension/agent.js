@@ -7,6 +7,7 @@
   if (!EXT || window.__samestate || window.parent === window || window.parent !== window.top) return;
   if (!location.ancestorOrigins || location.ancestorOrigins[0] !== EXT) return; // only inside a Samestate device frame
   window.__samestate = true;
+  try { performance.setResourceTimingBufferSize(1500); } catch {} // the default 250 entries fill up on busy pages
   const cfg = { touch: false, inspect: false };
   const privateContent = 'form,input,textarea,select,option,[contenteditable],[hidden],[aria-hidden=true],[data-samestate-private],script,style,noscript,template';
   const encoder = new TextEncoder();
@@ -18,6 +19,21 @@
   }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const now = () => Date.now();
+
+  // With phone and tablet identity on, the extension sends the device's user-agent to the server for page loads
+  // whose address carries samestate-ua (emulate.js removes it from the address before the page's scripts run).
+  // Pages this screen opens itself keep the mark, so the server keeps sending the phone or tablet page.
+  const UA_MARK = 'samestate-ua';
+  function uaMark() {
+    if (demo || !window.name.startsWith('samestate-device:')) return null;
+    try { const d = JSON.parse(window.name.slice(17)); return d.ios ? (d.mobile ? 'iphone' : 'ipad') : (d.mobile ? 'android' : 'android-tablet'); } catch { return null; }
+  }
+  function withUa(href) {
+    const mark = uaMark();
+    if (!mark) return href;
+    try { const u = new URL(href, location.href); if (u.origin !== location.origin) return href; u.searchParams.set(UA_MARK, mark); return u.href; } catch { return href; }
+  }
+  const reloadPage = () => { const href = withUa(location.href); if (href === location.href) location.reload(); else location.replace(href); };
 
   const ACTIONABLE = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=switch],[role=checkbox],[role=option],[onclick],[data-toggle],[data-bs-toggle],[aria-controls],[aria-expanded],[tabindex]:not([tabindex="-1"])';
 
@@ -384,25 +400,36 @@
     if (!event.userInitiated && now() - playbackGesture > 1000) return; // playbackGesture is the last trusted click or key
     let url;
     try { url = new URL(event.destination.url); } catch { return; }
-    if (url.origin !== location.origin || url.href === following) return;
+    // Only this screen adds samestate-ua, when it loads a page it already sent; the address is never passed on.
+    if (url.searchParams.has(UA_MARK) || url.origin !== location.origin || url.href === following) return;
     act('navigate', { url: url.href });
     // Loading a new page ends this document before the message above reaches Samestate, which then
     // drops it, so this screen goes there itself once the message is on its way.
     if (!event.destination.sameDocument && event.cancelable) {
       event.preventDefault();
       following = url.href;
-      setTimeout(() => location.assign(url.href), 120);
+      setTimeout(() => location.assign(withUa(url.href)), 120);
     }
+  });
+  // A link followed with link sync off keeps the server user-agent too.
+  window.navigation?.addEventListener('navigate', event => {
+    if (!uaMark() || !event.isTrusted || !event.cancelable || event.defaultPrevented || event.hashChange || event.downloadRequest != null || event.formData) return;
+    if (!event.sourceElement?.closest?.('a[href]')) return; // link clicks only; scripts and routers navigate on their own
+    const href = withUa(event.destination.url);
+    if (href === event.destination.url) return;
+    event.preventDefault();
+    location.assign(href);
   });
   function followAddress(address) {
     let url;
     try { url = new URL(address); } catch { return { status: 'none' }; }
     if (url.origin !== location.origin || url.username || url.password) return { status: 'none' };
+    url.searchParams.delete(UA_MARK); // another screen's device type never reaches this one
     if (url.href === location.href) return { status: 'skip' };
     following = url.href;
     const samePage = url.pathname === location.pathname && url.search === location.search;
     // After the result has been sent: a full page load ends this script.
-    setTimeout(() => { if (samePage && url.hash) location.hash = url.hash; else location.assign(url.href); }, 0);
+    setTimeout(() => { if (samePage && url.hash) location.hash = url.hash; else location.assign(withUa(url.href)); }, 0);
     return { status: 'navigated' };
   }
 
@@ -674,6 +701,114 @@
     }
   };
 
+  function hiddenReason(el, vw, vh) {
+    for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+      const cs = getComputedStyle(a), r = a.getBoundingClientRect();
+      if (+cs.opacity === 0 && a !== el) return 'transparent'; // a see-through control over its own styled box (custom selects, checkboxes) is fine
+      if (cs.position === 'fixed' && (r.right <= 0 || r.left >= vw || r.bottom <= 0 || r.top >= vh)) return 'off-screen panel';
+      if (a !== el && /hidden|clip/.test(cs.overflowY) && r.height < 2) return 'collapsed panel';
+    }
+    return null;
+  }
+
+  /* --------------------------- test modes and fix previews --------------------------- */
+  // Long text: every visible text node grows by about a third, with accented vowels, as translations often do.
+  let longText = null; // text node → its original text
+  const ACCENTS = { a: 'á', e: 'é', i: 'î', o: 'ö', u: 'ü', A: 'Á', E: 'É', I: 'Î', O: 'Ö', U: 'Ü' };
+  const FILLER = 'lörem ipsüm dölor sit amét cönsectetür adipiscing élit ';
+  function setLongText(on) {
+    if (on === !!longText) return;
+    if (!on) { for (const [node, text] of longText) if (node.isConnected) node.data = text; longText = null; return; }
+    longText = new Map();
+    const skip = privateContent + ',samestate-layer';
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, { acceptNode: node => !node.data.trim() || node.parentElement?.closest(skip) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    for (let node, n = 0; (node = walker.nextNode()) && n < 5000; n++) {
+      const text = node.data, extra = Math.max(2, Math.round(text.trim().length * .35));
+      longText.set(node, text);
+      node.data = text.replace(/[aeiouAEIOU]/g, c => ACCENTS[c]).replace(/(\S)(\s*)$/, '$1 ' + FILLER.repeat(Math.ceil(extra / FILLER.length)).slice(0, extra).trim() + '$2');
+    }
+  }
+
+  // Screen settings: dark color scheme or 200% text. Dark rewrites the page's prefers-color-scheme rules in the
+  // stylesheets it can read (its own and inline ones); scripts that ask matchMedia() still get the computer's answer.
+  let variant = '', mediaEdits = [], textEdit = null;
+  const SCHEME = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/gi;
+  function forceScheme(text, scheme) { return text.replace(SCHEME, (match, value) => value.toLowerCase() === scheme ? '(min-width: 0px)' : '(max-width: 0px)'); }
+  function editMedia(scheme) {
+    const visit = rules => {
+      for (const rule of rules) {
+        if (rule.media && rule.cssRules && SCHEME.test(rule.media.mediaText)) { SCHEME.lastIndex = 0; mediaEdits.push([rule.media, rule.media.mediaText]); rule.media.mediaText = forceScheme(rule.media.mediaText, scheme); }
+        SCHEME.lastIndex = 0;
+        if (rule.cssRules) visit(rule.cssRules);
+        if (rule.styleSheet) { try { visit(rule.styleSheet.cssRules); } catch {} }
+      }
+    };
+    for (const sheet of document.styleSheets) { try { visit(sheet.cssRules); } catch {} } // other sites' stylesheets can't be read
+    for (const el of document.querySelectorAll('link[media],source[media],style[media]')) {
+      const media = el.getAttribute('media'); SCHEME.lastIndex = 0;
+      if (SCHEME.test(media)) { SCHEME.lastIndex = 0; mediaEdits.push([el, media]); el.setAttribute('media', forceScheme(media, scheme)); }
+    }
+  }
+  function setVariant(next) {
+    if (next === variant) return;
+    for (const [target, text] of mediaEdits.reverse()) { try { if (target instanceof Element) target.setAttribute('media', text); else target.mediaText = text; } catch {} }
+    mediaEdits = [];
+    if (textEdit) { const de = document.documentElement; if (textEdit.value) de.style.setProperty('font-size', textEdit.value, textEdit.priority); else de.style.removeProperty('font-size'); textEdit = null; }
+    document.documentElement.style.removeProperty('color-scheme');
+    variant = next;
+    if (variant === 'dark' || variant === 'light') { editMedia(variant); document.documentElement.style.setProperty('color-scheme', variant); }
+    if (variant === 'text200') {
+      const de = document.documentElement;
+      textEdit = { value: de.style.getPropertyValue('font-size'), priority: de.style.getPropertyPriority('font-size') };
+      de.style.setProperty('font-size', parseFloat(getComputedStyle(de).fontSize) * 2 + 'px', 'important'); // what a 200% browser text size does to rem and em
+    }
+  }
+
+  // Fix previews: the suggested CSS is set on the elements of one finding, and taken off again with Undo.
+  const fixes = new Map(); // fix id → [{ el, style }]
+  function applyFix(id, keys, declarations) {
+    if (fixes.has(id) || !declarations || typeof declarations !== 'object') return 0;
+    const changed = [];
+    for (const key of keys || []) for (const el of snapMap.get(key) || []) {
+      if (!el.isConnected || changed.some(c => c.el === el)) continue;
+      changed.push({ el, style: el.getAttribute('style') });
+      for (const [property, value] of Object.entries(declarations)) if (typeof value === 'string') el.style.setProperty(property, value, 'important');
+    }
+    fixes.set(id, changed);
+    return changed.length;
+  }
+  function removeFix(id) {
+    for (const { el, style } of (fixes.get(id) || []).reverse()) { if (style === null) el.removeAttribute('style'); else el.setAttribute('style', style); }
+    fixes.delete(id);
+  }
+
+  /* ------------------------------ page weight ------------------------------ */
+  // Reads only the browser's resource timing: each request's address, its type and its size.
+  // Query strings and fragments are dropped, and path segments that look like IDs become ":id".
+  // Request and response contents are never read.
+  const ownScript = tag?.src ? tag.src.split(/[?#]/)[0] : '';
+  function requestAddress(url) {
+    try {
+      const u = new URL(url, location.href);
+      if (!/^https?:$/.test(u.protocol)) return null;
+      const path = u.pathname.split('/').map(part => /^\d{3,}$|^[0-9a-f-]{16,}$|@|^[A-Za-z0-9_-]{24,}$/i.test(part) ? ':id' : part).join('/');
+      return u.origin + path;
+    } catch { return null; }
+  }
+  function requests() {
+    const out = [];
+    const add = (entry, type) => {
+      const url = requestAddress(entry.name);
+      if (!url || url === ownScript || (demo && /\/(agent|emulate)\.js$/.test(url))) return;
+      // encodedBodySize counts a body served from cache too; both are 0 for other sites without Timing-Allow-Origin.
+      out.push({ url, type, bytes: entry.encodedBodySize || entry.transferSize || 0 });
+    };
+    const page = performance.getEntriesByType('navigation')[0];
+    if (page) add(page, 'document');
+    for (const entry of performance.getEntriesByType('resource')) { if (out.length >= 800) break; add(entry, entry.initiatorType || 'other'); }
+    return out;
+  }
+
   /* --------------------------- snapshot for diffing --------------------------- */
   let snapMap = new Map();
   async function snapshot() {
@@ -703,18 +838,21 @@
     document.querySelectorAll('p,li,blockquote,figcaption,dd,dt').forEach(el => {
       if (hasTextNode(el)) push('text', el);
     });
+    let dom = 0; // document order, which is the Tab order for controls without a positive tabindex
     document.querySelectorAll('a[href],button,[role=button],input:not([type=hidden]),select,textarea,summary,[role=tab]').forEach(el => {
       const kind = kindOf(el);
       const field = ['field', 'select', 'check'].includes(kind);
       const inline = kind === 'link' && getComputedStyle(el).display === 'inline' && hasTextNode(el.parentElement);
-      push(field ? 'input' : kind === 'link' ? 'link' : 'button', el, { kind, inline });
+      let pinned = false; // inside a fixed or sticky bar, which shows out of document order on purpose
+      for (let a = el; a && a !== document.body && !pinned; a = a.parentElement) pinned = /fixed|sticky/.test(getComputedStyle(a).position);
+      push(field ? 'input' : kind === 'link' ? 'link' : 'button', el, { kind, inline, dom: dom++, pinned });
     });
     document.querySelectorAll('img').forEach(el => {
-      push('image', el, { natW: el.naturalWidth, broken: el.complete && el.naturalWidth === 0 && el.matches('img[src],img[srcset],picture img') });
+      push('image', el, { natW: el.naturalWidth, src: el.currentSrc ? requestAddress(el.currentSrc) : null, loaded: el.complete && el.naturalWidth > 0, boxed: el.getClientRects().length > 0, broken: el.complete && el.naturalWidth === 0 && el.matches('img[src],img[srcset],picture img') });
     });
     document.querySelectorAll('table').forEach(el => {
       let scroller = null;
-      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      for (let a = el; a && a !== document.body; a = a.parentElement) { // a table set to display: block can scroll itself
         if (/auto|scroll/.test(getComputedStyle(a).overflowX)) { scroller = a; break; }
       }
       const box = scroller || el.parentElement;
@@ -735,7 +873,7 @@
       if (++n > 5000) break; if (el.tagName === 'SAMESTATE-LAYER' || el.closest('samestate-layer')) continue;
       const cs = getComputedStyle(el); if (cs.display === 'none') continue;
       const r = el.getBoundingClientRect(); if (r.width < 1 || r.height < 1) continue;
-      if (/auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 4) { const key = 'sc|' + scrollers.length; reg(key, el); scrollers.push({ key, name: 'scroll area', snap: cs.scrollSnapType && cs.scrollSnapType !== 'none', table: !!el.querySelector('table') }); }
+      if (/auto|scroll/.test(cs.overflowX) && el.scrollWidth > el.clientWidth + 4) { const key = 'sc|' + scrollers.length; reg(key, el); scrollers.push({ key, name: 'scroll area', snap: cs.scrollSnapType && cs.scrollSnapType !== 'none', table: el.matches('table') || !!el.querySelector('table') }); }
       if ((cs.position === 'fixed' || cs.position === 'sticky') && visible(el) && r.width * Math.min(r.height, vh) / (vw * vh) > 0.25 && r.top < vh && r.bottom > 0) { const key = 'fx|' + fixed.length; reg(key, el); fixed.push({ key, name: 'fixed element', cover: Math.round(r.width * Math.min(r.height, vh) / (vw * vh) * 100) }); }
       if (r.right + scrollX > vw + 2 && overflow.length < 6 && visible(el)) {
         let clipped = false, parentOver = false;
@@ -758,10 +896,21 @@
       const r = fx.getBoundingClientRect(), key = 'cv|' + fixed.length; reg(key, fx); els.forEach(e => reg(key, e));
       fixed.push({ key, name: 'overlay', cover: Math.round(r.width * Math.min(r.height, vh) / (vw * vh) * 100), hides: els.slice(0, 6).map(kindOf) });
     }
+    // controls the Tab key reaches although nobody can see them (a closed drawer or accordion, a transparent layer)
+    const hiddenFocus = []; let seen = 0;
+    for (const el of document.querySelectorAll('a[href]:not([href^="#"]),button,input:not([type=hidden]),select,textarea,summary,[tabindex]')) {
+      if (++seen > 3000 || hiddenFocus.length >= 40) break;
+      if (el.tabIndex < 0 || el.disabled || el.closest('[inert],[aria-hidden=true],samestate-layer') || !el.getClientRects().length || visible(el)) continue;
+      if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue; // visibility: hidden is skipped by Tab
+      const reason = hiddenReason(el, vw, vh);
+      if (!reason) continue;
+      const key = 'hf|' + hiddenFocus.length; reg(key, el); hiddenFocus.push({ key, kind: kindOf(el), reason });
+    }
     await Promise.all(textTasks);
     return {
       vw, docW: de.scrollWidth, metaViewport: !!document.querySelector('meta[name=viewport]'),
-      items, overflow, scrollers, fixed,
+      dpr: devicePixelRatio, requests: requests(),
+      vh, items, overflow, scrollers, fixed, hiddenFocus,
       menuToggle: Array.from(document.querySelectorAll('[aria-haspopup=menu],[aria-controls][aria-expanded]')).some(visible)
     };
   }
@@ -810,22 +959,25 @@
       }
       applyTouchMode();
       applyPreviewTheme(m.themeCss);
+      if (document.body) { setLongText(m.longText === true); setVariant(['dark', 'light', 'text200'].includes(m.variant) ? m.variant : ''); }
     }
+    else if (m.type === 'fix' && typeof m.id === 'string') send('fixed', { id: m.id, count: applyFix(m.id, m.keys, m.css) });
+    else if (m.type === 'unfix' && typeof m.id === 'string') removeFix(m.id);
     else if (m.type === 'replay-step' && Array.isArray(m.actions)) await replayStep(m.actions);
-    else if (m.type === 'reload') location.reload();
+    else if (m.type === 'reload') reloadPage();
     else if (m.type === 'identity' && typeof m.name === 'string' && (m.name === '' || m.name.startsWith('samestate-device:'))) {
       // The device identity emulate.js reads when a page loads. Only Samestate's own names are accepted.
       if (window.name !== m.name && (m.name || window.name.startsWith('samestate-device:'))) window.name = m.name;
-      if (m.reload) location.reload();
+      if (m.reload) reloadPage();
     }
     else if (m.type === 'state') send('state', { rid: m.rid, url: location.href, scroll: scrollState() });
     else if (m.type === 'align') {
       // Asked for by the user with "Align screens": go to the page the leading screen is on, then to its scroll position.
       let url = null;
-      try { url = new URL(m.url); } catch {}
+      try { url = new URL(m.url); url.searchParams.delete(UA_MARK); } catch {}
       if (m.navigate && url && url.origin === location.origin && (url.pathname !== location.pathname || url.search !== location.search)) {
         send('aligning');
-        location.assign(url.href);
+        location.assign(withUa(url.href));
       } else if (m.scroll) applyScroll(m.scroll);
     }
     else if (m.type === 'demo' && demo) runDemo(m);

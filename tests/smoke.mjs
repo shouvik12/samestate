@@ -173,7 +173,14 @@ const PROBE = `(() => {
       return [sitesMode && pages.join() === 'index.html,pricing.html' && screens.join() === '7,7', 'columns: ' + pages.join(' + ') + ', screens: ' + screens.join(' + ')];
     },
     'Screenshot and Record': () => [!!document.querySelector('#screenshot') && !!document.querySelector('#record'), 'capture buttons present'],
-    'That is the tour': () => [!sitesMode && !pageSteps, 'back on the device wall: ' + (!sitesMode && !pageSteps)]
+    'Day and night': () => {
+      const shown = document.documentElement.dataset, saved = [localStorage.getItem('samestate.uiTheme') || 'samestate', localStorage.getItem('samestate.uiMode') || 'dark'];
+      return [shown.uiTheme === 'hive' && shown.uiMode !== saved[1] && saved[0] === 'samestate', 'showing ' + shown.uiTheme + ' ' + shown.uiMode + ', saved ' + saved.join(' ')];
+    },
+    'That is the tour': () => {
+      const back = !sitesMode && !pageSteps, theme = document.documentElement.dataset.uiTheme + ' ' + document.documentElement.dataset.uiMode;
+      return [back && theme === 'samestate dark', 'back on the device wall: ' + back + ', theme ' + theme];
+    }
   };
   document.addEventListener('samestate-tour-step', event => {
     const { step, title } = event.detail;
@@ -211,6 +218,39 @@ const AFTER_TOUR = `(async () => {
     const zoomText = document.querySelector('#zoomv').textContent;
     record('Workspace save and open', !android.on && zoomText === '80%' && active().length === 6, 'Android selected: ' + android.on + ', zoom ' + zoomText + ', screens ' + active().length);
   } catch (error) { record('Workspace save and open', false, error.message); }
+  // The report tools added on top of the difference report, on the same sample site.
+  try {
+    await detect(true);
+    const cats = new Set(findings.map(f => f.cat));
+    record('Accessibility and network checks', cats.has('Accessibility') && cats.has('Network'), [...cats].join(', '));
+    localStorage.removeItem(baselineKey()); saveBaseline();
+    const table = () => issueGroups(findings).find(g => g.kind === 'Table is wider than its container');
+    toggleFix(table().items); await wait(300); await detect(true);
+    const state = compareBaseline();
+    record('Fix preview and baseline', !table() && state.fixed.some(item => item.kind === 'Table is wider than its container'), state.fixed.length + ' fixed since the baseline, ' + state.added + ' new');
+    undoAllFixes(); await detect(true); localStorage.removeItem(baselineKey());
+    record('Undo fix preview', !!table(), 'table issue back on ' + (table()?.screens.length || 0) + ' screens');
+    document.querySelector('#long-text').click(); await wait(400);
+    const long = active()[0].iframe.contentDocument.querySelector('h1').textContent;
+    document.querySelector('#long-text').click(); await wait(400);
+    const back = active()[0].iframe.contentDocument.querySelector('h1').textContent;
+    record('Long text', long.length > back.length * 1.25 && !back.includes('lörem'), back.length + ' → ' + long.length + ' characters, then back');
+    const settings = document.querySelector('#screen-settings');
+    settings.value = 'text'; settings.dispatchEvent(new Event('change')); await wait(400);
+    const sizes = active().slice(0, 2).map(d => d.iframe.contentWindow.getComputedStyle(d.iframe.contentDocument.documentElement).fontSize);
+    settings.value = ''; settings.dispatchEvent(new Event('change')); await wait(300);
+    const uiBg = () => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    const darkBg = uiBg(); document.querySelector('#ui-mode').click(); const lightBg = uiBg();
+    const themeSelect = document.querySelector('#ui-theme'); themeSelect.value = 'clay'; themeSelect.dispatchEvent(new Event('change')); const clayBg = uiBg();
+    themeSelect.value = 'samestate'; themeSelect.dispatchEvent(new Event('change')); document.querySelector('#ui-mode').click();
+    record('Interface themes', new Set([darkBg, lightBg, clayBg]).size === 3 && uiBg() === darkBg && themeSelect.options.length === 5, themeSelect.options.length + ' themes; background ' + darkBg + ' → ' + lightBg + ' (day) → ' + clayBg + ' (Clay day) → ' + uiBg());
+    record('Sign-ins option hidden in the web demo', document.querySelector('#sign-ins-row').hidden, 'Use my sign-ins is extension-only');
+    record('Screen settings', sizes[1] === parseFloat(sizes[0]) * 2 + 'px', 'root font size ' + sizes.join(' and '));
+    document.querySelector('#ref').value = 'iphone';
+    await sweepWidths();
+    const swept = findings.filter(f => f.cat === 'Widths'), sideways = swept.find(f => f.kind === 'Page scrolls sideways');
+    record('Width sweep', sideways && /at 320–\\d+px/.test(sideways.title) && active().find(d => d.id === 'iphone').sweepW == null, (sideways?.title || 'no sideways finding') + '; ' + swept.length + ' findings');
+  } catch (error) { record('Report tools', false, error.message); }
   return results;
 })()`;
 

@@ -17,6 +17,20 @@ const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
 let textSalt = null, wallRevision = 0;
 let videoRequest = null;
+// Screen settings show one page two ways side by side: every second screen on the wall gets the other setting.
+const SETTING_NAMES = { dark: 'Dark', light: 'Light', text200: '200% text', landscape: 'Landscape', portrait: 'Portrait' };
+let screenSettings = ''; // '', 'scheme', 'text' or 'orientation'
+let longText = false; // every preview's text about a third longer, as translations often are
+function screenSetting(d) {
+  if (!screenSettings || d.settingShown || d.site || d.step || d.label) return '';
+  const index = DEVICES.filter(x => x.on).indexOf(d);
+  if (index < 0) return '';
+  const second = index % 2 === 1;
+  if (screenSettings === 'scheme') return second ? 'dark' : 'light';
+  if (screenSettings === 'text') return second ? 'text200' : '';
+  return presetFor(d).kind === 'desktop' ? '' : second ? 'landscape' : 'portrait'; // desktops don't rotate
+}
+const screenVariant = d => { const setting = screenSetting(d); return ['dark', 'light', 'text200'].includes(setting) ? setting : ''; };
 const active = () => viewScreens().filter(d => d.el);
 const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
 const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
@@ -67,6 +81,9 @@ function deviceChrome(preset, landscape) {
 }
 
 function screenName(d) {
+  if (d.label) return d.label;
+  const setting = screenSetting(d);
+  if (setting) return screenName({ ...d, settingShown: true, label: null }) + ' · ' + SETTING_NAMES[setting];
   if (d.site) return sameDevice ? d.name + ' · ' + presetFor(d).name : d.name;
   if (d.step) return 'Step ' + d.step + ' · ' + presetFor(d).name;
   if (sameDevice) return 'Screen ' + (viewScreens().indexOf(d) + 1) + ' · ' + presetFor(d).name;
@@ -75,6 +92,8 @@ function screenName(d) {
 
 function size(d) {
   const { w, h, kind } = presetFor(d);
+  if (d.fixedSize) return d.fixedSize; // a journey report screen: one step at one device's size
+  if (d.sweepW) return { w: d.sweepW, h: d.rot && kind !== 'desktop' ? w : h };
   return d.rot && kind !== 'desktop' ? { w: h, h: w } : { w, h };
 }
 
@@ -86,17 +105,23 @@ let emulateDevices = false;
 try { emulateDevices = localStorage.getItem('samestate.emulate') === 'on'; } catch {}
 const CHROME_MAJOR = (navigator.userAgent.match(/Chrome\/(\d+)/) || [])[1] || '130';
 const IOS_VERSION = '17_5', SAFARI_VERSION = '17.5';
+// iPads have reported themselves as a Mac with touch since iPadOS 13.
+function userAgent(ios, phone) {
+  return ios
+    ? phone
+      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${IOS_VERSION} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Mobile/15E148 Safari/604.1`
+      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Safari/605.1.15`
+    : `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 ${phone ? 'Mobile ' : ''}Safari/537.36`;
+}
+// The background worker sends these to the server for page loads marked samestate-ua=<type> (see setPreviewSource).
+const SERVER_AGENTS = { iphone: userAgent(true, true), ipad: userAgent(true, false), android: userAgent(false, true), 'android-tablet': userAgent(false, false) };
+const uaType = identity => identity.ios ? (identity.mobile ? 'iphone' : 'ipad') : (identity.mobile ? 'android' : 'android-tablet');
 function deviceIdentity(d) {
   const preset = presetFor(d);
   if (!emulateDevices || preset.kind === 'desktop') return null;
   const { w, h } = size(d);
   const ios = preset.os === 'ios', phone = preset.kind === 'phone';
-  // iPads have reported themselves as a Mac with touch since iPadOS 13.
-  const ua = ios
-    ? phone
-      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${IOS_VERSION} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Mobile/15E148 Safari/604.1`
-      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/${SAFARI_VERSION} Safari/605.1.15`
-    : `Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${CHROME_MAJOR}.0.0.0 ${phone ? 'Mobile ' : ''}Safari/537.36`;
+  const ua = userAgent(ios, phone);
   return {
     ua, ios, mobile: phone, chrome: CHROME_MAJOR, w, h, dpr: phone ? 3 : 2,
     platform: ios ? (phone ? 'iPhone' : 'MacIntel') : 'Linux armv81',
@@ -196,10 +221,12 @@ function relayout() {
   refreshThemeTargets();
 }
 
-function setPreviewSource(frame, url) {
+function setPreviewSource(frame, url, d) {
   if (url.origin === EXT) frame.removeAttribute('sandbox');
   else frame.setAttribute('sandbox', PREVIEW_SANDBOX);
-  frame.credentialless = url.origin !== EXT;
+  frame.credentialless = url.origin !== EXT && !useSignIns; // a credentialless frame has no cookies and throwaway storage
+  const identity = d && IS_EXT && url.origin !== EXT ? deviceIdentity(d) : null;
+  if (identity) { url = new URL(url); url.searchParams.set('samestate-ua', uaType(identity)); } // the server gets the device's user-agent
   frame.src = url.href;
 }
 
@@ -248,10 +275,10 @@ function addFrame(d) {
   d.themeTargetId = d.token = crypto.randomUUID();
   d.identity = d.iframe.name = identityName(d); // before the first load
   if (d.site) {
-    setPreviewSource(d.iframe, d.site.url);
+    setPreviewSource(d.iframe, d.site.url, d);
     d.site.frames.append(el);
   } else {
-    setPreviewSource(d.iframe, new URL(d.pageUrl || previewUrl));
+    setPreviewSource(d.iframe, new URL(d.pageUrl || previewUrl), d);
     const next = allScreens().find(item => item.slot > d.slot && item.el);
     $('#frames').insertBefore(el, next?.el || null);
   }
@@ -403,6 +430,8 @@ function refreshViews() {
   findings = [];
   renderFindings();
   updateWall();
+  applyScreenSettings();
+  $('#journey').hidden = !journeyView;
 }
 
 function setPageSteps(enabled) {
@@ -461,6 +490,36 @@ function setDeviceIdentity(on, save) {
     setIdentity(d, true);
   }
 }
+// Previews share Chrome's cookies and storage for the site unless the user turns this off. The frame's credentialless
+// state is fixed when it starts loading a page, so the screens are opened again on their current pages.
+let useSignIns = true;
+try { useSignIns = localStorage.getItem('samestate.signins') !== 'off'; } catch {}
+async function setSignIns(on) {
+  useSignIns = on;
+  $('#sign-ins').checked = on;
+  try { localStorage.setItem('samestate.signins', on ? 'on' : 'off'); } catch {}
+  const screens = connectedScreens().filter(d => d.iframe && previewOrigin(d) && previewOrigin(d) !== EXT);
+  const pages = await Promise.all(screens.map(screenAddress));
+  if (useSignIns !== on) return;
+  screens.forEach((d, i) => {
+    if (!pages[i]) return;
+    d.ready = false; d.el?.classList.remove('ready');
+    setPreviewSource(d.iframe, pages[i], d);
+  });
+}
+// The page a screen shows now (its agent knows; the frame's src is only where it started).
+async function screenAddress(d) {
+  let address = null;
+  if (d.ready) {
+    const rid = crypto.randomUUID();
+    const state = await new Promise(done => { pendingState.set(rid, done); post(d, 'state', { rid }); setTimeout(() => done(null), 800); });
+    pendingState.delete(rid);
+    address = state?.url;
+  }
+  try { const url = new URL(address || d.iframe.src); url.searchParams.delete('samestate-ua'); return url; } catch { return null; }
+}
+$('#sign-ins').checked = useSignIns;
+$('#sign-ins').addEventListener('change', event => setSignIns(event.target.checked));
 const savedDeviceIdentity = () => { try { return localStorage.getItem('samestate.emulate') === 'on'; } catch { return false; } };
 function restoreDeviceIdentity() {
   if (emulateDevices !== savedDeviceIdentity()) setDeviceIdentity(savedDeviceIdentity(), false);
@@ -694,7 +753,7 @@ function register(origin, site) {
     const nextSites = new Map(registeredSites);
     if (site && origin) nextSites.set(site, origin);
     else if (site) nextSites.delete(site);
-    const reply = await chrome.runtime.sendMessage({ type: 'register', origin: nextWall, sites: [...new Set(nextSites.values())] });
+    const reply = await chrome.runtime.sendMessage({ type: 'register', origin: nextWall, sites: [...new Set(nextSites.values())], agents: SERVER_AGENTS });
     if (!reply?.ok) throw new Error('Preview registration failed');
     registeredWallOrigin = nextWall;
     registeredSites = nextSites;
@@ -960,7 +1019,7 @@ async function openSite(site, url, alreadyAllowed = false) {
       d.ready = false;
       d.token = crypto.randomUUID();
       d.el.classList.remove('ready', 'leader');
-      setPreviewSource(d.iframe, url);
+      setPreviewSource(d.iframe, url, d);
     }
     site.status.textContent = '';
     fitSite(site);
@@ -1652,11 +1711,26 @@ const STEPS = [
     run: async t => { if (await t.point('#screenshot') && await t.nap(1100)) await t.point('#record'); }
   },
   {
+    title: 'Day and night', at: '#ui-mode', wait: 1400,
+    text: 'The sun and moon button switches Samestate between <b>day</b> and <b>night</b> mode. The menu beside it picks the theme: Samestate, Neutral, Clay, Teal or Hive. Your choice is remembered.',
+    run: async t => {
+      if (!await t.point('#ui-mode')) return;
+      const mode = uiTheme.mode === 'dark' ? 'light' : 'dark';
+      uiTheme.preview(uiTheme.theme, mode); showUiTheme();
+      if (!await t.nap(1300) || !await t.point('#ui-theme')) return;
+      for (const id of ['neutral', 'clay', 'teal', 'hive']) {
+        uiTheme.preview(id, mode); showUiTheme();
+        if (!await t.nap(900)) return;
+      }
+    }
+  },
+  {
     title: 'That is the tour', wait: 0,
     text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
     run: () => {
       setSitesMode(false);
       restoreDeviceIdentity();
+      restoreUiTheme();
       scrollWall(0, 0);
       tourPointer.hidden = true;
       $('#tourpause').hidden = true;
@@ -1730,7 +1804,7 @@ async function startTour() {
   tourRunning = false;
 }
 function endTour(clear) {
-  if (tourRunning) restoreDeviceIdentity(); // skipped part-way, possibly after the identity step
+  if (tourRunning) { restoreDeviceIdentity(); restoreUiTheme(); } // skipped part-way, possibly after the identity or theme step
   tour++;
   tourRunning = false;
   setTourPaused(false);
@@ -1758,7 +1832,8 @@ function configure(device) {
   const inspect = device !== device.site?.singleDevice;
   post(device, 'config', {
     touch: device.touch, inspect, textSalt: inspect ? textSalt : null,
-    pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || ''
+    pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || '',
+    longText: inspect && longText, variant: inspect ? screenVariant(device) : ''
   });
 }
 const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
@@ -1810,6 +1885,9 @@ function handleMessage(device, message) {
       break;
     case 'snapshot':
       pendingSnap.get(message.rid)?.(device, message.data);
+      break;
+    case 'fixed':
+      if (Number.isInteger(message.count)) fixCounts.set(message.id, (fixCounts.get(message.id) || 0) + message.count);
       break;
     case 'result':
       addResult(message, device);
@@ -2005,7 +2083,22 @@ function addResult(message, device) {
 }
 
 /* ----------------------------- difference engine ----------------------------- */
-const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability'];
+const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Network', 'Widths'];
+// Network findings use resource timing sizes from each preview; request and response contents are never read.
+const API_TYPES = new Set(['fetch', 'xmlhttprequest']);
+const kb = bytes => !bytes ? '0 KB' : bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
+const weight = requests => requests.reduce((sum, r) => sum + r.bytes, 0);
+const requestPath = url => url.replace(/^https?:\/\/[^/]+/, '') || '/';
+const fileName = url => requestPath(url).split('/').filter(Boolean).pop() || '/';
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+// Repeat requests for one address (video ranges, polling) count together, largest first.
+const byAddress = requests => {
+  const merged = new Map();
+  for (const r of requests) if (r.bytes) { const e = merged.get(r.url) || { url: r.url, bytes: 0, n: 0 }; e.bytes += r.bytes; e.n++; merged.set(r.url, e); }
+  return [...merged.values()].sort((a, b) => b.bytes - a.bytes);
+};
+const times = r => r.n > 1 ? ` (${r.n} requests)` : '';
+const more = (arr, n = 3) => arr.slice(0, n).join(', ') + (arr.length > n ? ` +${arr.length - n} more` : '');
 const q = s => '“' + (s.length > 38 ? s.slice(0, 36) + '…' : s) + '”';
 const list = (arr0, n = 3, arr = [...new Set(arr0)]) => arr.slice(0, n).map(q).join(', ') + (arr.length > n ? ` +${arr.length - n} more` : '');
 
@@ -2044,6 +2137,13 @@ function matchItems(reference, device) {
   }
   return matches;
 }
+// Indexes of the longest run that keeps its order (longest increasing subsequence).
+function keptInOrder(values) {
+  const tails = [], prev = [], keep = new Set();
+  values.forEach((v, idx) => { let lo = 0, hi = tails.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (values[tails[mid]] < v) lo = mid + 1; else hi = mid; } prev[idx] = lo ? tails[lo - 1] : -1; tails[lo] = idx; });
+  for (let k = tails[tails.length - 1]; k !== undefined && k >= 0; k = prev[k]) keep.add(k);
+  return keep;
+}
 function analyze(snaps, refId) {
   const ref = snaps.find(s => s.dev.id === refId) || snaps[0];
   if (!ref) return [];
@@ -2081,11 +2181,57 @@ function analyze(snaps, refId) {
     } else {
       const sw = data.scrollers.filter(s => !s.table); if (sw.length) add('info', 'Input', dev, 'Sideways scroll areas', `${sw.length} sideways scroll area${sw.length > 1 ? 's' : ''}`, 'Mouse users need a scrollbar, shift-wheel or arrow buttons here.', sw.map(s => s.key));
     }
+    // ---- page weight
+    const requests = data.requests || [], total = weight(requests), sizeOf = new Map(requests.map(r => [r.url, r.bytes]));
+    const imageLabel = i => q(i.src ? fileName(i.src) : i.name) + (i.src && sizeOf.get(i.src) ? ` (${kb(sizeOf.get(i.src))})` : '');
+    if (requests.length) {
+      const api = requests.filter(r => API_TYPES.has(r.type)), origin = new URL(requests[0].url).origin;
+      const unsized = requests.filter(r => !r.bytes && !r.url.startsWith(origin + '/')).length; // other sites hide sizes without Timing-Allow-Origin
+      add('info', 'Network', dev, 'Page weight', `Downloads ${kb(total)} in ${plural(requests.length, 'request')}`,
+        `${plural(api.length, 'API call')}` + (unsized ? `. ${plural(unsized, 'request')} to other sites ${unsized === 1 ? 'has' : 'have'} no size, so the real total is higher.` : '.'));
+      const bigApi = api.filter(r => r.bytes >= 100 * 1024);
+      if (bigApi.length) add('info', 'Network', dev, 'Large API responses', `${plural(bigApi.length, 'API response')} over 100 KB`, more(byAddress(bigApi).map(r => `${q(requestPath(r.url))} ${kb(r.bytes)}${times(r)}`)));
+    }
+    const images = [...I.values()].filter(i => i.cat === 'image' && i.loaded);
+    const unseen = images.filter(i => !i.boxed);
+    if (unseen.length) add('warn', 'Network', dev, 'Hidden images still downloaded', `${plural(unseen.length, 'hidden image')} still downloaded`, 'Hidden on this screen but loaded anyway: ' + more(unseen.map(imageLabel)));
+    const ratio = dev.kind === 'phone' ? 3 : 2; // the sharpest screens of each kind
+    const oversized = vis.filter(i => i.cat === 'image' && i.loaded && i.natW && !/\.svg$/i.test(i.src || '') && i.natW > i.w * ratio * 1.5 && i.natW - i.w * ratio >= 400);
+    if (oversized.length) add('warn', 'Network', dev, 'Images larger than shown', `${plural(oversized.length, 'image')} much larger than shown`, more(oversized.map(i => `${imageLabel(i)} ${i.natW}px wide, shown at ${i.w}px (${Math.round(i.w * ratio)}px covers a ${ratio}× screen)`)), oversized.map(i => i.key));
+    // ---- accessibility
+    const hiddenFocus = data.hiddenFocus || [];
+    if (hiddenFocus.length) {
+      const where = Object.entries(hiddenFocus.reduce((n, h) => ({ ...n, [h.reason]: (n[h.reason] || 0) + 1 }), {})).map(([reason, n]) => `${n} in ${reason === 'transparent' ? 'a transparent layer' : reason === 'off-screen panel' ? 'an off-screen panel' : 'a ' + reason}`);
+      add('warn', 'Accessibility', dev, 'Keyboard reaches hidden controls', `${plural(hiddenFocus.length, 'hidden control')} reachable with Tab`, `${where.join(', ')}: ${list(hiddenFocus.map(h => h.kind), 4)}. Keyboard users land on controls they can't see.`);
+    }
+    const tabbable = vis.filter(i => Number.isInteger(i.dom) && !i.pinned).sort((a, b) => a.dom - b.dom).slice(0, 300);
+    const visual = [...tabbable].sort((a, b) => {
+      const rows = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y), cols = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      if (rows > .3 * Math.min(a.h, b.h)) return cols > 0 ? a.dom - b.dom : a.x - b.x; // overlapping boxes have no visual order of their own
+      return a.y - b.y;
+    });
+    const kept = keptInOrder(visual.map(i => i.dom));
+    const jumps = visual.filter((_, k) => !kept.has(k));
+    if (tabbable.length >= 4 && jumps.length && jumps.length <= tabbable.length / 2) add('warn', 'Accessibility', dev, 'Tab order differs from what you see', `Tab order skips around for ${plural(jumps.length, 'control')}`, `The Tab key reaches these in a different order than they appear: ${list(jumps.map(i => i.name))}`, jumps.map(i => i.key));
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
     const rn = screenName(ref.dev);
+    const refRequests = ref.data.requests || [], refTotal = weight(refRequests);
+    if ((dev.kind === 'phone' || dev.kind === 'tablet') && ref.dev.kind === 'desktop' && refTotal >= 300 * 1024 && total >= refTotal * .85) {
+      const largest = byAddress(requests).map(r => `${q(fileName(r.url))} ${kb(r.bytes)}${times(r)}`);
+      add('warn', 'Network', dev, `Downloads as much as ${rn}`, `Downloads ${Math.round(total / refTotal * 100)}% of what ${rn} does`, `${kb(total)} here, ${kb(refTotal)} on ${rn}. Largest: ${more(largest)}`);
+    }
     const matches = matchItems(R, I);
     for (const [referenceItem, item] of matches) referenceKeys.set(item.key, referenceItem.key);
+    // ---- above the fold: what the reference shows on its first screen, this screen makes you scroll to
+    if (ref.data.vh && data.vh) {
+      const firstScreen = ([r, i], cats) => cats.includes(r.cat) && !r.inNav && !r.inline && r.y + r.h <= ref.data.vh && i.y + i.h > data.vh;
+      const below = [...matches].filter(([r, i]) => r.visible && i.visible && r.w * r.h >= 1800 && firstScreen([r, i], ['button', 'link', 'input']));
+      const heading = [...matches].find(([r, i]) => r.visible && i.visible && r.level === 1 && firstScreen([r, i], ['heading']));
+      const screens = i => i.y < data.vh ? 'cut off by the bottom of the screen' : (i.y / data.vh).toFixed(1) + ' screens down';
+      if (below.length) add('warn', 'Layout', dev, 'Key controls below the fold', `${plural(below.length, 'control')} from ${rn}'s first screen ${below.length === 1 ? 'needs' : 'need'} scrolling`, more(below.map(([, i]) => `${q(i.name)} ${screens(i)}`)), below.map(p => p[1].key));
+      if (heading) add('info', 'Layout', dev, 'Main heading below the fold', 'Main heading below the fold', `On ${rn} it is on the first screen; here it is ${screens(heading[1])}.`, [heading[1].key]);
+    }
     const both = [...matches].filter(([r, i]) => r.visible && i.visible);
     const matchedVisible = new Set(both.map(([, item]) => item));
     const gone = [...R.values()].filter(item => item.visible && !matches.get(item)?.visible);
@@ -2139,6 +2285,7 @@ function analyze(snaps, refId) {
 }
 
 async function detect(quiet) {
+  if (sweepRun || journeyRunning) return; // screens are being resized; their own report replaces this one
   const devs = workspaceScreens().filter(d => d.ready); if (devs.length < 1) return;
   $('#detect span').textContent = 'Measuring…';
   const rid = crypto.randomUUID(), snaps = [];
@@ -2150,7 +2297,7 @@ async function detect(quiet) {
     devs.forEach(d => post(d, 'snapshot', { rid })); setTimeout(done, 4000);
   });
   pendingSnap.delete(rid);
-  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision) return;
+  if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || sweepRun || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
   snaps.sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
@@ -2182,35 +2329,39 @@ function issueGroups(list) {
 
 function renderFindings() {
   const order = SEVERITY;
+  renderBaseline(compareBaseline());
   const byIssue = reportView === 'issue';
   findings.forEach((f, i) => { f.i = i; });
   const groups = issueGroups(findings);
   const counted = byIssue ? groups : findings;
   const count = cat => counted.filter(item => !cat || item.cat === cat).length;
   const cats = CATS.filter(c => findings.some(f => f.cat === c));
+  if (catFilter && !cats.includes(catFilter)) catFilter = null; // a filter left over from another scan
   $('#report-bar').hidden = !findings.length;
   document.querySelectorAll('#report-view button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === reportView)));
   $('#chips').innerHTML = cats.length ? `<button class="chip ${!catFilter ? 'on' : ''}" data-cat="">All ${count()}</button>` + cats.map(c => `<button class="chip ${catFilter === c ? 'on' : ''}" data-cat="${c}">${c} ${count(c)}</button>`).join('') : '';
   $('#diffn').textContent = counted.length || '';
-  const shown = findings.filter(f => !catFilter || f.cat === catFilter);
+  const shown = findings.filter(f => (!catFilter || f.cat === catFilter) && (!newOnly || f.isNew));
   if (!shown.length) { $('#findings').innerHTML = '<p class="muted">No differences found for this view.</p>'; return; }
   const screens = sitesMode ? workspaceScreens() : viewScreens();
   let html = '';
   if (byIssue) {
-    reportGroups = groups.filter(g => !catFilter || g.cat === catFilter);
+    reportGroups = groups.filter(g => (!catFilter || g.cat === catFilter) && (!newOnly || g.items.some(f => f.isNew)));
     for (const site of sitesMode ? sitePanels : [null]) {
       const own = reportGroups.filter(g => g.site === site);
       if (!own.length) continue;
       const c = s => own.filter(g => g.sev === s).length;
-      const compared = 'Compared with ' + screenName(own[0].items[0].reference);
+      const reference = own[0].items[0].reference;
+      const compared = (reference.journeyRef ? 'Each step compared with ' + reference.journeyRef : 'Compared with ' + screenName(reference)) + (own[0].cat === 'Widths' ? ' · width sweep' : '');
       const name = site ? `Site ${sitePanels.indexOf(site) + 1} · ${site.url.origin === EXT ? 'Demo' : site.url.host} · ${compared}` : compared;
       html += `<div class="group">${esc(name)}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>`;
       for (const g of own) {
         const pick = g.screens.includes(pickedScreen.get(g.key)) ? pickedScreen.get(g.key) : g.screens[0];
         const details = g.items.filter(f => f.dev === pick).map(f => (f.title === g.kind ? '' : f.title + '. ') + f.detail);
-        html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}<span class="c">${g.cat}</span></div>`
+        const fresh = g.items.filter(f => f.isNew).length;
+        html += `<div class="finding ${g.sev} grouped" data-g="${reportGroups.indexOf(g)}"><div class="t">${esc(g.kind)}${fresh ? `<span class="new-tag">New${fresh < g.items.length ? ' on ' + fresh : ''}</span>` : ''}<span class="c">${g.cat}</span></div>`
           + `<div class="screens" role="group" aria-label="Screens with this finding">${g.screens.map((d, s) => `<button type="button" class="screen-chip${d === pick ? ' on' : ''}" data-s="${s}" aria-pressed="${d === pick}" title="Show details for ${esc(screenName(d))}">${esc(screenName(d))}</button>`).join('')}</div>`
-          + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + '</div>';
+          + details.map((detail, k) => `<div class="d">${k ? '' : `<b>${esc(screenName(pick))}:</b> `}${esc(detail)}</div>`).join('') + fixHtml(g.kind, g.items) + '</div>';
       }
     }
     $('#findings').innerHTML = html;
@@ -2220,7 +2371,7 @@ function renderFindings() {
     const fs = shown.filter(f => f.dev === d).sort((a, b) => order[a.sev] - order[b.sev]); if (!fs.length) continue;
     const c = s => fs.filter(f => f.sev === s).length;
     html += `<div class="group">${esc(reportName(d))}<small>${c('issue')} issues · ${c('warn')} warnings · ${c('info')} adaptations</small></div>` +
-      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div></div>`).join('');
+      fs.map(f => `<div class="finding ${f.sev}" data-i="${f.i}"><div class="t">${esc(f.title)}${f.isNew ? '<span class="new-tag">New</span>' : ''}<span class="c">${f.cat}</span></div><div class="d">${esc(f.detail)}</div>${fixHtml(f.kind, [f])}</div>`).join('');
   }
   $('#findings').innerHTML = html;
 }
@@ -2232,6 +2383,251 @@ $('#report-view').addEventListener('click', e => {
   try { localStorage.setItem('samestate.reportView', view); } catch {}
   renderFindings();
 });
+/* ------------------------------ fix previews ------------------------------ */
+// CSS that usually fixes a finding, set on that finding's elements in every affected preview until Undo.
+const FIX_CSS = {
+  'Page scrolls sideways': { 'max-width': '100%', 'box-sizing': 'border-box', 'overflow-wrap': 'anywhere' },
+  'Table is wider than its container': { display: 'block', 'max-width': '100%', 'overflow-x': 'auto' },
+  'Text cut off': { 'white-space': 'normal', 'text-overflow': 'clip', '-webkit-line-clamp': 'unset', overflow: 'visible' },
+  'Tap targets under 24px': { 'min-width': '44px', 'min-height': '44px', display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center' },
+  'Tap targets under 40px': { 'min-width': '44px', 'min-height': '44px', display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center' },
+  'Text under 12px': { 'font-size': '12px' },
+  'Fields under 16px font': { 'font-size': '16px' },
+  'Text touches the screen edge': { 'padding-inline': '16px', 'box-sizing': 'border-box' },
+  'Images stretched beyond source size': { 'max-width': '100%', height: 'auto', 'object-fit': 'contain' }
+};
+const FIX_ADVICE = [
+  ['Hidden images still downloaded', 'Add loading="lazy" to these images, or use <picture> with a media query so this screen never fetches them.'],
+  ['Images larger than shown', 'Add srcset with smaller widths and a sizes attribute, so each screen downloads the size it shows.'],
+  ['Downloads as much as', 'Load below-the-fold images lazily, split scripts this screen doesn’t run, and send smaller images to narrow screens.'],
+  ['Large API responses', 'Ask the API for only the fields this screen shows, or page the results.'],
+  ['Keyboard reaches hidden controls', 'Add the inert attribute (or visibility: hidden) to menus and panels while they are closed.'],
+  ['Tab order differs from what you see', 'Match the HTML order to the visual order instead of reordering with CSS order, flex-direction or grid placement.'],
+  ['Key controls below the fold', 'Move the main action up on small screens, or shorten what comes before it (hero image, intro text).'],
+  ['Overlay hides controls', 'Give the banner a smaller footprint on phones, or add bottom padding to the page while it is shown.'],
+  ['No viewport meta tag', 'Add <meta name="viewport" content="width=device-width, initial-scale=1">.']
+];
+const appliedFixes = new Map(), fixCounts = new Map(); // finding kind → screens with the fix on; fix id → elements changed
+const fixCss = declarations => Object.entries(declarations).map(([p, v]) => `${p}: ${v};`).join(' ');
+function fixHtml(kind, items) {
+  const css = FIX_CSS[kind], advice = FIX_ADVICE.find(([start]) => kind.startsWith(start))?.[1];
+  if (!css && !advice) return '';
+  const hasElements = items.some(f => f.keys.length);
+  return '<div class="fix">' + (css ? `<code>${esc(fixCss(css))}</code><button type="button" class="pill fix-btn" data-fix${hasElements ? '' : ' disabled title="No elements to change on these screens"'}>${appliedFixes.has(kind) ? 'Undo fix' : 'Preview fix'}</button>` : '')
+    + (advice ? `<p>${esc(advice)}</p>` : '') + '</div>';
+}
+function toggleFix(items) {
+  const kind = items[0].kind, id = 'fix:' + kind;
+  if (appliedFixes.has(kind)) {
+    for (const d of appliedFixes.get(kind)) post(d, 'unfix', { id });
+    appliedFixes.delete(kind);
+  } else if (FIX_CSS[kind]) {
+    fixCounts.delete(id);
+    for (const f of items) if (f.keys.length) post(f.dev, 'fix', { id, keys: f.keys, css: FIX_CSS[kind] });
+    appliedFixes.set(kind, new Set(items.map(f => f.dev)));
+  }
+  renderFindings();
+}
+function undoAllFixes() {
+  for (const [kind, screens] of appliedFixes) for (const d of screens) post(d, 'unfix', { id: 'fix:' + kind });
+  appliedFixes.clear();
+  renderFindings();
+}
+
+/* ------------------------------ baseline ------------------------------ */
+// A saved scan for this site; later scans mark what is new and list what is gone.
+let newOnly = false;
+const baselineKey = () => 'samestate.baseline.' + (sitesMode ? sitePanels.map(site => site.url?.origin).join('|') : target);
+const findingId = f => reportName(f.dev) + '|' + f.kind;
+function loadBaseline() { try { return JSON.parse(localStorage.getItem(baselineKey()) || 'null'); } catch { return null; } }
+function saveBaseline() {
+  const items = findings.map(f => ({ id: findingId(f), kind: f.kind, screen: reportName(f.dev), sev: f.sev }));
+  try { localStorage.setItem(baselineKey(), JSON.stringify({ at: Date.now(), items })); } catch {}
+  newOnly = false;
+  renderFindings();
+}
+function clearBaseline() { try { localStorage.removeItem(baselineKey()); } catch {} newOnly = false; renderFindings(); }
+function compareBaseline() {
+  const baseline = findings.length ? loadBaseline() : null;
+  for (const f of findings) f.isNew = false;
+  if (!baseline) return null;
+  const before = new Set(baseline.items.map(item => item.id)), now = new Set(findings.map(findingId));
+  for (const f of findings) f.isNew = !before.has(findingId(f));
+  const fixed = baseline.items.filter(item => !now.has(item.id));
+  return { at: new Date(baseline.at), added: findings.filter(f => f.isNew).length, fixed, unchanged: findings.length - findings.filter(f => f.isNew).length };
+}
+function renderBaseline(state) {
+  const bar = $('#baseline');
+  bar.hidden = !findings.length;
+  if (!findings.length) return;
+  const fixes = appliedFixes.size ? `<p class="fix-line">${plural(appliedFixes.size, 'fix preview')} on. <button type="button" class="link" data-baseline="recheck">Check again</button> · <button type="button" class="link" data-baseline="undo-fixes">Undo all</button></p>` : '';
+  if (!state) { bar.innerHTML = `<button type="button" class="pill" data-baseline="save" title="Later scans of this site mark what is new and what is fixed">Save as baseline</button>` + fixes; return; }
+  const when = state.at.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const gone = state.fixed.length ? `<details><summary>${state.fixed.length} fixed</summary><ul>${state.fixed.slice(0, 40).map(item => `<li>${esc(item.kind)} <span class="muted">· ${esc(item.screen)}</span></li>`).join('')}</ul></details>` : '<span>0 fixed</span>';
+  bar.innerHTML = `<div class="baseline-line"><b>Since baseline</b> <span class="muted">${esc(when)}</span></div>`
+    + `<div class="baseline-line"><button type="button" class="chip${newOnly ? ' on' : ''}" data-baseline="new"${state.added ? '' : ' disabled'}>${state.added} new</button>${gone}<span>${state.unchanged} unchanged</span></div>`
+    + `<div class="baseline-line"><button type="button" class="link" data-baseline="save">Replace baseline</button> · <button type="button" class="link" data-baseline="clear">Clear</button></div>` + fixes;
+}
+$('#baseline').addEventListener('click', e => {
+  const action = e.target.closest('[data-baseline]')?.dataset.baseline;
+  if (action === 'save') saveBaseline();
+  else if (action === 'clear') clearBaseline();
+  else if (action === 'new') { newOnly = !newOnly; renderFindings(); }
+  else if (action === 'recheck') detect(true);
+  else if (action === 'undo-fixes') undoAllFixes();
+});
+
+/* ------------------------------ snapshots of several screens ------------------------------ */
+function snapshotScreens(screens, ms = 5000) {
+  const rid = crypto.randomUUID(), out = new Map();
+  let answered = 0;
+  return new Promise(done => {
+    const finish = () => { pendingSnap.delete(rid); clearTimeout(timer); done(out); };
+    pendingSnap.set(rid, (d, data) => { if (data) out.set(d, data); if (++answered >= screens.length) finish(); });
+    const timer = setTimeout(finish, ms);
+    screens.forEach(d => post(d, 'snapshot', { rid }));
+  });
+}
+const settle = ms => new Promise(done => setTimeout(done, ms)); // a snapshot forces layout; this gives the page's resize handlers time to run
+
+/* ------------------------------ breakpoint sweep ------------------------------ */
+// Resizes the reference screen from 320px to 1920px, checks it at each width and narrows every change down to
+// the pixel, so the report says where a problem starts and stops instead of which preset happens to show it.
+let sweepRun = 0;
+const SWEEP_WIDTHS = [...Array(35)].map((_, k) => 320 + k * 20).concat([...Array(23)].map((_, k) => 1000 + (k + 1) * 40)); // 320–1000 every 20px, then to 1920 every 40px
+async function sweepWidths() {
+  const button = $('#sweep'), label = button.querySelector('span');
+  if (sweepRun) { sweepRun = 0; return; } // a second press stops it
+  const d = active().find(x => x.id === $('#ref').value && x.ready) || active().find(x => x.ready);
+  if (!d || sitesMode) { label.textContent = sitesMode ? 'Turn off Compare sites to sweep' : 'Open a site first'; setTimeout(() => { label.textContent = 'Sweep widths'; }, 2500); return; }
+  const run = sweepRun = Date.now(), scan = openId, probes = new Map();
+  const probe = async w => {
+    if (probes.has(w)) return probes.get(w);
+    if (sweepRun !== run || scan !== openId || !d.el) throw new Error('stopped');
+    label.textContent = `Stop sweep · ${w}px`;
+    d.sweepW = w; layout(d);
+    await settle(160);
+    const data = (await snapshotScreens([d], 4000)).get(d);
+    const kinds = new Map();
+    if (data) {
+      const probeScreen = { ...d, sweepW: w }; // the screen keeps its own kind: touch checks don't switch on and off with width
+      for (const f of analyze([{ dev: probeScreen, data }], probeScreen.id)) if (f.cat !== 'Network' && !kinds.has(f.kind)) kinds.set(f.kind, f);
+    }
+    probes.set(w, kinds);
+    return kinds;
+  };
+  const same = (a, b) => a.size === b.size && [...a.keys()].every(k => b.has(k));
+  button.classList.add('busy');
+  try {
+    for (const w of SWEEP_WIDTHS) await probe(w);
+    let budget = 140; // bisect every change between two sampled widths, down to one pixel
+    const bisect = async (a, b) => {
+      if (b - a <= 1 || budget-- <= 0) return;
+      const m = (a + b) >> 1, mid = await probe(m);
+      if (!same(probes.get(a), mid)) await bisect(a, m);
+      if (!same(mid, probes.get(b))) await bisect(m, b);
+    };
+    for (let k = 1; k < SWEEP_WIDTHS.length; k++) if (!same(probes.get(SWEEP_WIDTHS[k - 1]), probes.get(SWEEP_WIDTHS[k]))) await bisect(SWEEP_WIDTHS[k - 1], SWEEP_WIDTHS[k]);
+  } catch {}
+  const finished = sweepRun === run && scan === openId;
+  d.sweepW = null;
+  if (d.el) { layout(d); fitWall(d.site); }
+  sweepRun = 0; button.classList.remove('busy'); label.textContent = 'Sweep widths';
+  if (!finished) return;
+  const widths = [...probes.keys()].sort((a, b) => a - b), kinds = new Map();
+  for (const w of widths) for (const [kind, f] of probes.get(w)) if (!kinds.has(kind)) kinds.set(kind, f);
+  const swept = [];
+  for (const [kind, sample] of kinds) {
+    const ranges = [];
+    for (const w of widths) {
+      const on = probes.get(w).has(kind), last = ranges[ranges.length - 1];
+      if (on && last && last.open) last.to = w; else if (on) ranges.push({ from: w, to: w, open: true }); else if (last) last.open = false;
+    }
+    const text = ranges.map(r => r.from === r.to ? r.from + 'px' : `${r.from}–${r.to}px`).join(', ');
+    const reflow = kind === 'Page scrolls sideways' && ranges.some(r => r.from <= 320) ? ' At 320px this fails WCAG 1.4.10 Reflow.' : '';
+    swept.push({ sev: sample.sev, cat: 'Widths', dev: d, kind, title: `${kind} at ${text}`, detail: `At ${ranges[0].from}px: ${sample.title}. ${sample.detail}${reflow}`, keys: [], refKeys: [], reference: d });
+  }
+  findings = [...findings.filter(f => f.cat !== 'Widths'), ...swept];
+  lastScan = lastScan || { at: new Date(), screens: [d] };
+  catFilter = swept.length ? 'Widths' : catFilter;
+  renderFindings(); showTab('diff');
+  $('#sweep-status').textContent = `Checked ${widths.length} widths from 320 to 1920px on ${screenName(d)}: ${plural(swept.length, 'finding')}.`;
+}
+
+/* ------------------------------ journey report ------------------------------ */
+// Page steps on every selected device: each step is measured at each device's size and compared with the same
+// step on the reference device, so the report says which step breaks on which screens.
+let journeyRunning = false;
+async function journeyReport() {
+  if (journeyRunning || !pageSteps || sitesMode) return;
+  const steps = pageScreens.filter(d => d.el && d.ready), devices = DEVICES.filter(d => d.on);
+  const status = $('#page-steps-status');
+  if (!steps.length || !devices.length) { status.textContent = 'Open a step and select devices first.'; return; }
+  journeyRunning = true;
+  const saved = sharedDeviceId, scan = openId, data = new Map(); // "step|device" → snapshot
+  const refDevice = devices.find(d => d.id === 'desktop') || devices.find(d => d.kind === 'desktop') || devices[0];
+  try {
+    for (const [n, device] of devices.entries()) {
+      if (scan !== openId || !pageSteps) throw new Error('stopped');
+      status.textContent = `Checking the journey on ${device.name} (${n + 1} of ${devices.length})…`;
+      sharedDeviceId = device.id; $('#shared-device').value = device.id;
+      for (const d of steps) d.rot = false;
+      refreshViews();
+      await settle(700);
+      const snaps = await snapshotScreens(steps, 6000);
+      for (const [d, snap] of snaps) data.set(d.id + '|' + device.id, snap);
+    }
+  } catch {}
+  sharedDeviceId = saved; $('#shared-device').value = saved;
+  refreshViews();
+  journeyRunning = false;
+  if (scan !== openId || !pageSteps) { status.textContent = ''; return; }
+  const screens = [];
+  const out = steps.flatMap((step, k) => {
+    const snaps = devices.map((device, j) => {
+      const dev = { ...step, id: step.id + '@' + device.id, kind: device.kind, os: device.os, touch: device.kind !== 'desktop', slot: k * 1000 + j, label: `Step ${step.step} · ${device.name}`, journeyRef: device.name, fixedSize: { w: device.w, h: device.h } };
+      screens.push(dev);
+      return { dev, data: data.get(step.id + '|' + device.id) };
+    }).filter(s => s.data);
+    return analyze(snaps, step.id + '@' + refDevice.id);
+  });
+  findings = out;
+  lastScan = { at: new Date(), screens };
+  const broken = new Set(out.filter(f => f.sev === 'issue').map(f => f.dev.label));
+  status.textContent = `Checked ${plural(steps.length, 'step')} on ${plural(devices.length, 'device')}. ${broken.size ? 'Issues on ' + [...broken].slice(0, 4).join(', ') + (broken.size > 4 ? ` +${broken.size - 4} more` : '') + '.' : 'No issues.'}`;
+  renderFindings(); showTab('diff');
+}
+
+/* ------------------------------ screen settings and long text ------------------------------ */
+function applyScreenSettings() {
+  let rotated = false;
+  for (const d of DEVICES) {
+    if (!d.el) continue;
+    const setting = screenSetting(d);
+    const rot = setting === 'landscape' && d.touch;
+    if ((screenSettings === 'orientation' || d.settingRot) && d.rot !== rot) { d.rot = rot; d.settingRot = rot; layout(d); rotated = true; }
+    if (d.ready) configure(d);
+    const name = screenName(d);
+    d.el.querySelector('.dev-name').textContent = name;
+    d.iframe.title = name + ' preview';
+  }
+  if (rotated) fitWall();
+  const reference = $('#ref');
+  for (const option of reference.options) { const d = DEVICES.find(x => x.id === option.value); if (d) option.textContent = screenName(d); }
+}
+$('#screen-settings').addEventListener('change', event => {
+  screenSettings = event.target.value;
+  $('#screen-settings-help').hidden = !screenSettings;
+  findings = []; renderFindings();
+  applyScreenSettings();
+});
+$('#long-text').addEventListener('change', event => {
+  longText = event.target.checked;
+  for (const d of connectedScreens()) if (d.ready) configure(d);
+});
+$('#sweep').onclick = () => sweepWidths();
+$('#journey').onclick = () => journeyReport();
+
 // Outlines the findings in their previews, and the matching elements on the reference screen.
 function showFindings(list) {
   for (const f of list) if (f.keys.length) post(f.dev, 'highlight', { keys: f.keys });
@@ -2248,6 +2644,8 @@ function showFindings(list) {
 }
 $('#findings').addEventListener('click', e => {
   const el = e.target.closest('.finding'); if (!el) return;
+  if (e.target.closest('[data-fix]')) { toggleFix(el.dataset.g === undefined ? [findings[+el.dataset.i]] : reportGroups[+el.dataset.g].items); return; }
+  if (e.target.closest('.fix')) return; // selecting the CSS to copy it
   if (el.dataset.g === undefined) { showFindings([findings[+el.dataset.i]]); return; }
   const group = reportGroups[+el.dataset.g], chip = e.target.closest('.screen-chip');
   if (!chip) { showFindings(group.items); return; } // the whole issue, on every screen it affects
@@ -2290,6 +2688,21 @@ const refreshDevicePicker = mountDevicePicker(DEVICES, {
 fillSharedDevices();
 renderLeft();
 refreshThemeTargets();
+$('#sign-ins-row').hidden = !IS_EXT;
+// Interface theme and day/night mode (ui-theme.js applies the saved choice before the page is drawn).
+const uiTheme = window.samestateUiTheme;
+$('#ui-theme').innerHTML = Object.entries(uiTheme.THEMES).map(([id, name]) => `<option value="${id}">${name}</option>`).join('');
+function showUiTheme() {
+  $('#ui-theme').value = uiTheme.theme;
+  const button = $('#ui-mode');
+  button.title = `Switch to ${uiTheme.mode === 'dark' ? 'day' : 'night'} mode`;
+  button.setAttribute('aria-label', button.title);
+}
+// The guided demo previews themes without saving them; this puts the visitor's own choice back.
+function restoreUiTheme() { uiTheme.restore(); showUiTheme(); }
+$('#ui-theme').addEventListener('change', event => { uiTheme.save(event.target.value, uiTheme.mode); showUiTheme(); });
+$('#ui-mode').addEventListener('click', () => { uiTheme.save(uiTheme.theme, uiTheme.mode === 'dark' ? 'light' : 'dark'); showUiTheme(); });
+showUiTheme();
 if (!IS_EXT) { document.body.classList.add('web'); $('#src').placeholder = 'Live demo on a sample site — install the extension to open any page'; $('#own').textContent = 'Get the Chrome extension'; }
 // The extension starts on the bundled sample site, which needs no site access, so no prompt is
 // needed and no outside site is requested in the manifest. The web demo starts with the tour.
@@ -2297,4 +2710,19 @@ async function openDefault() {
   if (target || openId) return; // the user already opened something
   await open(DEMO_URL);
 }
-if (IS_EXT) openDefault(); else startTour();
+// The toolbar icon passes the page it was clicked on. Sites Chrome already allows open straight away; for a new site
+// Chrome only shows its access prompt after a click or key press, so the address is filled in for the user.
+async function openClickedPage(address) {
+  history.replaceState(null, '', location.pathname); // a reload starts fresh instead of reopening this page
+  const url = parseAddress(address);
+  if (!url) return openDefault();
+  let allowed = false;
+  try { allowed = await chrome.permissions.contains({ origins: [originPattern(url)] }); } catch {}
+  if (target || openId) return;
+  if (allowed) return open(url, true);
+  $('#src').value = url.href;
+  $('#src').focus();
+  $('#joblog').textContent = `Press Enter to open ${url.host}. Chrome asks once for access to the site.`;
+}
+const clickedPage = IS_EXT && new URLSearchParams(location.search).get('open');
+if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else startTour();
