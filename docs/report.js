@@ -25,18 +25,20 @@
   function collect() {
     const groups = issueGroups(findings);
     const scanned = lastScan?.screens || [];
-    const sites = sitesMode ? sitePanels.filter(site => groups.some(g => g.site === site) || scanned.some(d => d.site === site)) : [null];
+    const unmeasured = lastScan?.missing || [];
+    const sites = sitesMode ? sitePanels.filter(site => groups.some(g => g.site === site)
+      || scanned.some(d => d.site === site) || unmeasured.some(d => d.site === site)) : [null];
     return {
       at: lastScan?.at || new Date(),
       groups,
       parts: sites.map(site => {
         const own = groups.filter(g => g.site === site);
         const screens = scanned.filter(d => (d.site || null) === site);
-        const missing = (lastScan?.missing || []).filter(d => (d.site || null) === site);
+        const missing = unmeasured.filter(d => (d.site || null) === site);
         // With no findings there is no finding to take the reference from: it is the chosen reference screen.
         const refId = $('#ref').value;
         const reference = own[0]?.items[0].reference || screens.find(d => d.id === refId || d.id.endsWith('@' + refId)) || screens[0] || null;
-        const pages = [...new Set(screens.map(pageOf))].map(showAddress);
+        const pages = [...new Set((screens.length ? screens : missing).map(pageOf))].map(showAddress);
         return { site, own, screens, missing, reference, pages };
       })
     };

@@ -81,6 +81,38 @@ class Pipe {
 }
 
 const sleep = ms => new Promise(done => setTimeout(done, ms));
+
+function changedFindings(current, previous) {
+  const group = f => JSON.stringify([f.id, f.category, f.severity]);
+  const before = Map.groupBy(previous, group);
+  const changes = new Set();
+  for (const [id, items] of Map.groupBy(current, group)) {
+    const saved = before.get(id);
+    if (!saved) {
+      for (const f of items) changes.add(f);
+      continue;
+    }
+
+    // Older reports have no element keys. Their titles still record counts for grouped findings.
+    if ([...items, ...saved].some(f => !Array.isArray(f.keys))) {
+      const usesKeys = [...items, ...saved].some(f => f.keys?.length);
+      const affected = findings => usesKeys ? findings.reduce((count, f) => {
+        const size = f.keys?.length ?? Number(f.title?.match(/^\d+(?= )/)?.[0]);
+        return count + (size || 1);
+      }, 0) : findings.length;
+      if (affected(items) > affected(saved)) for (const f of items) changes.add(f);
+      continue;
+    }
+
+    const keys = new Set(saved.flatMap(f => f.keys));
+    let withoutKeys = saved.filter(f => !f.keys.length).length;
+    for (const f of items) {
+      if (f.keys.length ? f.keys.some(key => !keys.has(key)) : --withoutKeys < 0) changes.add(f);
+    }
+  }
+  return current.filter(f => changes.has(f));
+}
+
 let chrome, work;
 async function run() {
   work = mkdtempSync(join(tmpdir(), 'samestate-ci-'));
@@ -132,7 +164,7 @@ async function run() {
   await evaluate('detect(true)');
   if (option('sweep')) await evaluate('sweepWidths()', 10 * 60_000);
   const report = await evaluate(`({
-    findings: findings.map(f => ({ id: reportName(f.dev) + '|' + f.kind, severity: f.sev, category: f.cat, issue: f.kind, screen: reportName(f.dev), title: f.title, detail: f.detail })),
+    findings: findings.map(f => ({ id: findingId(f), severity: f.sev, category: f.cat, issue: f.kind, screen: reportName(f.dev), title: f.title, detail: f.detail, keys: f.keys.length ? f.keys : f.refKeys })),
     screens: (lastScan?.screens || []).map(d => reportName(d)),
     missing: (lastScan?.missing || []).map(d => reportName(d)),
     md: samestateReport('md'), csv: samestateReport('csv'), html: samestateReport('html')
@@ -147,10 +179,10 @@ async function run() {
 
   let judged = report.findings;
   if (typeof baselineFile === 'string') {
-    const before = new Set(JSON.parse(readFileSync(baselineFile, 'utf8')).findings.map(f => f.id));
-    judged = judged.filter(f => !before.has(f.id));
-    const now = new Set(report.findings.map(f => f.id));
-    const fixed = JSON.parse(readFileSync(baselineFile, 'utf8')).findings.filter(f => !now.has(f.id));
+    const before = JSON.parse(readFileSync(baselineFile, 'utf8')).findings;
+    judged = changedFindings(report.findings, before);
+    const measured = new Set(report.screens);
+    const fixed = changedFindings(before, report.findings).filter(f => measured.has(f.screen));
     console.log(`Compared with ${baselineFile}: ${judged.length} new, ${fixed.length} fixed.`);
   }
   const count = sev => judged.filter(f => f.severity === sev).length;
