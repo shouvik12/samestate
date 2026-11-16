@@ -32,6 +32,7 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 - `docs/`: the live demo
 - `tests/smoke.mjs`: the end-to-end smoke test
 - `tools/samestate-ci.mjs`: runs the difference report on any site in headless Chrome, for CI
+- `tools/readme-media.mjs`: re-records the README's GIF and screenshots (and `docs/media/card.png`) from `docs/`; run it after visible interface changes
 - `promo/`: scripts that record the promo video from `docs/` (usage at the top of `promo/record.mjs`); `stage.js` calls functions in `docs/app.js`, so re-render it after renaming them
 
 ## Pull requests
