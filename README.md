@@ -161,7 +161,7 @@ Works in Chrome and other Chromium browsers (Edge, Brave, Arc) on desktop. Updat
 Click the Samestate icon on any page to open that page on every screen, in a new tab beside it. Previews share
 your Chrome sign-ins, so a page you are signed in to stays signed in (turn off **Use my sign-ins** to preview signed
 out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
-opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo on a
+opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo (it opens with a short intro: the logo and what Samestate is for) on a
 sample site with 46 guided stops. Alongside sync, annotations, layout, Page steps and Compare sites, it now shows
 fix previews and baselines, accessibility and page-weight reports, width sweeps, screen settings, breakpoints,
 debug tools and simulators, grids and design overlays, forms and typing sync, tool search, Meta and Console,
@@ -551,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **Demo intro**: the guided demo opens with 5–7 seconds of the Samestate logo, tagline and purpose, with its own narration, while the sample site loads; Skip intro, Next, the right arrow or a click moves on to step 1 ([details](changelogs/CHANGELOG-demo-intro.md)) |
 | **2026-11-19** | | | **Individual help icons**: small ? shortcuts appear on hover or keyboard focus, with click-to-open contextual voice and the existing always-visible top-bar help search ([details](changelogs/CHANGELOG-contextual-help-icons.md)) |
 | **2026-11-19** | | | **Top-bar help icon**: one small ? opens searchable explanations with natural voice; hovering or focusing individual controls no longer opens help ([details](changelogs/CHANGELOG-topbar-help-icon.md)) |
 | **2026-11-19** | | | **GitHub demo refresh**: new Zinc banner, animated preview and narrated video; current screenshots for measurements, metadata, combined checks, voice help, demo navigation, themes and capture ([details](changelogs/CHANGELOG-github-demo-refresh.md)) |

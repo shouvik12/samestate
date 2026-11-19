@@ -3,7 +3,7 @@
 Install kokoro-onnx and soundfile in a build-only environment. Supply the model and
 voices from https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.1.
 Run with --model kokoro-v1.0.onnx --voices voices-v1.0.bin. No model ships in the app.
-tools/demo-narration.json contains the captions exported from the live 46-step tour.
+tools/demo-narration.json contains the intro (key "intro") and the captions exported from the live 46-step tour.
 """
 import argparse
 import hashlib
@@ -47,7 +47,8 @@ def main():
     args = parser.parse_args()
     source = json.loads((args.help_catalog or ROOT / 'tools/demo-narration.json').read_text())
     if not args.help_catalog:
-        assert len(source['clips']) == 46, 'Export all 46 current demo captions first.'
+        steps = [clip for clip in source['clips'] if clip.get('key') != 'intro']
+        assert len(steps) == 46, 'Export all 46 current demo captions first (the intro clip is extra).'
     output = ROOT / ('extension/help/narration' if args.help_catalog else 'extension/demo/narration')
     output.mkdir(parents=True, exist_ok=True)
     options = ort.SessionOptions()

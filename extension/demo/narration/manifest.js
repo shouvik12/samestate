@@ -2,7 +2,16 @@
 window.samestateDemoNarration = Object.freeze({
   "version": 1,
   "voice": "Kokoro af_heart",
+  "speed": 1.0,
   "clips": [
+    {
+      "title": "Samestate",
+      "key": "intro",
+      "caption": "Test your site on every screen size at once. Click once, every device follows. See what breaks.",
+      "file": "intro.mp3",
+      "duration": 7.147,
+      "speech": "Same state. Test your site on every screen size at once. Click once, every device follows. See what breaks."
+    },
     {
       "title": "Click sync",
       "caption": "The Desktop clicks Products. Phones and tablets have no nav bar, so each one opens its own menu first, then Products.",
@@ -330,5 +339,5 @@ window.samestateDemoNarration = Object.freeze({
       "extensionSpeech": "That is the tour. Keep exploring the sample site, or type your own address in the bar at the top."
     }
   ],
-  "build": "ad747ee4db093cb7"
+  "build": "c3af6f8f8b7a26f9"
 });

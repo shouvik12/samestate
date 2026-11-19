@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Samestate — one interaction, every device</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="app.css?v=context-help-hover-20261119">
+<link rel="stylesheet" href="app.css?v=demo-intro-20261119">
 <link rel="stylesheet" href="clean-theme.css">
 <script src="ui-theme.js?v=clean-20261119"></script>
 </head>
@@ -382,6 +382,17 @@
     <span id="tour-navigation-status" class="sr-only" role="status" aria-live="polite"></span>
     <span id="tour-voice-status" class="sr-only" role="status" aria-live="polite"></span>
   </div>
+  <div class="tour-intro" id="tour-intro" hidden>
+    <section class="tour-intro-card" aria-labelledby="tour-intro-name" aria-describedby="tour-intro-purpose">
+      <div class="tour-intro-logo" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h2 id="tour-intro-name">Samestate</h2>
+      <p class="tour-intro-tagline">One interaction, every device.</p>
+      <p class="tour-intro-purpose" id="tour-intro-purpose">Test your site on every screen size at once. Click once, every device follows. See what breaks.</p>
+      <ul class="tour-intro-points" aria-label="What it does"><li>Logical sync</li><li>Difference report</li><li>Debug tools</li></ul>
+      <div class="tour-intro-progress" aria-hidden="true"><i></i></div>
+      <button type="button" class="tour-intro-skip" id="tour-intro-skip">Skip intro</button>
+    </section>
+  </div>
   <div class="tour-ring" id="tour-ring" hidden aria-hidden="true"></div>
   <div class="tour-callout" id="tour-callout" role="status" hidden><b id="tourtitle"></b><p id="tourtext"></p></div>
   <div class="tour-cursor" id="tour-cursor" hidden aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 2l14 11h-7.2l-2.9 7.5z" fill="#fff" stroke="#10182b" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="tap"></span><span class="ripple"></span><span class="wheel"></span></div>
@@ -525,7 +536,7 @@
 <script src="devices.js?v=weekly-demo-20261119-final"></script>
 <script src="annotations.js"></script>
 <script src="themes.js?v=clean-20261119"></script>
-<script src="app.js?v=context-help-hover-20261119"></script>
+<script src="app.js?v=demo-intro-20261119"></script>
 <script src="capture.js"></script>
 <script src="report.js"></script>
 <script src="workspaces.js"></script>
@@ -533,7 +544,7 @@
 <script src="checks.js?v=weekly-demo-20261119-final"></script>
 <script src="outline.js?v=weekly-demo-20261119-final"></script>
 <script src="tour-features.js?v=demo-carousel-20261119"></script>
-<script src="demo/narration/manifest.js?v=context-help-hover-20261119"></script>
+<script src="demo/narration/manifest.js?v=demo-intro-20261119"></script>
 <script src="tour-voice.js?v=context-help-hover-20261119"></script>
 <script src="feature-help-catalog.js?v=context-help-hover-20261119"></script>
 <script src="help/narration/manifest.js?v=context-help-hover-20261119"></script>
