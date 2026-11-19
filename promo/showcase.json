@@ -2,11 +2,11 @@
   "duration": 30,
   "voice": "af_heart",
   "scenes": [
-    {"id":"intro","start":0,"duration":3,"caption":"Every screen. One shared state.","voice":"Samestate. Test every screen together."},
-    {"id":"sync","start":3,"duration":4,"caption":"One click. Every layout follows.","voice":"One click. Every layout follows."},
-    {"id":"measure","start":7,"duration":4,"caption":"Measurements & practical suggestions","voice":"Measure elements, and review practical suggestions."},
-    {"id":"meta","start":11,"duration":4,"caption":"Metadata & social previews","voice":"Check metadata and preview social cards."},
-    {"id":"checks","start":15,"duration":5,"caption":"Automated checks. Human visual review.","voice":"Run grouped checks, and record human reviews."},
+    {"id":"intro","start":0,"duration":4,"caption":"One interaction, every device.","voice":"Samestate. Test every screen size at once."},
+    {"id":"sync","start":4,"duration":4,"caption":"One click. Every layout follows.","voice":"One click. Every layout follows."},
+    {"id":"measure","start":8,"duration":4,"caption":"Measurements & practical suggestions","voice":"Measure elements, and review practical suggestions."},
+    {"id":"meta","start":12,"duration":4,"caption":"Metadata & social previews","voice":"Check metadata and preview social cards."},
+    {"id":"checks","start":16,"duration":4,"caption":"Automated checks. Human visual review.","voice":"Run grouped checks, and record human reviews."},
     {"id":"help","start":20,"duration":4,"caption":"Click any ?. Hear its explanation.","voice":"Click a question mark for voice help."},
     {"id":"tour","start":24,"duration":3,"caption":"46 narrated steps. Move at your pace.","voice":"Forty-six narrated steps, at your pace."},
     {"id":"outro","start":27,"duration":3,"caption":"One interaction. Every device.","voice":"One interaction. Every device."}

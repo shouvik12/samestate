@@ -12,6 +12,7 @@
   .media-brand{display:inline-flex;align-items:center;gap:12px;font-weight:750;letter-spacing:-.04em}.media-logo{display:inline-flex;align-items:flex-end;gap:4px}.media-logo i{display:block;width:22px;height:27px;border:2px solid #6ea8ff;border-radius:4px}.media-logo i:nth-child(2){width:15px;height:37px;border-color:#5fe0a6}.media-logo i:nth-child(3){width:10px;height:23px;border-color:#ffc35a}
   #media-card{position:fixed;inset:0;z-index:5000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:radial-gradient(ellipse at 75% 20%,#27272a,transparent 65%),#09090b;color:#fafafa;text-align:center;font-family:system-ui;pointer-events:none}
   #media-card .media-brand{font-size:70px}#media-card h1{font-size:clamp(42px,5vw,78px);line-height:1.12;letter-spacing:-.045em;margin:10px 0}#media-card p{font-size:23px;color:#a1a1aa;margin:0}#media-card em{font-style:normal;color:#6ea8ff}#media-card .media-tags{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}#media-card .media-tags span{border:1px solid #3f3f46;background:#1c1c20;padding:9px 16px;border-radius:999px;font-size:17px;color:#d4d4d8}
+  .media-recording .tour-intro-skip{display:none}.media-recording .tour-intro:not(.playing) .tour-intro-card{opacity:0}
   #media-pointer{position:fixed;left:0;top:0;width:24px;height:30px;z-index:4100;pointer-events:none;transition:transform .45s ease;filter:drop-shadow(0 3px 4px #0009)}
  `;
  document.head.append(style);
@@ -31,10 +32,14 @@
   await fit();await wait(200);
  }
  async function prepare(id,text='',recording=false){
-  document.documentElement.classList.toggle('media-recording',recording);caption.hidden=!recording;caption.lastElementChild.textContent=text;card.hidden=true;pointer.hidden=true;
-  if(id==='intro'||id==='outro'){
+  document.documentElement.classList.toggle('media-recording',recording);caption.hidden=!recording||id==='intro';caption.lastElementChild.textContent=text;card.hidden=true;pointer.hidden=true;
+  if(id==='intro'){
+   // The app's own demo intro: logo, name, tagline, purpose and chips. It animates in when the recording starts (act).
+   await base();const intro=$('#tour-intro');intro.classList.remove('playing','leaving','paused');intro.hidden=false;return {id,intro:true};
+  }
+  if(id==='outro'){
    await endTour(false);samestateFeatureHelp.close(false);for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
-   card.innerHTML=brand+`<h1>${id==='intro'?'Every screen.<br><em>One shared state.</em>':'One interaction.<br><em>Every device.</em>'}</h1><div class="media-tags"><span>46 narrated steps</span><span>Measurements & checks</span><span>Voice help</span></div><p>shouvik12.github.io/samestate</p>`;card.hidden=false;return {id};
+   card.innerHTML=brand+`<h1>One interaction.<br><em>Every device.</em></h1><div class="media-tags"><span>46 narrated steps</span><span>Measurements & checks</span><span>Voice help</span></div><p>shouvik12.github.io/samestate</p>`;card.hidden=false;return {id};
   }
   await base(['measure','meta','checks','report'].includes(id)?['iphone','desktop']:['iphone','ipad','desktop']);
   if(id==='measure'){
@@ -64,7 +69,8 @@
   return {id,theme:document.documentElement.dataset.uiTheme,background:getComputedStyle(document.body).backgroundColor,screens:active().length};
  }
  async function act(id){
-  if(id==='sync'){point(['desktop','.dd-btn']);await wait(650);play('desktop',{do:'click',sel:'.dd-btn'});await wait(700);}
+  if(id==='intro'){const intro=$('#tour-intro');intro.style.setProperty('--intro-ms','4000ms');void intro.offsetWidth;intro.classList.add('playing');}
+  else if(id==='sync'){point(['desktop','.dd-btn']);await wait(650);play('desktop',{do:'click',sel:'.dd-btn'});await wait(700);}
   else if(id==='measure'){point('#outline-list button');await wait(500);$('#outline-list button').click();await until(()=>!!samestateOutline.get().measurement);}
   else if(id==='checks'){point('#checks-run');await wait(500);$('#checks-run').click();await until(()=>!samestateChecks.running&&!!samestateChecks.get()?.finishedAt);await wait(650);const first=$('#pane-checks [data-status="review"]');if(first)$('#pane-checks').scrollTo({top:first.offsetTop-260,behavior:'smooth'});}
   else if(id==='help'){const source=$('#open-outline'),icon=samestateFeatureHelpIcons.forTarget(source);point(source);source.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'mouse'}));await wait(400);point(icon);await wait(250);icon.click();await wait(250);point('#feature-help-hear');$('#feature-help-hear').click();source.dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:$('#feature-help-hear')}));}
