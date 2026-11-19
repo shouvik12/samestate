@@ -1,11 +1,12 @@
-<p align="center"><img src="docs/media/samestate-banner.png" alt="Samestate: one interaction, every device" width="100%"></p>
+<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-zinc" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
 
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
 Click once on any device. Every phone, tablet and desktop follows to the same state, even when the layouts are completely different.</p>
 
 <p align="center">·
-  <a href="docs/media/samestate-promo.mp4">Watch the 30s video</a> ·
+  <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
+  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-zinc">Watch the narrated 30s video</a> ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -18,7 +19,8 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
-<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif" alt="Clicking Products on the desktop opens the drawer and the Products accordion on every phone and tablet" width="900"></a></p>
+<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-zinc" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, voiced tooltips and demo navigation" width="900"></a></p>
+<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-zinc">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
 
 ## Why Samestate
 
@@ -58,8 +60,23 @@ that are too small, text that disappears.
 
 | Logical sync | Difference report |
 |---|---|
-| ![Desktop clicks Products; every phone opens its drawer and the Products accordion](docs/media/screenshot-sync.png) | ![Per-device findings: sideways scroll, wide table, small tap targets, hidden content](docs/media/screenshot-report.png) |
-| Desktop clicks **Products**. Each phone opens its own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
+| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-zinc) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-zinc) |
+| Desktop clicks **Products**. The phone and tablet open their own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
+
+| Measurements & suggestions | Metadata & social previews |
+|---|---|
+| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-zinc) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-zinc) |
+| Inspect an element and review its measurements and practical guidance. | Find missing metadata and preview how the page appears when shared. |
+
+| Run all checks | Search & voiced help |
+|---|---|
+| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-zinc) | ![Search tools showing a Measure area explanation with its voice playing](docs/media/screenshot-voice-help.png?v=20261119-zinc) |
+| Run selected groups together. Visual items await the tester’s review. | Search the feature catalog and hear an explanation on demand. |
+
+| Narrated demo & carousel | Clean theme option |
+|---|---|
+| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-zinc) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-zinc) |
+| Jump between steps, pause and mute. Each step has natural AI narration. | Zinc is the default dark theme; Clean Green is available for the interface and previews. |
 
 ## What it does
 
@@ -287,7 +304,7 @@ With a preview open in desktop Chrome, click **Screenshot**, **Record** or **Aut
 - **Save to folder…** picks a folder, and every screenshot and recording part is written there as it is made. Chrome remembers the folder and asks again for permission after a restart; **Use Downloads** goes back to downloads. Without a folder, each file starts a download.
 - The pace, its unit and the frame rate are remembered in this browser.
 
-<p align="center"><img src="docs/media/screenshot-capture.png" alt="The Capture drawer set to one screenshot every 0.5 seconds, reading Takes 2 screenshots every second, while Auto screenshots saves into a folder named samestate-captures, next to four device previews" width="800"></p>
+<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-zinc" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
@@ -534,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **GitHub demo refresh**: new Zinc banner, animated preview and narrated video; current screenshots for measurements, metadata, combined checks, voice help, demo navigation, themes and capture ([details](changelogs/CHANGELOG-github-demo-refresh.md)) |
 | **2026-11-19** | | | **Voiced tooltips throughout the app**: 473 explanations for controls, sections, preview tools, dialogs and results, with on-demand natural voice and F1/Escape access ([details](changelogs/CHANGELOG-voiced-feature-help.md)) |
 | **2026-11-19** | | | **Demo voice explainer**: natural AI narration for all 46 steps, Mute beside Pause, synchronized playback and a saved mute preference ([details](changelogs/CHANGELOG-demo-voice.md)) |
 | **2026-11-19** | | | **Sidebar width fix**: wrap long labels and button text, stack breakpoint actions, and keep capture controls within their drawers at narrow widths ([details](changelogs/CHANGELOG-sidebar-width.md)) |

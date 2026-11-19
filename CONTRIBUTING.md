@@ -34,8 +34,23 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 - `docs/`: the live demo
 - `tests/smoke.mjs`: the end-to-end smoke test
 - `tools/samestate-ci.mjs`: runs the difference report on any site in headless Chrome, for CI
-- `tools/readme-media.mjs`: re-records the README's GIF and screenshots (and `docs/media/card.png`) from `docs/`; run it after visible interface changes
-- `promo/`: scripts that record the promo video from `docs/` (usage at the top of `promo/record.mjs`); `stage.js` calls functions in `docs/app.js`, so re-render it after renaming them
+- `tools/readme-media.mjs`: captures the README screenshots, banner and link card from `docs/`, then publishes the freshly recorded promo and derives its silent GIF
+- `tools/media-browser.mjs`: shared headless Chrome capture harness for media tooling
+- `promo/`: `showcase.json` defines the eight scenes and narration, `stage.js` drives real app controls, and `banner.html` surrounds the fresh app screenshot with brand text; re-render after visible app changes
+
+### Refreshing the GitHub demos
+
+Use Node 22+, Chrome and ffmpeg. Narration generation additionally needs Python with `kokoro-onnx`, `onnxruntime`, `numpy` and `soundfile`, plus the Kokoro ONNX model and voice pack used by the app’s narration builder. These are build-only dependencies; models and intermediate media stay out of Git.
+
+```sh
+python promo/voiceover.py --model /path/to/kokoro-v1.0.onnx --voices /path/to/voices-v1.0.bin
+node promo/record.mjs landscape
+node tools/readme-media.mjs
+```
+
+The first command generates the original music if needed and mixes eight natural AI explanations into the 30-second soundtrack. The recorder prepares each real app state before recording it, so loading time does not consume a scene. It checks measured elements and pending human reviews before producing H.264/AAC video. `portrait` is also accepted by the recorder for a separate vertical export.
+
+Inspect the PNGs in `docs/media/` and the scene captures in `promo/out/`. Check the final video’s sound, 30-second duration and captions before committing. The 15-second GIF is intentionally silent; README links open the narrated video or the 46-step interactive demo. Both public MP4 filenames are refreshed together to preserve existing links.
 
 ## Pull requests
 
