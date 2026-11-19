@@ -1,0 +1,325 @@
+<!doctype html>
+<!-- Motion promo: 30 s of kinetic type and real app screens, cut on the bars of promo/music.py (128 BPM).
+     render(t) draws the frame for any time t, so promo/record-motion.mjs can capture it frame by frame.
+     Open with ?play to preview in real time. Words and their times match promo/motion.json. -->
+<html lang="en"><head><meta charset="utf-8"><title>Samestate motion promo</title>
+<style>
+:root{--bg:#f6f8fc;--ink:#14203d;--mute:#5b6787;--acc:#2f6fe0;--acc2:#6ea8ff;--ok:#12805a;--ok2:#5fe0a6;--warn:#e0a020;--bad:#cf2f45;--line:#d0d7e6}
+*{box-sizing:border-box;margin:0}
+html,body{width:1600px;height:900px;overflow:hidden;background:var(--bg);font-family:system-ui,-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:var(--ink)}
+#stage{position:absolute;inset:0;overflow:hidden}
+#glow{position:absolute;left:50%;top:50%;width:1500px;height:1100px;margin:-550px 0 0 -750px;border-radius:50%;background:radial-gradient(closest-side,rgba(110,168,255,.42),rgba(110,168,255,.10) 60%,transparent)}
+#dots{position:absolute;inset:-40px;background-image:radial-gradient(rgba(47,111,224,.16) 1.4px,transparent 1.6px);background-size:34px 34px}
+section{position:absolute;inset:0;display:none;perspective:2200px}
+.w{display:inline-block;will-change:transform,opacity,filter;white-space:pre}
+.h{position:absolute;left:0;right:0;text-align:center;font-weight:750;letter-spacing:-.035em;line-height:1.05}
+.blue{color:var(--acc)}.green{color:var(--ok)}
+.shot{position:absolute;border-radius:18px;background-size:cover;background-position:center;box-shadow:0 40px 90px -20px rgba(20,32,61,.45),0 0 0 1px rgba(20,32,61,.12);transform-style:preserve-3d;overflow:hidden}
+.box{position:absolute;border:4px solid var(--acc2);border-radius:14px;box-shadow:0 0 0 6px rgba(110,168,255,.25),0 0 40px rgba(110,168,255,.7)}
+.ring{position:absolute;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;border:5px solid var(--acc2)}
+.cursor{position:absolute;width:40px;height:48px;transform-origin:4px 4px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.35))}
+.ghost{opacity:.9}
+.dev{position:absolute;border:7px solid var(--acc);border-radius:16px;background:rgba(255,255,255,.6)}
+.logo{display:flex;align-items:flex-end;gap:12px}
+.logo i{display:block;border:7px solid var(--acc);border-radius:12px;width:104px;height:78px;transform-origin:50% 100%}
+.logo i:nth-child(2){width:62px;height:108px;border-color:var(--ok)}
+.logo i:nth-child(3){width:38px;height:68px;border-color:var(--warn)}
+#bar{position:absolute;left:300px;top:520px;width:1000px;height:60px;border-radius:30px;background:#e3e8f3;overflow:hidden;box-shadow:inset 0 2px 6px rgba(20,32,61,.12)}
+#fill{height:100%;width:0;border-radius:30px;background:linear-gradient(90deg,#b9d3ff,var(--acc2) 45%,var(--acc));box-shadow:0 0 30px rgba(47,111,224,.6)}
+#count{position:absolute;left:300px;width:1000px;top:330px;text-align:right;font-weight:800;letter-spacing:-.04em;font-size:150px;line-height:1}
+#count small{font-size:46px;color:var(--mute);font-weight:650;letter-spacing:-.02em;margin-left:14px}
+#countlabel{position:absolute;left:300px;top:610px;font-size:26px;color:var(--mute);font-weight:550}
+.card{position:absolute;width:340px;border-radius:20px;background:#fff;box-shadow:0 24px 60px -18px rgba(20,32,61,.35),0 0 0 1px rgba(20,32,61,.08);overflow:hidden;transform-origin:50% 100%}
+.card .thumb{height:212px;background-repeat:no-repeat;background-color:#18181b}
+.card .meta{padding:16px 20px 18px}
+.card b{display:block;font-size:26px;letter-spacing:-.02em}
+.card span{display:block;font-size:17px;color:var(--mute);margin-top:4px}
+.float{position:absolute;width:420px;height:236px}
+#wave{position:absolute;left:560px;top:600px;width:480px;height:90px;display:flex;align-items:center;gap:8px}
+#wave i{flex:1;border-radius:6px;background:linear-gradient(var(--acc2),var(--acc));height:20px}
+#issue{position:absolute;left:560px;top:270px;width:860px;padding:34px 40px 30px 46px;border-radius:24px;background:#fff;box-shadow:0 40px 90px -24px rgba(20,32,61,.45),0 0 0 1px rgba(20,32,61,.08);overflow:hidden}
+#issue::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:var(--edge,var(--bad))}
+#issue .top{display:flex;align-items:center;gap:16px}
+#issue h3{font-size:44px;letter-spacing:-.03em;flex:1}
+.tag{font-size:17px;font-weight:700;letter-spacing:.12em;color:var(--mute)}
+.pill{font-size:20px;font-weight:700;padding:7px 16px;border-radius:999px;color:#fff;background:var(--bad)}
+.chip{display:inline-block;margin-top:18px;font-size:21px;font-weight:600;padding:6px 16px;border-radius:999px;border:2px solid var(--acc);color:var(--acc)}
+#issue p{font-size:25px;color:var(--mute);margin-top:16px}
+#issue code{display:block;margin-top:20px;padding:18px 22px;border-radius:14px;background:#f1f4fa;font:500 22px ui-monospace,Menlo,monospace;color:var(--ink)}
+#fixbtn{position:absolute;right:40px;bottom:38px;font-size:22px;font-weight:700;padding:12px 22px;border-radius:12px;background:var(--acc);color:#fff}
+#phone{position:absolute;left:200px;top:250px;width:230px;height:440px;border:9px solid var(--ink);border-radius:38px;background:#fff;overflow:visible}
+#phone .notch{position:absolute;left:62px;top:-2px;width:88px;height:20px;border-radius:0 0 14px 14px;background:var(--ink)}
+#phone .ln{position:absolute;left:18px;height:14px;border-radius:7px;background:#dfe5f1}
+#wide{position:absolute;left:18px;top:170px;height:140px;border-radius:14px;background:linear-gradient(135deg,#1e3a74,#2f6fe0)}
+#over{position:absolute;top:160px;height:160px;left:212px;border:3px dashed var(--bad);border-left:none;border-radius:0 14px 14px 0;background:rgba(207,47,69,.08)}
+#wordmark{font-size:150px;font-weight:800;letter-spacing:-.05em}
+#url{display:inline-block;font-size:26px;font-weight:600;padding:12px 26px;border-radius:999px;background:#fff;color:var(--acc);box-shadow:0 10px 30px -10px rgba(20,32,61,.3)}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+html.portrait,html.portrait body{width:1080px;height:1920px}
+html.portrait .h{padding:0 50px}
+html.portrait #end{flex-direction:column;gap:36px}
+html.portrait #glow{width:1300px;height:1700px;margin:-850px 0 0 -650px}
+</style></head><body>
+<div id="stage">
+ <div id="glow"></div><div id="dots"></div>
+
+ <section id="s1">
+  <div class="h" id="p1" style="top:360px;font-size:150px"><span class="w">One </span><span class="w blue">site.</span></div>
+  <div class="h" id="p2" style="top:360px;font-size:150px"><span class="w">Every </span><span class="w blue">screen </span><span class="w blue">size.</span></div>
+  <div class="h" id="p3" style="top:360px;font-size:150px"><span class="w">At </span><span class="w blue">once.</span></div>
+  <div id="devs"></div>
+ </section>
+
+ <section id="s2">
+  <div class="shot" id="sync" style="left:210px;top:44px;width:1180px;height:663.75px;background-image:url(../docs/media/screenshot-sync.png)">
+   <div class="box" id="b0"></div><div class="box" id="b1"></div><div class="box" id="b2"></div>
+   <div class="ring" id="r0"></div><div class="ring" id="r1"></div><div class="ring" id="r2"></div>
+   <svg class="cursor" id="c0" viewBox="0 0 40 48"><path d="M4 4 L4 38 L13 30 L19 44 L25 41 L19 28 L31 28 Z" fill="#111" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+   <svg class="cursor ghost" id="c1" viewBox="0 0 40 48"><path d="M4 4 L4 38 L13 30 L19 44 L25 41 L19 28 L31 28 Z" fill="#2f6fe0" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+   <svg class="cursor ghost" id="c2" viewBox="0 0 40 48"><path d="M4 4 L4 38 L13 30 L19 44 L25 41 L19 28 L31 28 Z" fill="#2f6fe0" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="h" id="h2a" style="top:752px;font-size:84px"><span class="w">Click </span><span class="w blue">once.</span></div>
+  <div class="h" id="h2b" style="top:752px;font-size:84px"><span class="w">Every </span><span class="w blue">device </span><span class="w">follows.</span></div>
+ </section>
+
+ <section id="s3">
+  <div class="h" id="h3" style="top:120px;font-size:110px"><span class="w">See </span><span class="w">what </span><span class="w blue">breaks.</span></div>
+  <div id="count"><span id="n">0</span><small>differences</small></div>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="countlabel">3 screens compared with Desktop</div>
+  <div class="shot" id="report" style="left:200px;top:70px;width:1200px;height:675px;background-image:url(../docs/media/screenshot-report.png)"></div>
+ </section>
+
+ <section id="s4">
+  <div class="h" id="h4" style="top:96px;font-size:120px"></div>
+  <div id="grid" style="position:absolute;left:0;top:0;width:1600px;height:900px;transform-style:preserve-3d"></div>
+ </section>
+
+ <section id="s5">
+  <div id="floats"></div>
+  <div class="h" id="h5" style="top:330px;font-size:118px"><span class="w">Guided, </span><span class="w">step </span><span class="w">by </span><span class="w">step,</span></div>
+  <div class="h" id="h5b" style="top:470px;font-size:80px"><span class="w blue">with </span><span class="w blue">voice.</span></div>
+  <div id="wave"></div>
+ </section>
+
+ <section id="s6">
+  <div class="h" id="h6a" style="top:90px;font-size:120px"><span class="w">Find </span><span class="w" style="color:var(--bad)">it.</span></div>
+  <div class="h" id="h6b" style="top:90px;font-size:120px"><span class="w">Fix </span><span class="w green">it.</span></div>
+  <div id="phone"><div class="notch"></div>
+   <div class="ln" style="top:52px;width:90px;background:var(--acc)"></div>
+   <div class="ln" style="top:90px;width:170px"></div><div class="ln" style="top:116px;width:130px"></div>
+   <div id="wide"></div><div id="over"></div>
+   <div class="ln" style="top:340px;width:160px"></div><div class="ln" style="top:366px;width:110px"></div>
+  </div>
+  <div id="issue">
+   <div class="top"><h3>Page scrolls sideways</h3><span class="tag">LAYOUT</span><span class="pill" id="pill">Issue</span></div>
+   <span class="chip">iPhone 11 Pro</span>
+   <p>Pushed out by an element <b style="color:var(--ink)">+288px</b> wider than the screen.</p>
+   <code>max-width: 100%; overflow-wrap: anywhere;</code>
+   <div style="height:64px"></div>
+   <div id="fixbtn">Preview fix</div>
+  </div>
+ </section>
+
+ <section id="s7">
+  <div id="l7" class="logo" style="position:absolute;left:0;right:0;justify-content:center;top:200px"><i></i><i></i><i></i></div>
+  <div class="h" id="h7" style="top:420px;font-size:150px"><span class="w">Click. </span><span class="w">Compare. </span><span class="w blue">Ship.</span></div>
+ </section>
+
+ <section id="s8">
+  <div id="end" style="position:absolute;left:0;right:0;top:300px;display:flex;justify-content:center;align-items:center;gap:40px">
+   <div class="logo" id="l8"><i></i><i></i><i></i></div><div id="wordmark">Samestate</div>
+  </div>
+  <div class="h" id="h8" style="top:530px;font-size:46px;font-weight:600;color:var(--mute);letter-spacing:-.015em"><span class="w">Test </span><span class="w">every </span><span class="w">screen </span><span class="w">size </span><span class="w blue">at </span><span class="w blue">once.</span></div>
+  <div id="urlrow" style="position:absolute;left:0;right:0;top:660px;text-align:center"><span id="url">shouvik12.github.io/samestate</span></div>
+  <div class="ring" id="burst" style="left:800px;top:400px"></div>
+ </section>
+
+ <svg class="cursor" id="cur" viewBox="0 0 40 48" style="display:none"><path d="M4 4 L4 38 L13 30 L19 44 L25 41 L19 28 L31 28 Z" fill="#111" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+ <div id="flash"></div>
+</div>
+<script>
+const BEAT=60/128,BAR=BEAT*4,DURATION=30;
+const PORTRAIT=/portrait/.test(location.search);
+if(PORTRAIT)document.documentElement.classList.add('portrait');
+const L=PORTRAIT?{
+ devs:[[90,300,120,210,0],[700,250,280,180,1],[120,1350,300,190,2],[760,1300,160,260,0],[440,170,170,110,2],[480,1560,200,130,1],[880,560,110,190,0]],
+ syncW:1000,reportW:1000,cardW:440,cardAt:i=>[70+(i%2)*500,600+Math.floor(i/2)*500],cardPick:i=>[70+(i%2)*500+330,600+Math.floor(i/2)*500+330],curStart:[1000,1880],
+ floats:[['screenshot-tour',-80,150,-11],['screenshot-voice-help',700,90,9],['screenshot-theme',-60,1450,8],['screenshot-capture',720,1500,-8],['screenshot-sync',330,-130,3],['screenshot-checks',330,1720,-4]],
+ fix:[[1000,1880],[0,0]],center:[540,960],
+ css:{p1:'top:780px;font-size:140px',p2:'top:700px;font-size:140px',p3:'top:780px;font-size:140px',sync:'left:40px;top:520px;width:1000px;height:562.5px',h2a:'top:1190px;font-size:90px',h2b:'top:1190px;font-size:90px',
+  h3:'top:320px;font-size:110px',count:'left:100px;width:880px;top:700px',bar:'left:100px;top:890px;width:880px',countlabel:'left:100px;top:980px',report:'left:40px;top:640px;width:1000px;height:562.5px',
+  h4:'top:300px',h5:'top:700px;font-size:110px',h5b:'top:850px',wave:'left:300px;top:1000px',h6a:'top:220px',h6b:'top:220px',phone:'left:425px;top:440px',issue:'left:60px;top:1000px;width:960px',
+  l7:'top:520px',h7:'top:720px;font-size:170px',end:'top:620px',h8:'top:1080px',urlrow:'top:1200px',burst:'left:540px;top:800px'}
+}:{
+ devs:[[150,140,110,190,0],[330,560,250,160,1],[1260,120,200,280,2],[1150,600,300,190,0],[90,560,130,220,2],[600,130,170,110,1],[900,670,120,170,0]],
+ syncW:1180,reportW:1200,cardW:340,cardAt:i=>[70+i*370,360],cardPick:i=>[70+i*370+250,560],curStart:[1500,860],
+ floats:[['screenshot-tour',-60,40,-11],['screenshot-voice-help',1240,30,9],['screenshot-theme',40,640,8],['screenshot-capture',1180,630,-8],['screenshot-sync',600,-150,3],['screenshot-checks',620,780,-4]],
+ fix:[[1540,880],[1300,592]],center:[800,450],css:{}
+};
+for(const [id,css] of Object.entries(L.css))document.getElementById(id).style.cssText+=';'+css;
+const $=id=>document.getElementById(id);
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const P=(t,a,b)=>clamp((t-a)/(b-a));
+const out3=p=>1-(1-p)**3, in2=p=>p*p, io=p=>p<.5?4*p*p*p:1-(-2*p+2)**3/2;
+const back=p=>{const c=1.9;return 1+(c+1)*(p-1)**3+c*(p-1)**2;};
+const lerp=(a,b,p)=>a+(b-a)*p;
+function st(el,{o=1,x=0,y=0,z=0,s=1,r=0,rx=0,ry=0,b=0}={}){
+ el.style.opacity=o;
+ el.style.transform=`translate3d(${x}px,${y}px,${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotateZ(${r}deg) scale(${s})`;
+ el.style.filter=b>.05?`blur(${b}px)`:'none';
+}
+// Words rise in one after another, and leave upward at tOut.
+function words(el,t,t0,{stagger=.07,dur=.38,tOut=null,rise=60}={}){
+ [...el.querySelectorAll('.w')].forEach((w,i)=>{
+  const p=out3(P(t,t0+i*stagger,t0+i*stagger+dur));
+  let o=p,y=(1-p)*rise,b=(1-p)*14,s=lerp(.92,1,p);
+  if(tOut!=null){const q=in2(P(t,tOut,tOut+.2));o*=1-q;y-=q*50;b+=q*10;}
+  st(w,{o,y,b,s});
+ });
+}
+const scenes=[['s1',0,3.75],['s2',3.75,7.5],['s3',7.5,11.25],['s4',11.25,15],['s5',15,18.75],['s6',18.75,22.5],['s7',22.5,26.25],['s8',26.25,30.01]];
+
+// Scene 1: device outlines that pop in around "At once."
+const DEVS=L.devs;
+const COLORS=['var(--acc)','var(--ok)','var(--warn)'];
+$('devs').innerHTML=DEVS.map(([x,y,w,h,c])=>`<div class="dev" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-color:${COLORS[c]}"></div>`).join('');
+
+// Scene 2: the real device wall (1600x900 screenshot shown at 1180 wide).
+const K=L.syncW/1600;
+const RECTS=[[26,74,390,651],[448,74,592,394],[1071,74,388,610]];
+const CLICKS=[[245,235],[515,152],[1378,204]];
+RECTS.forEach(([x,y,w,h],i)=>Object.assign($('b'+i).style,{left:x*K-4+'px',top:y*K-4+'px',width:w*K+8+'px',height:h*K+8+'px'}));
+CLICKS.forEach(([x,y],i)=>Object.assign($('r'+i).style,{left:x*K+'px',top:y*K+'px'}));
+
+// Scene 4: feature cards, each cropped from a real screenshot. crop = [x, y, width] in the 1600x900 source.
+const CARDS=[['Measure.','Measure','Sizes, spacing, contrast','screenshot-measure',[440,60,960]],['Check.','Check','Layout, access, meta, speed','screenshot-checks',[800,40,800]],['Preview.','Preview','Titles and social cards','screenshot-meta',[960,40,640]],['Capture.','Capture','Screenshots and recordings','screenshot-capture',[0,40,960]]];
+$('grid').innerHTML=CARDS.map(([,title,sub,img,[cx,cy,cw]],i)=>{const k=L.cardW/cw,[x,y]=L.cardAt(i);return `<div class="card" id="k${i}" style="left:${x}px;top:${y}px;width:${L.cardW}px"><div class="thumb" style="height:${L.cardW*.625}px;background-image:url(../docs/media/${img}.png);background-size:${1600*k}px ${900*k}px;background-position:${-cx*k}px ${-cy*k}px"></div><div class="meta"><b>${title}</b><span>${sub}</span></div></div>`;}).join('');
+$('h4').innerHTML=CARDS.map(([w],i)=>`<span class="w ${i%2?'blue':''}" id="hw${i}" style="position:absolute;left:0;right:0">${w}</span>`).join('');
+
+// Scene 5: floating screens around the words, and a voice wave.
+const FLOATS=L.floats;
+$('floats').innerHTML=FLOATS.map(([img,x,y],i)=>`<div class="shot float" id="f${i}" style="left:${x}px;top:${y}px;background-image:url(../docs/media/${img}.png)"></div>`).join('');
+$('wave').innerHTML='<i></i>'.repeat(26);
+
+function cursor(el,x,y,click){st(el,{x,y,s:click?.82:1});el.style.left='0px';el.style.top='0px';}
+function pressAt(t,at){return t>=at&&t<at+.12;}
+
+function render(t){
+ for(const [id,a,b] of scenes)$(id).style.display=t>=a&&t<b?'block':'none';
+ // Beat pulse in the background, strongest on bar lines.
+ const sinceBeat=t%BEAT,onBar=Math.abs((t%BAR))<.01||t%BAR<BEAT;
+ const groove=t>=3.75&&t<26.25;
+ const pulse=groove?Math.exp(-sinceBeat/.13)*(t%BAR<BEAT?1:.55):Math.exp(-sinceBeat/.2)*.35;
+ st($('glow'),{o:.55+.45*pulse,s:1+.05*pulse});
+ st($('dots'),{o:.6,x:-(t*9)%34,y:-(t*5)%34});
+ $('cur').style.display='none';
+
+ if(t<3.75){
+  words($('p1'),t,0,{tOut:1.3});
+  words($('p2'),t,1.406,{tOut:2.72,stagger:.08});
+  words($('p3'),t,2.8125,{stagger:.09});
+  [...$('devs').children].forEach((d,i)=>{const p=back(P(t,2.85+i*.07,3.2+i*.07));st(d,{o:clamp(p*1.4),s:lerp(.3,1,p),r:(i%2?6:-6)*(1-p)});});
+ }
+ else if(t<7.5){
+  const p=out3(P(t,3.75,4.6)),q=io(P(t,4.6,7.5));
+  st($('sync'),{y:lerp(300,0,p)-14*q,s:lerp(.62,.95,p)+.04*q,rx:lerp(38,9,p)*(1-q),ry:lerp(-26,-6,p)*(1-q),r:lerp(10,1.5,p)*(1-q),o:clamp(p*2)});
+  // The visitor's click on the phone, then every device follows.
+  const cx0=lerp(880,CLICKS[0][0]*K,io(P(t,4.15,4.95))),cy0=lerp(560,CLICKS[0][1]*K,io(P(t,4.15,4.95)));
+  cursor($('c0'),cx0,cy0,pressAt(t,5.0)); $('c0').style.opacity=clamp(P(t,4.0,4.2));
+  const hits=[5.0,5.625,5.625+BEAT/2];
+  hits.forEach((h,i)=>{
+   const r=P(t,h,h+.7);st($('r'+i),{o:t<h?0:1-r,s:lerp(.4,3.4,out3(r))});
+   const bx=P(t,h,h+.25);st($('b'+i),{o:t<h?0:clamp(bx*1.2)*(i===0?.85:1),s:lerp(1.06,1,out3(bx))});
+   if(i){const g=back(P(t,h,h+.3));cursor($('c'+i),CLICKS[i][0]*K,CLICKS[i][1]*K,false);$('c'+i).style.opacity=t<h?0:1;$('c'+i).style.transform+=` scale(${lerp(.2,1,g)})`;}
+  });
+  words($('h2a'),t,3.75,{tOut:5.45});
+  words($('h2b'),t,5.625,{stagger:.08});
+ }
+ else if(t<11.25){
+  words($('h3'),t,7.5,{tOut:9.2});
+  const f=io(P(t,7.95,9.05));
+  $('fill').style.width=(f*100)+'%';
+  $('n').textContent=Math.round(22*f);
+  const showA=t<9.375;
+  for(const id of['count','bar','countlabel']){const p=out3(P(t,7.6,8.0));st($(id),{o:showA?p:0,y:(1-p)*40});}
+  // The report swoops in, then the camera pushes into the first issue.
+  const p=out3(P(t,9.375,10.05)),z=io(P(t,10.05,11.15));
+  const el=$('report');el.style.transformOrigin=`${1430*L.reportW/1600}px ${470*L.reportW/1600}px`;
+  st(el,{o:t<9.375?0:clamp(p*2),y:lerp(420,0,p),rx:lerp(30,4,p)*(1-z),ry:lerp(24,6,p)*(1-z),r:lerp(-6,0,p),s:lerp(.7,1,p)*lerp(1,2.1,z)});
+ }
+ else if(t<15){
+  const idx=Math.min(3,Math.floor((t-11.25)/(2*BEAT)));
+  CARDS.forEach((c,i)=>{
+   const s0=11.25+i*2*BEAT;
+   const w=$('hw'+i),p=out3(P(t,s0,s0+.3)),q=i<3?in2(P(t,s0+2*BEAT-.14,s0+2*BEAT)):0;
+   st(w,{o:p*(1-q),y:(1-p)*60-q*40,b:(1-p)*12+q*8});
+   const e=back(P(t,11.25+i*.08,11.65+i*.08)),act=i===idx?out3(P(t,s0,s0+.25)):0,was=i<idx?1-out3(P(t,s0+2*BEAT,s0+2*BEAT+.2)):0;
+   const lift=Math.max(act,was);
+   st($('k'+i),{o:clamp(e*1.5),y:lerp(160,0,e)-30*lift,s:lerp(.8,1,e)+.07*lift});
+   $('k'+i).style.boxShadow=lift>.01?`0 30px 70px -18px rgba(20,32,61,.45),0 0 0 ${4*lift}px var(--acc)`:'';
+  });
+  const d=io(P(t,11.25,15));st($('grid'),{rx:lerp(16,6,d),r:lerp(-3,1,d),y:lerp(40,0,d),s:lerp(.96,1.02,d)});
+  // A cursor visits each card on the beat.
+  const cur=$('cur');cur.style.display='block';
+  const from=Math.max(0,idx-1),k=io(P(t,11.25+idx*2*BEAT-.25,11.25+idx*2*BEAT+.05));
+  const a=L.cardPick(from),b=L.cardPick(idx),e0=io(P(t,11.0,11.45));
+  cursor(cur,idx===0?lerp(L.curStart[0],b[0],e0):lerp(a[0],b[0],k),idx===0?lerp(L.curStart[1],b[1],e0):lerp(a[1],b[1],k),false);
+  cur.style.opacity=clamp(P(t,11.25,11.4));
+ }
+ else if(t<18.75){
+  words($('h5'),t,15,{stagger:.1});
+  words($('h5b'),t,15.95,{stagger:.12});
+  FLOATS.forEach(([,x,y,r],i)=>{
+   const p=out3(P(t,15+i*.07,15.7+i*.07)),d=P(t,15,18.75);
+   const dx=(x+210-L.center[0])*.5,dy=(y+118-L.center[1])*.5;
+   st($('f'+i),{o:clamp(p*1.5)*.95,x:dx*(1-p)-dx*.08*d,y:dy*(1-p)-dy*.08*d,r:r*(1+.4*(1-p))+d*(i%2?2:-2),s:lerp(.8,.92,p),rx:i%2?8:-8,ry:i<3?10:-10});
+  });
+  const env=out3(P(t,15.9,16.3))*(1-P(t,18.2,18.7));
+  [...$('wave').children].forEach((b,i)=>{
+   const h=12+env*(18+70*Math.abs(Math.sin(t*Math.PI/BEAT*.5+i*.55))*(.55+.45*Math.sin(i*1.7+t*3))**2);
+   b.style.height=h+'px';
+  });
+ }
+ else if(t<22.5){
+  words($('h6a'),t,18.75,{tOut:20.45});
+  words($('h6b'),t,20.625);
+  const p=out3(P(t,18.75,19.5)),d=io(P(t,19.5,22.5));
+  st($('issue'),{o:clamp(p*2),y:lerp(260,0,p),rx:lerp(-34,4,p)*(1-d),ry:lerp(-20,-8,p)*(1-d),s:lerp(.82,1,p)+.02*d});
+  const ph=back(P(t,18.85,19.35));st($('phone'),{o:clamp(ph*1.5),s:lerp(.7,1,ph),r:lerp(-8,-3,ph)*(1-d*.6)});
+  // Clicking Preview fix pulls the wide block back inside the phone.
+  const fix=out3(P(t,20.82,21.3)),fixed=t>=20.82;
+  $('wide').style.width=lerp(260,176,fix)+'px';
+  $('over').style.width=lerp(66,0,fix)+'px';$('over').style.opacity=1-fix;
+  $('issue').style.setProperty('--edge',fixed?'var(--ok)':'var(--bad)');
+  $('pill').textContent=fixed?'Fixed ✓':'Issue';$('pill').style.background=fixed?'var(--ok)':'var(--bad)';
+  st($('pill'),{s:fixed?lerp(1.25,1,out3(P(t,20.82,21.1))):1});
+  st($('fixbtn'),{s:pressAt(t,20.7)?.93:1});
+  const cur=$('cur');cur.style.display='block';
+  const m=io(P(t,19.9,20.6));
+  const fb=$('fixbtn').getBoundingClientRect(),to=PORTRAIT?[fb.left+fb.width*.6,fb.top+fb.height*.6]:L.fix[1];
+  cursor(cur,lerp(L.fix[0][0],to[0],m),lerp(L.fix[0][1],to[1],m),pressAt(t,20.7));cur.style.opacity=clamp(P(t,19.8,20));
+ }
+ else if(t<26.25){
+  [...$('l7').children].forEach((i,n)=>{const p=back(P(t,22.5+n*.1,22.9+n*.1));st(i,{o:clamp(p*1.5),s:lerp(.2,1,p),y:(1-p)*40});});
+  words($('h7'),t,22.5,{stagger:2*BEAT,dur:.32});
+  const g=in2(P(t,25.3,26.25));
+  st($('s7'),{s:1+.06*g});
+  $('flash').style.opacity=in2(P(t,26.0,26.25))*.85;
+ }
+ else{
+  $('flash').style.opacity=.85*(1-out3(P(t,26.25,26.6)));
+  const p=out3(P(t,26.25,26.85));
+  st($('end'),{s:lerp(1.18,1,p),b:(1-p)*14,o:clamp(p*1.6)});
+  [...$('l8').children].forEach((i,n)=>{const q=back(P(t,26.3+n*.08,26.75+n*.08));st(i,{s:lerp(.3,1,q),o:clamp(q*1.4)});});
+  words($('h8'),t,27.6,{stagger:.08,rise:30});
+  const u=out3(P(t,28.3,28.7));st($('url'),{o:u,y:(1-u)*20});
+  const r=P(t,26.25,27.2);st($('burst'),{o:t<26.25?0:(1-r)*.9,s:lerp(1,26,out3(r))});
+ }
+}
+window.render=render;window.DURATION=DURATION;
+window.ready=Promise.all([...new Set([...document.querySelectorAll('[style*="url("]')].map(e=>e.style.backgroundImage.slice(5,-2)))].map(src=>new Promise(done=>{const i=new Image();i.onload=i.onerror=done;i.src=src;}))).then(()=>document.fonts.ready);
+render(0);
+if(location.search.includes('play')){const a=new Audio('out/motion-soundtrack.wav');const s=performance.now();a.play().catch(()=>{});(function f(){const t=(performance.now()-s)/1000;render(t%DURATION);requestAnimationFrame(f);})();}
+</script>
+</body></html>

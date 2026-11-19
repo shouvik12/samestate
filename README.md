@@ -6,7 +6,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center">·
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
-  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-demo-intro">Watch the narrated 30s video</a> ·
+  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-motion">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-motion">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -20,7 +20,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 </p>
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-demo-intro" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
-<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-demo-intro">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
+<p align="center">The animated preview is silent. Watch the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-motion">30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-motion">mobile version</a>), the <a href="https://shouvik12.github.io/samestate/media/samestate-demo.mp4?v=20261120-motion">narrated walkthrough</a>, or try the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
 
 ## Why Samestate
 
@@ -551,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Motion promo video**: a new 30-second video in a motion-graphics style (kinetic words, tilted real app screens, a camera that pushes into the report) on the same 128 BPM music, with new words on its beats; a 1080×1920 mobile version; the README links both, and the narrated walkthrough stays as its own video ([details](changelogs/CHANGELOG-motion-promo.md)) |
 | **2026-11-19** | | | **Start demo button**: the live demo opens on the intro card with Start demo, so its narration plays from the first word (browsers block sound until a click); Skip demo and explore opens the app; the sample site loads behind the card ([details](changelogs/CHANGELOG-start-demo-button.md)) |
 | **2026-11-19** | | | **Video opens with the demo intro**: the narrated 30-second video and the README GIF now start with the app's own intro (logo, tagline, purpose, chips) instead of a separate title card; screenshots, banner and link card re-recorded ([details](changelogs/CHANGELOG-promo-demo-intro.md)) |
 | **2026-11-19** | | | **Mute or Unmute only**: the demo's voice button no longer shows Enable voice or Retry voice, and the intro's click prompt is gone; the voice is on by default and a blocked or failed clip starts again with the next click or key press ([details](changelogs/CHANGELOG-demo-voice-mute-only.md)) |
