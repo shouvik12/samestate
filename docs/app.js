@@ -1943,7 +1943,6 @@ async function playIntro(id) {
     if (!touring(id)) break;
     el.classList.toggle('paused', tourPaused);
     const v = voice();
-    $('#tour-intro-sound').hidden = !v.blocked;
     if (v.blocked) waitedForSound = true;
     else if (waitedForSound && v.title === INTRO.title && !v.paused) {
       // The browser held the narration until the visitor clicked; give the intro its full length from here.
@@ -1954,7 +1953,6 @@ async function playIntro(id) {
     }
     await sleep(100);
   }
-  $('#tour-intro-sound').hidden = true;
   if (introSkipped || !touring(id)) window.samestateTourVoice?.stop();
   el.classList.add('leaving');
   await sleep(introSkipped ? 0 : 350);
