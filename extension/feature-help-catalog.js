@@ -298,6 +298,7 @@
   for (const [selector,key] of [['#design-title','debug:action:design'],['#grid-title','debug:action:grid'],['#preview-scale-title','screen-scale'],['#annotation-note-title','note-edit'],['.command-heading h2','#search-tools'],['.empty h1','#demo'],['.outline-overlays legend','#outline-focus-overlay']]) rules.push([selector,key]);
   function resolve(element) {
     if (!(element instanceof Element) || element.closest('#feature-help') || element.closest('iframe')) return null;
+    const original=window.samestateFeatureHelpIcons?.targetFor(element);if(original)return resolve(original)||entries.get(element.closest('.feature-help-trigger').dataset.helpKey)||null;
     let el=element;
     if (el.matches('label')) el=el.control || el.querySelector('input,select,textarea') || el;
     if (el.id && entries.has('#'+el.id)) {
