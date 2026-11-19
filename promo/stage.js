@@ -22,7 +22,7 @@
  function point(target){let r;if(Array.isArray(target)){const d=device(target[0]),f=d.iframe.getBoundingClientRect(),e=d.iframe.contentDocument.querySelector(target[1]).getBoundingClientRect(),k=f.width/d.iframe.offsetWidth;r={left:f.left+e.left*k,top:f.top+e.top*k,width:e.width*k,height:e.height*k};}else r=(typeof target==='string'?document.querySelector(target):target).getBoundingClientRect();pointer.hidden=false;pointer.style.transform=`translate(${r.left+r.width/2}px,${r.top+r.height/2}px)`;}
  async function fit(){for(let z=100;z>=24;z-=2){setZoom(z);await wait(15);if(cv.scrollWidth<=cv.clientWidth+1&&cv.scrollHeight<=cv.clientHeight+1)break;}cv.scrollTo(0,0);}
  async function base(ids=['iphone','ipad','desktop']){
-  await endTour(false);window.samestateFeatureHelp.close(false);for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
+  await endTour(false);window.samestateFeatureHelp.close(false);document.activeElement?.blur?.();for(const dialog of document.querySelectorAll('dialog[open]'))dialog.close();
   setSitesMode(false);setPageSteps(false);undoAllFixes();wallDebug.tools.clear();wallDebug.sim='';clearThemePreset();
   for(const d of DEVICES){if(d.on!==ids.includes(d.id))selectDevice(d,ids.includes(d.id));d.scaleOverride=null;d.linked=true;d.design=null;d.outlineState=null;d.debug=new Set();d.sim='';}
   refreshDevicePicker();if(!$('#sidebar').hidden)$('#toggle-sidebar').click();$('#panel').hidden=true;catFilter=null;uiTheme.preview('samestate','dark');setMode(ids.length>3?'grid':'row');
@@ -67,7 +67,7 @@
   if(id==='sync'){point(['desktop','.dd-btn']);await wait(650);play('desktop',{do:'click',sel:'.dd-btn'});await wait(700);}
   else if(id==='measure'){point('#outline-list button');await wait(500);$('#outline-list button').click();await until(()=>!!samestateOutline.get().measurement);}
   else if(id==='checks'){point('#checks-run');await wait(500);$('#checks-run').click();await until(()=>!samestateChecks.running&&!!samestateChecks.get()?.finishedAt);await wait(650);const first=$('#pane-checks [data-status="review"]');if(first)$('#pane-checks').scrollTo({top:first.offsetTop-260,behavior:'smooth'});}
-  else if(id==='help'){const icon=samestateFeatureHelpIcons.forTarget($('#open-outline'));point(icon);await wait(500);icon.click();await wait(350);point('#feature-help-hear');$('#feature-help-hear').click();}
+  else if(id==='help'){const source=$('#open-outline'),icon=samestateFeatureHelpIcons.forTarget(source);point(source);source.dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'mouse'}));await wait(400);point(icon);await wait(250);icon.click();await wait(250);point('#feature-help-hear');$('#feature-help-hear').click();source.dispatchEvent(new PointerEvent('pointerout',{bubbles:true,relatedTarget:$('#feature-help-hear')}));}
   else if(id==='tour'){point('#tourpause');await wait(500);$('#tourpause').click();}
   else if(id==='meta'){point('#pane-meta');await wait(900);$('#pane-meta').scrollTo({top:220,behavior:'smooth'});}
  }

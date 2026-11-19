@@ -1,4 +1,4 @@
-/* Small explicit help shortcuts. App controls and preview frames are never wrapped or moved. */
+/* Reveal explicit help shortcuts on hover/focus without wrapping controls or moving preview frames. */
 (() => {
   'use strict';
   const help=window.samestateFeatureHelp, catalog=window.samestateFeatureHelpCatalog;
@@ -7,9 +7,22 @@
   const layer=document.createElement('div');
   layer.className='feature-help-layer';layer.setAttribute('role','toolbar');layer.setAttribute('aria-label','Feature help shortcuts');
   document.body.append(layer);
-  const icons=new Map(), sources=new WeakMap();let queued=0, current=null;
+  const icons=new Map(), sources=new WeakMap();let queued=0, current=null, hovered=null, focused=null, leaveTimer=0;
   const glyph='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 .5c0 1.8-2.5 2-2.5 4M12 17h.01"/></svg>';
   const targetFor=node=>node instanceof Element?sources.get(node.closest('.feature-help-trigger'))||null:null;
+  function sourceAt(node){
+    if(!(node instanceof Element))return null;
+    const original=targetFor(node);if(original)return original;
+    if(node.closest(own))return null;
+    for(let el=node;el&&el!==document.body;el=el.parentElement){if(icons.has(el))return el;if(el.matches('label')&&icons.has(el.control))return el.control;}
+    return null;
+  }
+  function reveal(){
+    for(const [source,button] of icons){
+      const on=!button.hidden&&(source===hovered||source===focused||help.isFor(source));
+      button.classList.toggle('is-revealed',on);
+    }
+  }
   function visibleRect(el, clips) {
     if(!el.isConnected||el.closest('[hidden],[inert],.sr-only')||!el.getClientRects().length)return null;
     const style=getComputedStyle(el);if(style.visibility!=='visible'||style.display==='none')return null;
@@ -59,6 +72,7 @@
     const visible=[...icons.values()].filter(button=>!button.hidden).sort((a,b)=>parseFloat(a.style.top)-parseFloat(b.style.top)||parseFloat(a.style.left)-parseFloat(b.style.left));
     if(!visible.includes(current))current=visible[0]||null;
     for(const button of icons.values())button.tabIndex=button===current&&!button.hidden?0:-1;
+    reveal();
   }
   function schedule(){if(!queued)queued=requestAnimationFrame(refresh);}
   function iconEvent(event){const button=event.target instanceof Element?event.target.closest('.feature-help-trigger'):null;return button&&sources.has(button)?button:null;}
@@ -76,9 +90,16 @@
     event.preventDefault();event.stopImmediatePropagation();
     const visible=[...icons.values()].filter(b=>!b.hidden).sort((a,b)=>parseFloat(a.style.top)-parseFloat(b.style.top)||parseFloat(a.style.left)-parseFloat(b.style.left));
     const step=['ArrowLeft','ArrowUp'].includes(event.key)?-1:1,index=event.key==='Home'?0:event.key==='End'?visible.length-1:(visible.indexOf(button)+step+visible.length)%visible.length;
-    current=visible[index];for(const b of visible)b.tabIndex=b===current?0:-1;current?.focus({preventScroll:true});
+    current=visible[index];focused=sources.get(current)||null;reveal();for(const b of visible)b.tabIndex=b===current?0:-1;current?.focus({preventScroll:true});
   },true);
   window.addEventListener('keyup',event=>{if(iconEvent(event)&&(event.key==='Enter'||event.key===' ')){event.preventDefault();event.stopImmediatePropagation();}},true);
+  document.addEventListener('pointerover',event=>{const source=sourceAt(event.target);if(source){clearTimeout(leaveTimer);hovered=source;reveal();}},true);
+  document.addEventListener('pointerout',event=>{
+    const source=sourceAt(event.relatedTarget);clearTimeout(leaveTimer);
+    if(source){hovered=source;reveal();}else leaveTimer=setTimeout(()=>{hovered=null;reveal();},180);
+  },true);
+  document.addEventListener('focusin',event=>{focused=event.target.matches?.('.feature-help-trigger,:focus-visible')?sourceAt(event.target):null;reveal();},true);
+  document.addEventListener('focusout',event=>{focused=sourceAt(event.relatedTarget);reveal();},true);
   const observer=new MutationObserver(records=>{
     if(records.some(record=>{
       if(record.target instanceof Element&&record.target.closest(own+',#tour-cursor,#tour-ring,#tour-callout'))return false;
@@ -89,7 +110,7 @@
   observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,characterData:true});
   for(const event of ['scroll','toggle','transitionend','input','change'])document.addEventListener(event,schedule,true);
   addEventListener('resize',schedule);document.fonts.ready.then(schedule);
-  addEventListener('pagehide',()=>{observer.disconnect();cancelAnimationFrame(queued);});
+  addEventListener('pagehide',()=>{observer.disconnect();cancelAnimationFrame(queued);clearTimeout(leaveTimer);});
   window.samestateFeatureHelpIcons={targetFor,forTarget:el=>icons.get(el)||null,refresh:schedule};
   schedule();
 })();

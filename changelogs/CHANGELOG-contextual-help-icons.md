@@ -1,6 +1,6 @@
 # Individual Help Icons — A Question Mark for Each App Feature
 
-- Added small, always-visible question marks beside app buttons, fields, section headings, preview tools and report features.
+- Added small question marks beside app buttons and features that appear only on hover or keyboard focus, with a short handoff delay so they can be clicked.
 - Clicking a question mark opens that control’s explanation and its existing natural voice playback.
 - Kept the top-bar question mark and searchable help browser.
 - Kept hover and ordinary focus quiet; explanations open only on explicit activation.
@@ -13,7 +13,7 @@
 
 ## Summary
 
-The top-bar help browser is now accompanied by a small contextual question mark for each app control or feature. All shortcuts reuse the curated explanations and bundled natural voice clips, without automatic hover popups.
+The top-bar help browser is now accompanied by contextual question marks revealed on hover or keyboard focus. Icons stay hidden while unused, and explanations still require a click. The top-bar question mark remains visible at all times.
 
 ---
 
@@ -21,7 +21,7 @@ The top-bar help browser is now accompanied by a small contextual question mark 
 
 **Files:** `extension/feature-help-icons.js`, `docs/feature-help-icons.js`, `extension/app.css`, `docs/app.css`, `extension/app.html`, `docs/index.html`
 
-**What:** A separate shortcut layer positions real help buttons beside visible app controls. Controls and preview frames are never wrapped or reparented. Icons use the existing help catalog, account for scroll clipping and covered content, update after DOM and viewport changes, and move into the active native dialog. Small spacing adjustments keep icons clear of toolbar labels and capture-folder text. Existing Debug information markers are replaced visually by the clickable question marks. The new script and changed assets have updated cache versions in both builds.
+**What:** A separate shortcut layer positions real help buttons beside visible app controls, revealing only hovered, keyboard-focused or currently explained controls. A short pointer handoff delay keeps an icon reachable as the pointer moves onto it. Controls and preview frames are never wrapped or reparented. Icons account for scroll clipping and covered content, update after DOM and viewport changes, and move into the active native dialog. Spacing keeps icons clear of labels, and Debug information markers use the same explicit help flow. Both builds have updated cache versions.
 
 **Impact:** Help is discoverable beside each feature, including disabled controls and dynamically generated findings, while the top-bar lookup remains available. Icons do not add width to button rows or interfere with form values and preview navigation.
 
@@ -45,7 +45,7 @@ The top-bar help browser is now accompanied by a small contextual question mark 
 
 ## Testing
 
-- `node tests/feature-help.mjs`: 53/53 checks passed, including all 474 decoded audio clips, unchanged actions/forms, keyboard access, modal dialogs, responsive layouts, private-field exclusions and demo coordination; zero page errors.
+- `node tests/feature-help.mjs`: 55/55 checks passed, including idle-hidden and hover-reveal behaviour, all 474 decoded audio clips, unchanged actions/forms, keyboard access, modal dialogs, responsive layouts, private-field exclusions and demo coordination; zero page errors.
 - `node tests/smoke.mjs`: 62/62 checks passed in 259 seconds, zero page errors.
 - Eight real app scenes and nine screenshots recorded in headless Chrome without page exceptions; visually inspected contextual help and readable control labels.
 - Updated H.264/AAC showcase decodes and lasts 30.000 seconds; the narrated help cue fits its four-second scene.
@@ -60,8 +60,8 @@ The top-bar help browser is now accompanied by a small contextual question mark 
 | `README.md` | +18 −17 | Both help entry points, media URLs and release note |
 | `CONTRIBUTING.md` | +1 | Help-module reference |
 | `changelogs/CHANGELOG-contextual-help-icons.md` | +100 | Change documentation |
-| `extension/feature-help-icons.js` | +95 | Visible contextual shortcuts |
-| `docs/feature-help-icons.js` | +95 | Matching web shortcuts |
+| `extension/feature-help-icons.js` | +124 | Visible contextual shortcuts |
+| `docs/feature-help-icons.js` | +124 | Matching web shortcuts |
 | `extension/feature-help.js` | +8 −8 | Original control, invoker and focus handling |
 | `docs/feature-help.js` | +8 −8 | Matching interaction logic |
 | `extension/feature-help-catalog.js` | +1 | Shortcut metadata resolution |

@@ -386,7 +386,8 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 #feature-help{position:fixed;inset:auto;margin:0;width:min(330px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--side);color:var(--text);box-shadow:0 12px 38px color-mix(in srgb,var(--shadow) 45%,transparent);z-index:1000;font-family:inherit;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 #feature-help[hidden]{display:none}
 .feature-help-layer{position:fixed;inset:0;z-index:1001;pointer-events:none;overflow:visible}
-.feature-help-trigger{position:fixed;display:grid;place-items:center;width:14px;height:14px;padding:0;border:0;border-radius:50%;background:var(--side);color:var(--mute);box-shadow:0 0 0 1px var(--line);pointer-events:auto;cursor:help}
+.feature-help-trigger{position:fixed;display:grid;place-items:center;width:14px;height:14px;padding:0;border:0;border-radius:50%;background:var(--side);color:var(--mute);box-shadow:0 0 0 1px var(--line);opacity:0;pointer-events:none;cursor:help;transition:opacity .1s}
+.feature-help-trigger.is-revealed,.feature-help-trigger:focus-visible{opacity:1;pointer-events:auto}
 .feature-help-trigger[hidden]{display:none}
 .feature-help-trigger svg{width:14px;height:14px;pointer-events:none}
 .feature-help-trigger:hover,.feature-help-trigger[aria-expanded=true]{color:var(--acc);background:var(--raise)}
