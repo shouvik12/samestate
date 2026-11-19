@@ -1,0 +1,26 @@
+{
+  "duration": 30,
+  "voice": "af_heart",
+  "soundtrack": "motion-soundtrack.wav",
+  "note": "Words for the motion promo, on the beats of promo/music.py (128 BPM: beat 0.46875 s, bar 1.875 s). promo/motion.html shows the same words at the same times.",
+  "cues": [
+    {"start": 0,       "duration": 1.406, "voice": "One site."},
+    {"start": 1.406,   "duration": 1.406, "voice": "Every screen size."},
+    {"start": 2.8125,  "duration": 0.9375, "voice": "At once."},
+    {"start": 3.75,    "duration": 1.875, "voice": "Click once."},
+    {"start": 5.625,   "duration": 1.875, "voice": "Every device follows."},
+    {"start": 7.5,     "duration": 1.875, "voice": "See what breaks."},
+    {"start": 11.25,   "duration": 0.9375, "voice": "Measure."},
+    {"start": 12.1875, "duration": 0.9375, "voice": "Check."},
+    {"start": 13.125,  "duration": 0.9375, "voice": "Preview."},
+    {"start": 14.0625, "duration": 0.9375, "voice": "Capture."},
+    {"start": 15,      "duration": 3.75, "voice": "Guided, step by step, with voice."},
+    {"start": 18.75,   "duration": 1.875, "voice": "Find it."},
+    {"start": 20.625,  "duration": 1.875, "voice": "Fix it."},
+    {"start": 22.5,    "duration": 0.9375, "voice": "Click."},
+    {"start": 23.4375, "duration": 0.9375, "voice": "Compare."},
+    {"start": 24.375,  "duration": 1.875, "voice": "Ship."},
+    {"start": 26.25,   "duration": 1.35, "voice": "Samestate."},
+    {"start": 27.6,    "duration": 2.4, "voice": "Test every screen size at once."}
+  ]
+}

@@ -24,9 +24,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', required=True)
     parser.add_argument('--voices', required=True)
+    parser.add_argument('--story', default=str(HERE / 'showcase.json'), help='showcase.json (scenes) or motion.json (cues)')
     parser.add_argument('--ffmpeg', default=shutil.which('ffmpeg') or '/opt/homebrew/bin/ffmpeg')
     args = parser.parse_args()
-    story = json.loads((HERE / 'showcase.json').read_text())
+    story = json.loads(Path(args.story).read_text())
     output = HERE / 'out'; output.mkdir(exist_ok=True)
     if not (output / 'music.wav').exists():
         subprocess.run([sys.executable, str(HERE / 'music.py'), str(output / 'music.wav')], check=True)
@@ -35,18 +36,18 @@ def main():
     rate = 24000
     narration = np.zeros(int(story['duration'] * rate), dtype=np.float32)
     spans = []
-    for scene in story['scenes']:
+    for scene in story.get('cues') or story['scenes']:
         text = scene['voice'].replace('Samestate', 'Same state')
         samples, sample_rate = model.create(text, voice=story['voice'], speed=1.0, lang='en-us')
         room = scene['duration'] - .16
         if len(samples) / sample_rate > room:
             speed = min(1.15, len(samples) / sample_rate / room + .02)
             samples, sample_rate = model.create(text, voice=story['voice'], speed=speed, lang='en-us')
-        assert sample_rate == rate and len(samples) / rate <= room, 'Shorten the narration for ' + scene['id']
+        assert sample_rate == rate and len(samples) / rate <= room, 'Shorten the narration for ' + scene.get('id', scene['voice'])
         start = int((scene['start'] + .08) * rate)
         narration[start:start + len(samples)] = samples
         spans.append((start / rate, (start + len(samples)) / rate))
-        print(f"{scene['id']}: {len(samples) / rate:.2f}s within {scene['duration']}s", flush=True)
+        print(f"{scene.get('id', scene['voice'])}: {len(samples) / rate:.2f}s within {scene['duration']}s", flush=True)
     with tempfile.TemporaryDirectory(prefix='samestate-promo-voice-') as temp:
         temp = Path(temp)
         raw = temp / 'raw.wav'; sf.write(raw, narration, rate)
@@ -65,8 +66,8 @@ def main():
             gain[left:start] = np.minimum(gain[left:start], np.linspace(1, .25, start - left))
             gain[end:right] = np.minimum(gain[end:right], np.linspace(.25, 1, right - end))
         mixed = temp / 'mixed.wav'; sf.write(mixed, voice + music * .28 * gain[:, None], sr)
-        run('-i', mixed, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=9', '-ar', 48000, '-t', story['duration'], output / 'soundtrack.wav')
-    print('Wrote promo/out/soundtrack.wav with the app’s Kokoro af_heart voice.', flush=True)
+        run('-i', mixed, '-af', 'loudnorm=I=-16:TP=-1.5:LRA=9', '-ar', 48000, '-t', story['duration'], output / story.get('soundtrack', 'soundtrack.wav'))
+    print(f"Wrote promo/out/{story.get('soundtrack', 'soundtrack.wav')} with the app’s Kokoro af_heart voice.", flush=True)
 
 
 if __name__ == '__main__':
