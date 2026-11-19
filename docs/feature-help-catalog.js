@@ -13,6 +13,7 @@
   const controls = [
     ['src','Site address','Enter the website to open on the device wall. The extension can open your own pages; the web demo uses the bundled sample site.'],
     ['search-tools','Search tools and features','Find any Samestate tool by name or purpose. Filter by category, then choose a result. Press Command K or Control K to open this search.'],
+    ['feature-help-open','Feature help','Open the help browser from the question-mark icon in the top bar. Search for a feature, button or section, choose its explanation, and press Hear explanation for natural voice guidance.'],
     ['toggle-sidebar','Preview settings','Show or hide the sidebar containing devices, capture, layout, sync, themes and test settings.'],
     ['reload','Reload every preview','Reload the current page in every preview. Temporary changes to a page may be lost.'],
     ['ui-mode','Day and night mode','Switch the Samestate interface between light and dark appearance.'],

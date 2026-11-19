@@ -2839,6 +2839,12 @@
       "title": "Workspace portability",
       "caption": "Human review · save, reopen, export and import. Select this group to include it in a combined check run.",
       "file": "help-37f3f0804f978b.mp3"
+    },
+    {
+      "key": "#feature-help-open",
+      "title": "Feature help",
+      "caption": "Open the help browser from the question-mark icon in the top bar. Search for a feature, button or section, choose its explanation, and press Hear explanation for natural voice guidance.",
+      "file": "help-f9463b728bb99f.mp3"
     }
   ]
 }
