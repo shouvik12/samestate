@@ -9,12 +9,14 @@
   try { muted = localStorage.getItem('samestate.tourMuted') === 'true'; } catch {}
 
   function render() {
-    label.textContent = muted ? 'Unmute' : blocked ? 'Enable voice' : failed ? 'Retry voice' : 'Mute';
-    const action = muted ? 'Unmute demo narration' : blocked ? 'Enable demo narration' : failed ? 'Retry this step’s narration' : 'Mute demo narration';
+    // The voice is on unless muted, so the button only ever says Mute or Unmute. A blocked or failed clip starts
+    // again on the next click or key press (see unlock()); screen readers hear the reason in the status line.
+    label.textContent = muted ? 'Unmute' : 'Mute';
+    const action = muted ? 'Unmute demo narration' : 'Mute demo narration';
     button.title = button.ariaLabel = action;
     button.setAttribute('aria-pressed', String(muted));
     button.classList.toggle('is-muted', muted);
-    $('#tour-voice-status').textContent = muted ? 'Demo narration muted.' : blocked ? 'Click Enable voice to hear the demo.' : failed ? 'Narration could not play. Retry voice or continue reading the explanation.' : 'Demo narration on.';
+    $('#tour-voice-status').textContent = muted ? 'Demo narration muted.' : blocked ? 'Demo narration is on and starts with your first click or key press.' : failed ? 'This step’s narration could not play. It tries again with your next click or key press.' : 'Demo narration on.';
   }
 
   function stop() {
@@ -42,7 +44,7 @@
         current.pending = false;
         if (error.name === 'AbortError' && (held || muted)) return;
         blocked = error.name === 'NotAllowedError'; failed = !blocked;
-        if (blocked) armUnlock();
+        armUnlock(); // blocked by the browser, or the file failed: the next click or key press tries again
         render();
       });
     } catch { current.pending = false; failed = true; render(); }
@@ -59,7 +61,9 @@
     if (event.type === 'keydown' && ['Shift', 'Control', 'Alt', 'Meta', 'Escape', 'CapsLock', 'Fn'].includes(event.key)) return; // browsers don't count these as permission to play
     UNLOCK.forEach(type => removeEventListener(type, unlock, true)); unlockArmed = false;
     unlockedAt = Date.now();
-    if (blocked && current && !muted) { blocked = false; play(); }
+    if (!current || muted || !(blocked || failed)) return;
+    if (failed) { audio.src = current.source; audio.load(); current.finished = false; }
+    blocked = failed = false; play();
   }
   function armUnlock() {
     if (unlockArmed) return;
@@ -77,7 +81,7 @@
     audio.src = source;
     const token = sequence;
     audio.onended = () => { if (sequence === token && current && audio.ended) { current.finished = true; current.pending = false; } };
-    audio.onerror = () => { if (sequence === token && current && audio.error) { failed = true; current.pending = false; render(); } };
+    audio.onerror = () => { if (sequence === token && current && audio.error) { failed = true; current.pending = false; armUnlock(); render(); } };
     play();
   }
 
@@ -88,15 +92,12 @@
   }
 
   button.onclick = () => {
-    if (blocked || failed) {
-      muted = false;
+    muted = !muted;
+    if (muted) audio.pause();
+    else {
       if (failed && current) { audio.src = current.source; audio.load(); current.finished = false; }
       blocked = failed = false;
       play();
-    }
-    else {
-      muted = !muted;
-      if (muted) audio.pause(); else play();
     }
     try { localStorage.setItem('samestate.tourMuted', String(muted)); } catch {}
     render();

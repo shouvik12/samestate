@@ -99,17 +99,17 @@ async function main(){
   const url=`http://127.0.0.1:${server.address().port}/?tour-pace=0.05`;
   await page.send('Page.navigate',{url});await until('!!window.samestateTourVoice && !!window.samestateDemoNarration && tourPhase!==\'preparing\'');
   const clips=await evaluate('samestateDemoNarration.clips');
-  record('All 46 steps have narration matching their current captions',await evaluate(`STEPS.length===46 && samestateDemoNarration.clips.length===46 && STEPS.every(step=>{const el=document.createElement('div');el.innerHTML=step.text;return samestateDemoNarration.clips.some(c=>c.title===step.title&&c.caption===el.textContent.trim().replace(/\\s+/g,' '))})`));
+  record('All 46 steps and the intro have narration matching their current captions',await evaluate(`STEPS.length===46 && samestateDemoNarration.clips.length===47 && samestateDemoNarration.clips.some(c=>c.title==='Samestate'&&c.file==='intro.mp3') && STEPS.every(step=>{const el=document.createElement('div');el.innerHTML=step.text;return samestateDemoNarration.clips.some(c=>c.title===step.title&&c.caption===el.textContent.trim().replace(/\\s+/g,' '))})`));
   const files=clips.flatMap(c=>c.extensionFile?[c.file,c.extensionFile]:[c.file]);
-  record('All 47 MP3 files are identical in extension and web builds',files.every(f=>{const web=readFileSync(join(ROOT,'demo/narration',f)),ext=readFileSync(join(ROOT,'../extension/demo/narration',f));return web.length>5000&&web.equals(ext)}));
+  record(`All ${files.length} MP3 files are identical in extension and web builds`,files.every(f=>{const web=readFileSync(join(ROOT,'demo/narration',f)),ext=readFileSync(join(ROOT,'../extension/demo/narration',f));return web.length>5000&&web.equals(ext)}));
   const decoded=await evaluate(`(async()=>{const ctx=new OfflineAudioContext(1,1,44100),out=[];for(const c of samestateDemoNarration.clips){for(const file of [c.file,...(c.extensionFile?[c.extensionFile]:[])]){const res=await fetch('demo/narration/'+file);const b=await ctx.decodeAudioData(await res.arrayBuffer());const samples=b.getChannelData(0);let peak=0;for(let i=0;i<samples.length;i+=100)peak=Math.max(peak,Math.abs(samples[i]));out.push({file,duration:b.duration,peak});}}return out})()`);
-  record('Every clip decodes into audible audio',decoded.length===47&&decoded.every(c=>c.duration>2&&c.duration<60&&c.peak>.02&&c.peak<=1.01),`${decoded.length} decoded clips`);
+  record('Every clip decodes into audible audio',decoded.length===files.length&&decoded.every(c=>c.duration>2&&c.duration<60&&c.peak>.02&&c.peak<=1.01),`${decoded.length} decoded clips`);
   await until('samestateTourVoice.get().blocked');
-  record('Mute sits beside Pause with an accessible label',await evaluate(`$('#tour-mute').previousElementSibling===$('#tourpause') && $('#tour-mute').getAttribute('aria-label')==='Enable demo narration'`));
+  record('Mute sits beside Pause with an accessible label',await evaluate(`$('#tour-mute').previousElementSibling===$('#tourpause') && $('#tour-mute').getAttribute('aria-label')==='Mute demo narration'`));
   await until('samestateTourVoice.get().blocked');
-  record('Browser autoplay blocking offers Enable voice without stopping the demo',await evaluate(`$('#tour-mute span').textContent==='Enable voice' && !samestateTourVoice.waiting && tourRunning`));
-  await click('#tour-mute');await until("!$('#tour-audio').paused && $('#tour-audio').currentTime>.15");
-  record('A real click enables the bundled voice recording',await evaluate(`!samestateTourVoice.get().blocked && !samestateTourVoice.get().muted && $('#tour-audio').src.includes('demo/narration/')`));
+  record('Browser autoplay blocking keeps the voice on (Mute) without stopping the demo',await evaluate(`$('#tour-mute span').textContent==='Mute' && !samestateTourVoice.get().muted && !samestateTourVoice.waiting && tourRunning`));
+  await click('#tourcount');await until("!$('#tour-audio').paused && $('#tour-audio').currentTime>.15");
+  record('The first real click anywhere starts the bundled voice recording',await evaluate(`!samestateTourVoice.get().blocked && !samestateTourVoice.get().muted && $('#tour-audio').src.includes('demo/narration/')`));
   if(process.env.VOICE_SCREENSHOT){const shot=await page.send('Page.captureScreenshot',{format:'png'});writeFileSync(process.env.VOICE_SCREENSHOT,Buffer.from(shot.data,'base64'));}
   await click('#tourpause');const frozen=await evaluate("$('#tour-audio').currentTime");await sleep(450);
   record('Pause holds both voice and demo',await evaluate(`tourPaused && $('#tour-audio').paused && Math.abs($('#tour-audio').currentTime-${frozen})<.05`));
@@ -142,9 +142,9 @@ async function main(){
   await evaluate('endTour(false)');await until('!samestateTourFeatures.active');
   await evaluate('goTourStep(0);true');await until("samestateTourVoice.get().title==='Click sync'");await click('#tour-mute');if(await evaluate('tourPaused'))await click('#tourpause');await until("!$('#tour-audio').paused");
   await evaluate("$('#tour-audio').src='demo/narration/missing-voice.mp3';$('#tour-audio').load();true");await until('samestateTourVoice.get().failed');
-  record('Missing audio offers Retry without trapping the walkthrough',await evaluate(`!samestateTourVoice.waiting && $('#tour-mute span').textContent==='Retry voice'`));
-  await click('#tour-mute');if(await evaluate('tourPaused'))await click('#tourpause');await until("!samestateTourVoice.get().failed && !$('#tour-audio').paused && $('#tour-audio').src.includes('click-sync.mp3')");
-  record('Retry restores and plays the correct clip',true);
+  record('Missing audio keeps Mute and does not trap the walkthrough',await evaluate(`!samestateTourVoice.waiting && $('#tour-mute span').textContent==='Mute'`));
+  await click('#tourcount');if(await evaluate('tourPaused'))await click('#tourpause');await until("!samestateTourVoice.get().failed && !$('#tour-audio').paused && $('#tour-audio').src.includes('click-sync.mp3')");
+  record('The next click retries and plays the correct clip',true);
   await click('#skip');await until('!tourRunning && !samestateTourFeatures.active');
   record('No page errors',errors.length===0,errors.join('; '));
   const failed=results.filter(r=>!r.ok);console.log(`\n${results.length-failed.length}/${results.length} narration checks passed`);if(failed.length)process.exitCode=1;
