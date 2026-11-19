@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "voice": "Kokoro af_heart",
+  "clips": [
+    {
+      "title": "Click sync",
+      "caption": "The Desktop clicks Products. Phones and tablets have no nav bar, so each one opens its own menu first, then Products.",
+      "file": "click-sync.mp3"
+    },
+    {
+      "title": "Same state, different layout",
+      "caption": "Sign in sits in the bar on desktops and inside the menu on phones. One click opens the same dialog everywhere.",
+      "file": "same-state-different-layout.mp3"
+    },
+    {
+      "title": "Any screen can lead",
+      "caption": "The iPhone closes the dialog this time. Touch screens show a fingertip circle as the pointer, desktops a white arrow.",
+      "file": "any-screen-can-lead.mp3"
+    },
+    {
+      "title": "Twin controls",
+      "caption": "This site draws its dark mode button twice, once for phones and once for desktops. Samestate pairs the two by their attributes, so the desktops follow.",
+      "file": "twin-controls.mp3"
+    },
+    {
+      "title": "Works both ways",
+      "caption": "The Desktop switches dark mode off again, and every phone and tablet follows.",
+      "file": "works-both-ways.mp3"
+    },
+    {
+      "title": "Device identity",
+      "caption": "Phone and tablet identity in Views makes phones and tablets tell the page what they are. This site then shows its app banner to phones only. It is off by default, since some sites then show phones a different page.",
+      "file": "device-identity.mp3"
+    },
+    {
+      "title": "Scroll sync",
+      "caption": "Scrolling the Desktop to Compare plans. Screens stop at the same section even though their pages are different lengths.",
+      "file": "scroll-sync.mp3"
+    },
+    {
+      "title": "Difference report",
+      "caption": "Detect differences measures every screen against the Desktop and lists each problem once, with the screens it affects. Clicking one outlines it on all of them, here the table that is too wide for the phones.",
+      "file": "difference-report.mp3"
+    },
+    {
+      "title": "Annotations",
+      "caption": "The ✎ button on a preview opens drawing tools: freehand, lines, arrows and notes. Marks stay on their own preview and appear in screenshots.",
+      "file": "annotations.mp3"
+    },
+    {
+      "title": "Video playback",
+      "caption": "Play all starts the main video on every screen at once. The Sync log lists the result for each one.",
+      "file": "video-playback.mp3"
+    },
+    {
+      "title": "Unlink a screen",
+      "caption": "The chain icon unlinks a screen. The Desktop scrolls to Customer stories and the unlinked iPhone stays where it was.",
+      "file": "unlink-a-screen.mp3"
+    },
+    {
+      "title": "Align screens",
+      "caption": "After linking the iPhone again, Align screens brings every linked screen to the page and position of the one used last.",
+      "file": "align-screens.mp3"
+    },
+    {
+      "title": "Follow links",
+      "caption": "Following a link on one screen opens the same page on all of them. The Desktop clicks Pricing in its bar, and every phone and tablet opens the pricing page too.",
+      "file": "follow-links.mp3"
+    },
+    {
+      "title": "Back from any screen",
+      "caption": "The iPhone follows Back to overview, and the other screens go back with it. Links & pages in the Sync drawer turns this off.",
+      "file": "back-from-any-screen.mp3"
+    },
+    {
+      "title": "Free placement",
+      "caption": "Drag a screen by its title bar to put it anywhere, here the iPhone between the Desktop and the MacBook. The bar under the wall scrolls sideways.",
+      "file": "free-placement.mp3"
+    },
+    {
+      "title": "Preview scale",
+      "caption": "Click a preview’s percentage to set its own scale, here 100% of its CSS pixels. Physical size in the same dialog matches a real phone on your monitor.",
+      "file": "preview-scale.mp3"
+    },
+    {
+      "title": "Back to the grid",
+      "caption": "Grid returns every screen to the automatic layout. Lock layout, lower in this drawer, keeps an arrangement in place.",
+      "file": "back-to-the-grid.mp3"
+    },
+    {
+      "title": "Device catalog",
+      "caption": "The Devices drawer holds 83 presets. Search by name or size, here “fold” for the foldables, or add a custom device of your own.",
+      "file": "device-catalog.mp3"
+    },
+    {
+      "title": "Preview fixes and baselines",
+      "caption": "Save a baseline, try a suggested CSS fix and scan again. Here the wide table disappears from the report and appears under fixed since the baseline. Undo returns the original page.",
+      "file": "preview-fixes-and-baselines.mp3"
+    },
+    {
+      "title": "Accessibility, vitals and page weight",
+      "caption": "The report also checks names, contrast, landmarks, keyboard structure and page weight. Web Vitals show timing and layout shifts; unmeasured previews stay visible instead of silently passing.",
+      "file": "accessibility-vitals-and-page-weight.mp3"
+    },
+    {
+      "title": "Sweep responsive widths",
+      "caption": "Sweep widths tests 320–1920px and narrows transitions to the pixel. Follow the live width counter; the result says exactly where the sample page scrolls sideways.",
+      "file": "sweep-responsive-widths.mp3"
+    },
+    {
+      "title": "Screen settings and long text",
+      "caption": "Compare alternating screens at 200% text, reduced motion, more contrast, print, forced colors, RTL or another language. Longer text reveals layouts that break during translation.",
+      "file": "screen-settings-and-long-text.mp3"
+    },
+    {
+      "title": "Breakpoint screens",
+      "caption": "Read breakpoints from the site’s CSS and open a screen at each boundary. Include the pixel just below each breakpoint to compare both sides, then return to your device selection.",
+      "file": "breakpoint-screens.mp3"
+    },
+    {
+      "title": "Debug overlays",
+      "caption": "The bug menu opens tools for one screen or every screen: contrast, tap targets, focus tracking, text spacing, roles, ARIA and layout outlines. These overlays help a tester inspect the rendered page.",
+      "file": "debug-overlays.mp3"
+    },
+    {
+      "title": "Visual simulators",
+      "caption": "Preview color-vision, eyesight and lighting simulations. Here protanopia affects every screen. Filters are visual approximations; the tester still judges appearance and interactions.",
+      "file": "visual-simulators.mp3"
+    },
+    {
+      "title": "Rulers and layout grids",
+      "caption": "Use rulers and guides, a column grid and a baseline grid to check alignment. Grid settings control columns, gutters, margins and baseline spacing; area and text measurement tools share the same menu.",
+      "file": "rulers-and-layout-grids.mp3"
+    },
+    {
+      "title": "Design reference overlay",
+      "caption": "Compare one screen with a design image. Adjust opacity, difference blend, split and offsets to spot misalignment. The sample uses its dashboard illustration as the reference.",
+      "file": "design-reference-overlay.mp3"
+    },
+    {
+      "title": "Find elements across screens",
+      "caption": "Search a CSS selector to outline matching elements on every device. Previous and Next move between matches, making repeated headings, buttons or form fields easy to inspect.",
+      "file": "find-elements-across-screens.mp3"
+    },
+    {
+      "title": "Forms, typing sync and live reload",
+      "caption": "Fill test forms with normal or edge-case data, and enable Typing & form fields to mirror edits. Live reload can refresh a local site when its files change. Private and password fields are excluded from typing sync.",
+      "file": "forms-typing-sync-and-live-reload.mp3"
+    },
+    {
+      "title": "Search every tool",
+      "caption": "Search tools, or ⌘K / Ctrl+K, finds features by name or purpose. Search for metadata: the results explain the Meta overview and show when a tool needs another step first.",
+      "file": "search-every-tool.mp3"
+    },
+    {
+      "title": "Meta and social previews",
+      "caption": "All metadata in one overview: missing or duplicated values, title and description lengths, canonical links and social tags. Seven social previews show how the page may be shared.",
+      "file": "meta-and-social-previews.mp3"
+    },
+    {
+      "title": "Console across devices",
+      "caption": "Read logs, warnings and errors from every screen in one panel. Repeated messages are grouped with their screen names. This sample info message is emitted by each live preview.",
+      "file": "console-across-devices.mp3"
+    },
+    {
+      "title": "Outline and measurements",
+      "caption": "Measure lists headings and landmarks, including hidden states. Choose a heading to inspect its CSS size, margin, padding, typography and contrast, with linked best-practice suggestions.",
+      "file": "outline-and-measurements.mp3"
+    },
+    {
+      "title": "Keyboard order and landmarks",
+      "caption": "Switch between landmarks and estimated keyboard focus order, then draw the overlay. Verify real Tab/Shift+Tab navigation yourself; the DOM estimate is a guide for human review.",
+      "file": "keyboard-order-and-landmarks.mp3"
+    },
+    {
+      "title": "Replay a saved test",
+      "caption": "A saved journey replays the same steps on every linked screen, with a result for each device. This bundled test opens Pricing, checks its headline, returns to the overview and checks its heading.",
+      "file": "replay-a-saved-test.mp3"
+    },
+    {
+      "title": "Optional AI test writing",
+      "caption": "In the extension, connect OpenRouter or another compatible provider to turn a written plan into steps. Saved tests replay without AI. The guided demo uses its bundled test and does not call an AI service.",
+      "file": "optional-ai-test-writing.mp3"
+    },
+    {
+      "title": "Run all checks",
+      "caption": "Choose groups, then run them together. Live progress leads to one combined result for layout, accessibility, metadata, page errors and performance. Journeys, screen-setting scans and width sweeps are optional groups.",
+      "file": "run-all-checks.mp3"
+    },
+    {
+      "title": "Human review and combined results",
+      "caption": "Needs human review stays separate from automated results. A tester opens each visual tool, records Pass/Fail/Skip and notes, then exports one HTML or JSON report. The demo leaves these decisions pending.",
+      "file": "human-review-and-combined-results.mp3"
+    },
+    {
+      "title": "Share workspaces and reports",
+      "caption": "Save and reopen a device setup, or export/import workspaces with your team. Difference reports export as Markdown, CSV or HTML; combined checks have their own HTML/JSON export.",
+      "file": "share-workspaces-and-reports.mp3"
+    },
+    {
+      "title": "Themes",
+      "caption": "Pick a tweakcn preset and it is applied to the previews, here the bundled Clean Green palette. A theme can go on every preview, one preview, or one comparison column.",
+      "file": "themes.mp3"
+    },
+    {
+      "title": "Page steps",
+      "caption": "Page steps lays a journey out side by side at one device size. Opening the menu in Step 1 adds Step 2 with the menu open.",
+      "file": "page-steps.mp3"
+    },
+    {
+      "title": "Follow a link",
+      "caption": "Following Pricing in Step 2 adds Step 3. Earlier steps keep their own state, and each step can be dragged, rescaled or closed.",
+      "file": "follow-a-link.mp3"
+    },
+    {
+      "title": "Compare sites",
+      "caption": "Compare sites puts whole device walls side by side, each with its own address bar. Here the overview is next to the pricing page, with linked scrolling.",
+      "file": "compare-sites.mp3"
+    },
+    {
+      "title": "Screenshot and Record",
+      "caption": "Screenshot, Full page and Overview support PNG, JPEG and PDF. Auto screenshots have a pace; recordings have a frame rate and split into 10 MB parts. Choose a save folder when capturing.",
+      "file": "screenshot-and-record.mp3"
+    },
+    {
+      "title": "Day and night",
+      "caption": "The sun and moon button switches Samestate between day and night mode. The menu picks Samestate (Zinc at night), Neutral, Clay, Teal, Hive or Clean Green. Your saved choice returns after this demo.",
+      "file": "day-and-night.mp3"
+    },
+    {
+      "title": "That is the tour",
+      "caption": "Click around the screens yourself, or install the Chrome extension to open any page.",
+      "file": "that-is-the-tour.mp3",
+      "extensionCaption": "Keep exploring the sample site, or type your own address in the bar at the top.",
+      "extensionFile": "that-is-the-tour-extension.mp3"
+    }
+  ]
+}

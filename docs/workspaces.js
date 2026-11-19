@@ -224,6 +224,36 @@
     render();
   });
 
+  // Export and import: every saved workspace as one JSON file, to share a team's device sets.
+  $('#workspace-export').addEventListener('click', () => {
+    const items = read(KEY) || [];
+    if (!items.length) { say('Save a workspace first.'); return; }
+    const blob = new Blob([JSON.stringify({ format: 'samestate-workspaces', version: VERSION, exportedAt: new Date().toISOString(), workspaces: items }, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'samestate-workspaces.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 30_000);
+    say(`Exported ${items.length} workspace${items.length === 1 ? '' : 's'}.`);
+  });
+  $('#workspace-import').addEventListener('click', () => $('#workspace-file').click());
+  $('#workspace-file').addEventListener('change', async event => {
+    const file = event.target.files[0]; event.target.value = '';
+    if (!file) return;
+    let data; try { data = JSON.parse(await file.text()); } catch { say('That file is not a Samestate workspaces file.'); return; }
+    const incoming = (Array.isArray(data) ? data : data?.workspaces || []).filter(item => item && typeof item.name === 'string' && item.name.trim() && item.setup && typeof item.setup === 'object');
+    if (!incoming.length) { say('No workspaces found in that file.'); return; }
+    const saved = read(KEY) || [], names = new Set(saved.map(item => item.name.toLowerCase()));
+    const added = incoming.map(item => {
+      let name = item.name.trim().slice(0, 60);
+      for (let n = 2; names.has(name.toLowerCase()); n++) name = `${item.name.trim().slice(0, 54)} (${n})`;
+      names.add(name.toLowerCase());
+      return { name, savedAt: Number(item.savedAt) || Date.now(), setup: item.setup };
+    });
+    const merged = [...added, ...saved].slice(0, LIMIT);
+    if (!write(KEY, merged)) { say('This browser did not allow saving.'); return; }
+    const kept = merged.length - saved.length;
+    say(`Imported ${kept} workspace${kept === 1 ? '' : 's'}` + (kept < added.length ? `; ${LIMIT} is the limit.` : '.'));
+    render();
+  });
+
   // The guided demo's setup is not the user's, so it is not kept as the last session.
   addEventListener('pagehide', () => { if (!restoring && !tourRunning) write(LAST, { savedAt: Date.now(), setup: collect() }); });
   $('#workspaces-drawer').addEventListener('toggle', render);

@@ -9,6 +9,7 @@
 //   --reference=id    the screen the others are compared with (default: desktop)
 //   --sweep           also resize the reference screen from 320 to 1920px and report where problems start and stop
 //   --identity        phones and tablets tell the page's scripts and the server what they are
+//   --links           also check same-origin links (HEAD requests without cookies) and report broken ones
 //   --out=dir         where to write report.md, report.html, report.csv and report.json (default: samestate-report)
 //   --fail-on=level   exit with code 1 when the report has an issue (default), a warning or above (warn), or never (none);
 //                     a screen that did not answer in time also fails the run, except with none
@@ -34,7 +35,7 @@ if (typeof testFile === 'string') {
   if (typeof testData.site !== 'string' || testData.site.startsWith('demo:')) { console.error(`${testFile} is a test for the bundled sample site, which CI does not open. Record the test on your own site.`); process.exit(2); }
 }
 const address = args.find(a => !a.startsWith('--')) || testData?.site;
-if (!address) { console.error('Usage: node tools/samestate-ci.mjs <url> [--devices=iphone,pixel,desktop] [--sweep] [--fail-on=issue|warn|none] [--test=test.json]'); process.exit(2); }
+if (!address) { console.error('Usage: node tools/samestate-ci.mjs <url> [--devices=iphone,pixel,desktop] [--sweep] [--links] [--fail-on=issue|warn|none] [--test=test.json]'); process.exit(2); }
 const site = new URL(address);
 if (testData && new URL(testData.site).origin !== site.origin) { console.error(`${testFile} is a test for ${new URL(testData.site).origin}, not ${site.origin}.`); process.exit(2); }
 if (!['http:', 'https:'].includes(site.protocol)) { console.error('Only http and https addresses can be checked.'); process.exit(2); }
@@ -182,6 +183,7 @@ async function run() {
       for (const f of screen.failures.slice(0, 10)) console.log(`  fail   ${screen.screen}: step ${f.step}, ${f.action}: ${f.result}`);
     }
   }
+  if (option('links')) await evaluate(`$('#check-links').checked = true`);
   await evaluate('detect(true)');
   if (option('sweep')) await evaluate('sweepWidths()', 10 * 60_000);
   const report = await evaluate(`({
@@ -204,7 +206,8 @@ async function run() {
     const before = JSON.parse(readFileSync(baselineFile, 'utf8')).findings;
     judged = changedFindings(report.findings, before);
     const measured = new Set(report.screens);
-    const fixed = changedFindings(before, report.findings).filter(f => measured.has(f.screen));
+    const linksChecked = !!option('links'); // without --links, broken links in the baseline are not known to be fixed
+    const fixed = changedFindings(before, report.findings).filter(f => measured.has(f.screen) && (linksChecked || !['Broken links', 'Links not checked'].includes(f.issue)));
     console.log(`Compared with ${baselineFile}: ${judged.length} new, ${fixed.length} fixed.`);
   }
   const count = sev => judged.filter(f => f.severity === sev).length;

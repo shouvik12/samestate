@@ -50,6 +50,7 @@ async function unregister(tabId) {
 // emulate.js gives phone and tablet previews their device identity. It has to run in the page's own world before the
 // page's scripts, which only a registered content script can do. It is registered for the sites open in Samestate
 // tabs and does nothing outside a Samestate preview frame that names a device.
+// console.js rides along: it forwards console messages from Samestate preview frames only (see console.js).
 const EMULATION = 'samestate-device-identity';
 let emulationQueue = Promise.resolve();
 function syncEmulation() {
@@ -64,7 +65,7 @@ function syncEmulation() {
       if (current) await chrome.scripting.unregisterContentScripts({ ids: [EMULATION] });
       return;
     }
-    const script = { id: EMULATION, matches, js: ['emulate.js'], allFrames: true, runAt: 'document_start', world: 'MAIN', persistAcrossSessions: false };
+    const script = { id: EMULATION, matches, js: ['emulate.js', 'console.js'], allFrames: true, runAt: 'document_start', world: 'MAIN', persistAcrossSessions: false };
     if (current) await chrome.scripting.updateContentScripts([script]);
     else await chrome.scripting.registerContentScripts([script]);
   });

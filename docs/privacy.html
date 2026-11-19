@@ -76,6 +76,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
     <li><strong>Match visible text</strong> is off by default. When you turn it on, rendered text is read locally and compared using temporary fingerprints. Raw page text is kept out of the report and the sync log.</li>
     <li>Developers can mark elements with <code>data-samestate-private</code> to exclude their text from matching.</li>
     <li>Previews use your Chrome cookies and site storage for the site you open, so pages you are signed in to stay signed in. Samestate never reads or stores them. Turn off <strong>Use my sign-ins</strong> to start previews signed out, with separate, temporary storage.</li>
+    <li>The Meta and Console panels show the previewed page's meta tags, console messages and errors inside Samestate only. <strong>Typing &amp; form fields</strong> (off by default) copies what you type to the same field in the other previews of the same tab; password and file fields never.</li>
     <li>Network findings use the browser's resource timing: each request's address, type and size. Query strings are dropped, path segments that look like IDs are replaced, and request and response contents are never read.</li>
   </ul>
 
@@ -87,7 +88,7 @@ footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color
   <p>Screenshots, recordings, and exported reports are created locally and only saved where you choose to download them.</p>
 
   <h2>Theme presets</h2>
-  <p>When you open the Theme panel, Samestate downloads the list of tweakcn presets from <a href="https://tweakcn.com">tweakcn.com</a>, and when you pick a preset, it downloads that preset's theme data. These requests send no cookies and no referrer, and include nothing about you or the sites you preview. If you don't open the Theme panel or write a test with AI, Samestate makes no outside requests of its own.</p>
+  <p>When you open the Theme panel, Samestate downloads the list of tweakcn presets from <a href="https://tweakcn.com">tweakcn.com</a>, and when you pick a preset, it downloads that preset's theme data. These requests send no cookies and no referrer, and include nothing about you or the sites you preview. With <strong>Check links</strong> turned on, Samestate asks the site you are previewing for each of its own links (a HEAD request without cookies) and keeps only the status code; it never contacts other sites for this. With <strong>Live reload</strong> set to <em>when the site changes</em>, Samestate fetches the page you are previewing, and its own stylesheets and scripts, from your local site every 1.5 seconds to compare them. Social card previews in the Meta panel load the share image the page names. If you don't open the Theme panel, turn on Check links or Live reload, open the Meta panel or write a test with AI, Samestate makes no outside requests of its own.</p>
 
   <h2 id="ai">Writing tests with AI</h2>
   <p><strong>Write test with AI</strong> (in <strong>Test runs</strong>) is off until you enter an AI service and your own API key and press the button. By default the service is <a href="https://openrouter.ai">OpenRouter</a>; you can choose any OpenAI-compatible address instead, including one that runs on your own computer. Chrome asks for your permission before Samestate first contacts it.</p>

@@ -74,7 +74,7 @@ function serveAI() {
       () => ['check_layout', { why: 'layout of the About page' }],
       () => ['finish', { passed: true, summary: 'The form thanks the visitor and About opens.' }]
     ];
-    const [name, args] = plan[Math.min(done, plan.length - 1)]();
+    const [name, args] = view.includes('Return an incomplete AI plan') ? ['finish', { passed: false, summary: 'The plan could not be completed.' }] : plan[Math.min(done, plan.length - 1)]();
     res.writeHead(200, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify({
       choices: [{ message: { role: 'assistant', content: null, tool_calls: [{ id: 'call_' + requests.length, type: 'function', function: { name, arguments: JSON.stringify(args) } }] } }]
     }));
@@ -162,6 +162,19 @@ async function main() {
     record('Previews load the shop', await allReady(), siteUrl);
     await sleep(800);
 
+    // The inspector must work through the agent bridge on cross-origin extension previews.
+    await evaluate(`$('#open-outline').click()`);
+    for (let start = Date.now(); Date.now() - start < 10_000; await sleep(100)) {
+      if (await evaluate('!!samestateOutline.get().data')) break;
+    }
+    const outline = await evaluate('samestateOutline.get().data');
+    record('Outline reads a cross-origin extension preview', outline?.url.startsWith(siteUrl) && outline.headings.length > 0 && !/hunter2-SECRET|PRIVATE-NOTE/.test(JSON.stringify(outline)), 'agent bridge, no field values or private text');
+    await evaluate(`(() => { const key=samestateOutline.get().data.headings[0].key; document.querySelector('[data-outline-key="'+key+'"]').click(); })()`);
+    for (let start = Date.now(); Date.now() - start < 10_000; await sleep(100)) {
+      if (await evaluate('!!samestateOutline.get().measurement')) break;
+    }
+    record('Cross-origin element measurements reach the UI', await evaluate('samestateOutline.get().measurement?.rect.width > 0'), 'CSS measurements through the preview agent');
+
     // 1. Write the test with the AI.
     await evaluate(`(() => {
       $('#test-plan').value = 'Sign up with test@example.com and check the thank-you message, then open About.';
@@ -175,12 +188,23 @@ async function main() {
       const send = window.fetch;
       window.fetch = (url, init) => { if (String(url).includes('/chat/completions')) window.__sent.push(String(init?.body || '')); return send(url, init); };
     })()`);
-    await evaluate(`$('#test-write').click()`, true);
+    await evaluate(`(() => {
+      $('#open-checks').click();
+      for (const el of document.querySelectorAll('#checks-groups input')) el.checked = ['journey', 'visual'].includes(el.value);
+      $('#checks-groups').dispatchEvent(new Event('change'));
+      $('#checks-journey-mode').value = 'ai'; $('#checks-journey-mode').dispatchEvent(new Event('change'));
+      $('#checks-run').click();
+    })()`, true);
     let state;
     for (let start = Date.now(); Date.now() - start < (LIVE ? 400_000 : 120_000); await sleep(300)) {
-      state = await evaluate(`({ status: $('#test-status').textContent, busy: !$('#test-stop').hidden })`);
+      state = await evaluate(`({ status: $('#test-status').textContent, busy: samestateChecks.running || !$('#test-stop').hidden })`);
       if (!state.busy && /Wrote|did not|refused|Could not|needs access|Stopped/.test(state.status)) break;
     }
+    const combined = await evaluate('samestateChecks.get()');
+    record('UI bundles the AI journey and pending visual reviews', ['passed', 'warning', 'failed'].includes(combined?.results[0]?.status) && combined.results[0].steps.length > 0 && combined.results.filter(r => r.manual).every(r => r.status === 'review'), combined?.results[0]?.detail);
+    const stepChecks = combined?.results[0]?.steps.flatMap(s => Object.values(s.results || {})) || [];
+    const expectedStatus = stepChecks.some(r => r.issues) ? 'failed' : stepChecks.some(r => r.warnings) ? 'warning' : 'passed';
+    record('Journey report findings affect the combined outcome', combined?.results[0]?.status === expectedStatus, expectedStatus);
     const written = await evaluate('samestateTest.get()');
     const kinds = written.steps.map(s => s.do).join(',');
     const rows = await evaluate(`[...document.querySelectorAll('#test-steps li')].map(li => li.className + ' ' + li.querySelector('.test-step-result')?.textContent + ' ' + (li.querySelector('.test-step-misses')?.textContent || ''))`);
@@ -232,6 +256,18 @@ async function main() {
     writeFileSync(file, JSON.stringify(written, null, 2));
     const wrong = join(work, 'shop-test-wrong.json');
     writeFileSync(wrong, JSON.stringify({ ...written, steps: [...written.steps, { do: 'expect', text: 'This text is not on the page' }] }, null, 2));
+    if (!LIVE) {
+      await evaluate(`(() => {
+        $('#test-plan').value = 'Return an incomplete AI plan';
+        for (const el of document.querySelectorAll('#checks-groups input')) el.checked = el.value === 'journey';
+        $('#checks-groups').dispatchEvent(new Event('change')); $('#checks-run').click();
+      })()`, true);
+      for (let start = Date.now(); Date.now() - start < 30_000; await sleep(100)) {
+        if (!await evaluate('samestateChecks.running')) break;
+      }
+      const incomplete = await evaluate('samestateChecks.get()');
+      record('An unfinished AI plan cannot pass', incomplete.results[0].status === 'failed' && !incomplete.results[0].steps.length, incomplete.results[0].detail);
+    }
     chrome.kill();
     chrome = null;
 

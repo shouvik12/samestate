@@ -20,6 +20,7 @@
   const pause = ms => new Promise(done => setTimeout(done, ms));
   const blank = () => ({ samestate: 'test', version: VERSION, site: null, plan: '', steps: [] });
   let test = blank(), results = [], recording = false, run = null;
+  let demoPreview = null;
 
   /* ---------------------------------- addresses ---------------------------------- */
   // The bundled sample site is saved by page name (as workspaces do), so a test made in the extension runs in the web demo.
@@ -90,7 +91,7 @@
     return { steps: test.steps.length, dropped: data.steps.length - test.steps.length };
   }
   function changed() {
-    try { localStorage.setItem(LAST, JSON.stringify(test)); } catch {}
+    if (!demoPreview) try { localStorage.setItem(LAST, JSON.stringify(test)); } catch {}
     render();
   }
 
@@ -530,7 +531,7 @@
     return line;
   }
 
-  async function writeWithAI() {
+  async function writeWithAI({ signal } = {}) {
     if (!IS_EXT || run) return;
     const s = settings(), plan = planInput.value.trim();
     if (!plan) { say('Write the test plan first: what to do on the site, and what should happen.'); planInput.focus(); return; }
@@ -542,21 +543,23 @@
     // Chrome asks once for access to the AI service. It has to be the first thing after the click.
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [originPattern(base)] }); } catch {}
-    if (!granted) { say(`Samestate needs access to ${base.host} to reach the AI.`); return; }
+    if (!granted) { say(`Samestate needs access to ${base.host} to reach the AI.`); return { passed: false, cancelled: true, text: status.textContent }; }
+    if (signal?.aborted) return { passed: false, cancelled: true, text: 'Stopped before the AI journey started.' };
     const { screens, reference, error } = wall();
     if (error) { say(error); return; }
-    if (!signInsOk()) return;
+    if (!signInsOk()) return { passed: false, cancelled: true, text: 'The tester cancelled the journey.' };
     if (recording) setRecording(false);
     saveSettings();
     saveKey();
     const site = await startAt(reference);
     if (!site) { say('The screens are still loading. Try again in a moment.'); return; }
+    if (signal?.aborted) return { passed: false, cancelled: true, text: 'Stopped before the AI journey started.' };
     test = { ...blank(), site, plan, model: s.model };
     results = [];
     run = { stopped: false, controller: new AbortController() };
     changed();
     const history = [];
-    let reason = '', nudged = 0, rejected = 0;
+    let reason = '', nudged = 0, rejected = 0, finished = false, aiPassed = false;
     try {
       for (let turn = 0; turn < AI_TURNS && test.steps.length < MAX_STEPS && !run.stopped; turn++) {
         say(`Looking at ${screenName(reference)}… (${test.steps.length} steps so far)`);
@@ -572,6 +575,7 @@
           continue;
         }
         if (call.name === 'finish') {
+          finished = true; aiPassed = call.args?.passed === true;
           test.summary = text(call.args?.summary, 600);
           reason = (call.args?.passed === false ? 'The AI says the site does not do what the plan expects. ' : '') + (test.summary || '');
           break;
@@ -611,10 +615,13 @@
     const stopped = run.stopped;
     run = null;
     changed();
-    const result = summary(screens, false);
+    const result = summary(screens, stopped);
     const ran = test.steps.length;
+    result.passed = result.passed && ran > 0 && finished && aiPassed;
+    if (!result.passed && !stopped && (!finished || !aiPassed)) result.text = reason || 'The AI did not finish the test plan.';
     if (!ran) say(reason || 'The AI did not add any steps.');
     else say(`${stopped ? 'Stopped. ' : ''}Wrote ${ran} steps. ${result.text}${reason ? ' ' + reason : ''} Save the test file to run it again without the AI.`);
+    return { ...result, cancelled: stopped, text: result.text + (reason && !result.text.includes(reason) ? ' ' + reason : '') };
   }
 
   /* ------------------------------------ controls ------------------------------------ */
@@ -689,8 +696,27 @@
 
   // For tools/samestate-ci.mjs and tests/smoke.mjs.
   window.samestateTest = {
+    previewDemo(data) {
+      if (!tourRunning || !demoSite() || run || recording || demoPreview) return false;
+      demoPreview = { test, results, plan: planInput.value, status: status.textContent };
+      try { load(data); } catch (error) { test = demoPreview.test; results = demoPreview.results; demoPreview = null; throw error; }
+      return true;
+    },
+    async restoreDemo() {
+      const saved = demoPreview;
+      if (!saved) return;
+      if (run) run.stopped = true;
+      while (run) await pause(50);
+      if (demoPreview !== saved) return;
+      test = saved.test; results = saved.results; planInput.value = saved.plan;
+      demoPreview = null; render(); say(saved.status);
+    },
     load: data => load(typeof data === 'string' ? JSON.parse(data) : data),
     run: options => runTest({ confirmed: true, ...options }),
-    get: () => JSON.parse(JSON.stringify(test))
+    get: () => JSON.parse(JSON.stringify(test)),
+    get busy() { return !!run || recording; },
+    runFromUI: async () => await runTest() || { passed: false, cancelled: true, text: status.textContent || 'The tester cancelled the journey.' },
+    write: async options => await writeWithAI(options) || { passed: false, error: status.textContent || 'The AI journey did not start.' },
+    stop: () => $('#test-stop').click()
   };
 })();

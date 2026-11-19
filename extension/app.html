@@ -4,10 +4,21 @@
 <meta charset="utf-8">
 <title>Samestate — one interaction, every device</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="app.css">
-<script src="ui-theme.js"></script>
+<link rel="stylesheet" href="app.css?v=voice-help-20261119-final">
+<link rel="stylesheet" href="clean-theme.css">
+<script src="ui-theme.js?v=clean-20261119"></script>
 </head>
 <body>
+<svg class="vision-filters" aria-hidden="true" focusable="false" width="0" height="0"><defs>
+  <filter id="vision-protanopia"><feColorMatrix type="matrix" values="0.152 1.053 -0.205 0 0  0.115 0.786 0.099 0 0  -0.004 -0.048 1.052 0 0  0 0 0 1 0"/></filter>
+  <filter id="vision-deuteranopia"><feColorMatrix type="matrix" values="0.367 0.861 -0.228 0 0  0.280 0.673 0.047 0 0  -0.012 0.043 0.969 0 0  0 0 0 1 0"/></filter>
+  <filter id="vision-tritanopia"><feColorMatrix type="matrix" values="1.256 -0.077 -0.179 0 0  -0.078 0.931 0.148 0 0  0.005 0.691 0.304 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-protanomaly"><feColorMatrix type="matrix" values="0.385 0.769 -0.154 0 0  0.101 0.830 0.070 0 0  -0.007 -0.022 1.030 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-deuteranomaly"><feColorMatrix type="matrix" values="0.498 0.674 -0.172 0 0  0.205 0.754 0.041 0 0  -0.011 0.030 0.981 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-tritanomaly"><feColorMatrix type="matrix" values="1.104 -0.040 -0.064 0 0  -0.018 0.938 0.080 0 0  0.006 0.347 0.647 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-astig-h" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur in="SourceGraphic" stdDeviation="2.2 0.4" result="b"/><feOffset in="b" dx="4" result="o"/><feComponentTransfer in="o" result="g"><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode in="b"/><feMergeNode in="g"/></feMerge></filter>
+  <filter id="sim-astig-v" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur in="SourceGraphic" stdDeviation="0.4 2.2" result="b"/><feOffset in="b" dy="4" result="o"/><feComponentTransfer in="o" result="g"><feFuncA type="linear" slope="0.45"/></feComponentTransfer><feMerge><feMergeNode in="b"/><feMergeNode in="g"/></feMerge></filter>
+</defs></svg>
 <header class="bar">
   <div class="navbtns">
     <a class="brand" href="app.html" title="Samestate — one interaction, every device"><span class="logo"><i></i><i></i><i></i></span>Samestate</a>
@@ -22,6 +33,10 @@
     <span id="joblog" class="address-status" role="status"></span>
   </form>
   <div class="right-tools">
+    <button id="search-tools" class="pill tool-search-trigger" type="button" aria-haspopup="dialog" aria-controls="command-bar" title="Search every tool and feature (⌘K / Ctrl+K)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg>Search tools</button>
+    <button id="open-outline" class="pill" type="button" title="Page outline, element measurements and best-practice suggestions">Measure</button>
+    <button id="open-checks" class="pill" type="button" aria-controls="checks-drawer" title="Run selected checks and collect visual reviews">Run all checks</button>
+    <button id="debug-all" class="pill" type="button" aria-haspopup="menu" aria-expanded="false" title="Debug tools and simulators for every screen">Debug</button>
     <button id="sites-toggle" class="pill" type="button" aria-pressed="false" aria-controls="site-workspace">Compare sites</button>
     <button id="add-site" class="pill" type="button" hidden>+ Add site</button>
     <button id="demo" class="pill">Demo</button>
@@ -42,6 +57,14 @@
         <div class="capture-actions">
           <button type="button" id="auto-shots" class="pill" disabled>Auto screenshots</button>
         </div>
+        <div class="capture-actions">
+          <button type="button" id="full-page-shot" class="pill" title="The whole length of one screen's page, scrolled and stitched together" disabled>Full page</button>
+          <button type="button" id="overview-shot" class="pill" title="Every screen, one after another, on one sheet with its name and size (also the ones scrolled out of view)" disabled>Overview</button>
+        </div>
+        <div class="capture-rates">
+          <label>Full page of <select id="full-page-screen" aria-label="Screen for the full-page screenshot"></select></label>
+          <label>Format <select id="shot-format" aria-label="Screenshot format"><option value="png">PNG</option><option value="jpeg">JPEG</option><option value="pdf">PDF</option></select></label>
+        </div>
         <div class="capture-rates">
           <label>Screenshots <span class="rate-pair"><input type="number" id="shot-rate" min="0.1" max="10" step="0.1" value="1" aria-label="Screenshot pace"><select id="shot-unit" aria-label="Screenshot pace unit"><option value="per-second">per second</option><option value="apart">seconds apart</option></select></span></label>
           <p class="shot-hint" id="shot-hint" aria-live="polite">Takes 1 screenshot every second</p>
@@ -61,6 +84,7 @@
           <button class="pill" type="submit">Save</button>
         </form>
         <ul id="workspace-list" class="workspace-list"></ul>
+        <div class="capture-actions"><button type="button" class="pill" id="workspace-export" title="Download every saved workspace as a JSON file to share with your team">Export…</button><button type="button" class="pill" id="workspace-import" title="Add the workspaces from a Samestate JSON file">Import…</button><input type="file" id="workspace-file" accept="application/json,.json" hidden></div>
         <p id="workspace-status" class="workspace-status" role="status" hidden></p>
       </div>
     </details>
@@ -140,9 +164,33 @@
             <option value="scheme">Light and dark</option>
             <option value="text">Default and 200% text</option>
             <option value="orientation">Portrait and landscape</option>
+            <option value="motion">Default and reduced motion</option>
+            <option value="contrast">Default and more contrast</option>
+            <option value="print">Screen and print styles</option>
+            <option value="forced">Default and forced-colors styles</option>
+            <option value="reduceddata">Default and reduced data</option>
+            <option value="transparency">Default and reduced transparency</option>
+            <option value="gamut">Default and wide color (P3) styles</option>
+            <option value="rtl">Default and right-to-left</option>
+            <option value="lang">Default and another page language</option>
+            <optgroup label="Vision">
+              <option value="protanopia">Default and protanopia (no red)</option>
+              <option value="deuteranopia">Default and deuteranopia (no green)</option>
+              <option value="tritanopia">Default and tritanopia (no blue)</option>
+              <option value="achromatopsia">Default and no color</option>
+              <option value="blur">Default and blurred vision</option>
+            </optgroup>
           </select>
         </label>
-        <p id="screen-settings-help" hidden>Every second screen on the device wall gets the other setting (not in <b>Compare sites</b>). Choose <b>Same device on every screen</b> to see one device both ways.</p>
+        <label id="screen-lang-row" hidden>Page language <input id="screen-lang" value="de" maxlength="35" spellcheck="false" autocomplete="off" placeholder="de, ar, ja…"></label>
+        <div class="breakpoints">
+          <button type="button" class="item" id="find-breakpoints" title="Read the width breakpoints from the site's stylesheets"><svg viewBox="0 0 24 24"><path d="M4 6v12M10 6v12M16 6v12M20 6v12"/></svg><span>Breakpoints</span></button>
+          <div id="breakpoint-list" class="chips" hidden></div>
+          <label class="row" id="breakpoint-edges-row" hidden><input type="checkbox" id="breakpoint-edges">Add the width just below each one</label>
+          <div class="capture-actions" id="breakpoint-actions" hidden><button type="button" class="pill" id="open-breakpoints">Open one screen per breakpoint</button><button type="button" class="pill" id="close-breakpoints" hidden>Back to my devices</button></div>
+          <p class="drawer-note" id="breakpoint-status" role="status"></p>
+        </div>
+        <p id="screen-settings-help" hidden>Every second screen on the device wall gets the other setting (not in <b>Compare sites</b>). Vision settings filter what you see; the others change the page's own media rules. Choose <b>Same device on every screen</b> to see one device both ways.</p>
       </div>
     </details>
 
@@ -211,6 +259,8 @@
           <button class="pill" id="pause-videos" type="button" title="Pause the main video in every connected preview">Pause all</button>
         </div>
         <p id="video-status" role="status"></p>
+        <label class="live-reload">Live reload <select id="live-reload"><option value="">Off</option><option value="change">When the site changes</option><option value="5">Every 5 seconds</option><option value="10">Every 10 seconds</option><option value="30">Every 30 seconds</option><option value="60">Every minute</option></select></label>
+        <p class="drawer-note" id="live-reload-status" role="status"></p>
       </div>
     </details>
 
@@ -220,8 +270,40 @@
         <button class="item" id="detect"><svg viewBox="0 0 24 24"><path d="M4 5h7v14H4zM13 5h7v14h-7zM7 9h1M16 9h1M16 13h1"/></svg><span>Detect differences</span></button>
         <label class="item sel"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l-3 4 3 4M19 8l3 4-3 4"/></svg>Compare to <select id="ref"></select></label>
         <button class="item" id="sweep" title="Resize the reference screen from 320 to 1920px and report the widths where each problem appears"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span>Sweep widths</span></button>
+        <label class="row" title="Asks the site for each same-origin link on every screen (a HEAD request without cookies) and reports links that answer 404, 410 or a server error. Links like sign out or delete are skipped."><input type="checkbox" id="check-links">Check links</label>
         <label class="row" title="Makes every preview's text about a third longer, with accented letters, as translations often do. Run Detect differences to see what breaks."><input type="checkbox" id="long-text">Long text (+35%)</label>
         <p id="sweep-status" class="drawer-note" role="status"></p>
+      </div>
+    </details>
+
+    <details class="sidebar-drawer" id="find-drawer">
+      <summary>Find elements</summary>
+      <div class="drawer-body">
+        <form id="find-form" class="find-form"><input id="find-selector" spellcheck="false" autocomplete="off" placeholder="CSS selector, like nav a or .card" aria-label="CSS selector"><button type="button" class="pill" id="find-prev" aria-label="Previous match">↑</button><button type="submit" class="pill" aria-label="Next match">↓</button></form>
+        <p class="drawer-note" id="find-status" role="status"></p>
+      </div>
+    </details>
+
+    <details class="sidebar-drawer" id="checks-drawer">
+      <summary>Run all checks</summary>
+      <div class="drawer-body checks-setup">
+        <p class="drawer-note">Choose groups, run them together, then review the visual items. Uses the current devices and reference screen.</p>
+        <div class="checks-controls">
+        <div class="capture-actions"><button type="button" class="pill checks-primary" id="checks-run">Run selected checks</button><button type="button" class="pill" id="checks-stop" hidden>Stop</button></div>
+        <progress id="checks-progress" max="1" value="0" aria-label="Automated check progress" hidden></progress>
+        <p id="checks-status" class="drawer-note" role="status" aria-live="polite">Select groups to begin.</p>
+        <button type="button" class="link" id="checks-show-results">Open combined results</button>
+        </div>
+        <div class="checks-selection"><button type="button" class="link" id="checks-select-all">Select all</button><button type="button" class="link" id="checks-select-none">Clear</button></div>
+        <fieldset id="checks-options"><legend class="sr-only">Check groups</legend><div id="checks-groups"></div>
+          <div id="checks-journey-options" hidden>
+            <label for="checks-journey-mode">Test journey</label>
+            <select id="checks-journey-mode"><option value="saved">Run the saved test, without AI</option><option value="ai">Follow the plan with AI</option></select>
+            <button type="button" class="link" id="checks-configure-test">Set up test / AI connection…</button>
+            <p class="drawer-note">AI uses the plan and connection in Test runs. It sends page text and control names to your chosen service. A saved test runs locally.</p>
+          </div>
+        </fieldset>
+
       </div>
     </details>
 
@@ -293,14 +375,17 @@
   </div>
 
   <div class="tour" id="tour" hidden>
-    <div class="tour-top"><span class="tour-tag">Demo</span><span id="tourcount"></span><b id="tourname"></b><button id="tourpause" type="button" aria-pressed="false">Pause</button><button id="skip" type="button">Skip demo</button></div>
+    <div class="tour-top"><span class="tour-tag">Demo</span><span id="tourcount"></span><b id="tourname" class="sr-only"></b><select id="tour-step" aria-label="Jump to demo step"></select><button id="skip" type="button">Skip demo</button></div>
+    <div class="tour-nav" role="group" aria-label="Demo navigation"><button id="tour-prev" type="button" aria-label="Previous demo step" title="Previous step (Left arrow)">← Previous</button><div class="tour-playback"><button id="tourpause" type="button" aria-pressed="false">Pause</button><button id="tour-mute" type="button" aria-pressed="false" aria-label="Mute demo narration" title="Mute demo narration"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path class="voice-on" d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/><path class="voice-off" d="m16 9 5 6m0-6-5 6"/></svg><span>Mute</span></button></div><button id="tour-next" type="button" aria-label="Next demo step" title="Next step (Right arrow)">Next →</button></div>
     <div class="dots" id="tourdots"></div>
+    <span id="tour-navigation-status" class="sr-only" role="status" aria-live="polite"></span>
+    <span id="tour-voice-status" class="sr-only" role="status" aria-live="polite"></span>
   </div>
   <div class="tour-ring" id="tour-ring" hidden aria-hidden="true"></div>
   <div class="tour-callout" id="tour-callout" role="status" hidden><b id="tourtitle"></b><p id="tourtext"></p></div>
   <div class="tour-cursor" id="tour-cursor" hidden aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 2l14 11h-7.2l-2.9 7.5z" fill="#fff" stroke="#10182b" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="tap"></span><span class="ripple"></span><span class="wheel"></span></div>
   <aside class="right" id="panel" hidden>
-    <div class="tabs"><button data-tab="diff" class="on">Differences</button><button data-tab="log">Sync log</button><button id="closepanel" title="Close">✕</button></div>
+    <div class="tabs"><button data-tab="diff" class="on">Differences</button><button data-tab="log">Sync log</button><button data-tab="meta">Meta</button><button data-tab="outline">Outline</button><button data-tab="checks">Checks</button><button data-tab="console">Console <b id="console-count"></b></button><button id="closepanel" title="Close">✕</button></div>
     <div class="pane" id="pane-diff">
       <div class="report-bar" id="report-bar" hidden>
         <div class="report-view" id="report-view" role="group" aria-label="List findings"><button type="button" data-view="issue" aria-pressed="true">By issue</button><button type="button" data-view="device" aria-pressed="false">By device</button></div>
@@ -318,6 +403,32 @@
       <div class="baseline" id="baseline" hidden></div>
       <div class="chips" id="chips"></div>
       <div id="findings"><p class="muted">Open a site, then press <b>Detect differences</b>. Every device is measured and compared with the reference device.</p></div>
+    </div>
+    <div class="pane" id="pane-meta" hidden><div id="meta-view"><p class="muted">Open a site, then press <b>Detect differences</b> or <b>Read meta</b> to see its title, description, social cards and meta checks.</p></div></div>
+    <div class="pane" id="pane-outline" hidden>
+      <div class="outline-heading"><h2>Outline &amp; measurements</h2><p>Inspect page structure, measure an element and review practical suggestions.</p></div>
+      <div class="outline-controls">
+        <label>Screen <select id="outline-screen" aria-label="Screen to inspect"></select></label>
+        <div class="outline-actions"><button type="button" class="pill" id="outline-refresh">Refresh</button><button type="button" class="pill" id="outline-pick" aria-pressed="false">Pick element</button><button type="button" class="pill" id="outline-export" disabled>Export JSON</button></div>
+        <fieldset class="outline-overlays"><legend>Show overlays</legend><label><input type="checkbox" id="outline-headings-overlay">Headings</label><label><input type="checkbox" id="outline-landmarks-overlay">Landmarks</label><label><input type="checkbox" id="outline-focus-overlay">Focus order</label><button type="button" class="link" id="outline-clear">Clear</button></fieldset>
+        <label>Outline <select id="outline-mode"><option value="headings">Headings</option><option value="landmarks">Landmarks</option><option value="focus">Keyboard focus order</option></select></label>
+        <label class="outline-issues"><input type="checkbox" id="outline-issues-only">Suggestions only</label>
+      </div>
+      <p id="outline-status" role="status" aria-live="polite">Choose a screen and press Refresh.</p>
+      <div id="outline-page-info"></div>
+      <details class="outline-section" open><summary>Measurements &amp; suggestions</summary><div id="outline-measurements"><p class="muted">Pick an element in a preview, or choose an item in the outline below.</p></div></details>
+      <details class="outline-section" open><summary>Page outline</summary><div id="outline-page-suggestions"></div><div id="outline-list"></div></details>
+      <p class="outline-limit">Measurements use CSS pixels before preview scaling and visual filters. Focus order is a DOM estimate; verify Tab/Shift+Tab and screen-reader behaviour. Nested frames and shadow roots are not traversed.</p>
+    </div>
+    <div class="pane" id="pane-console" hidden>
+      <div class="console-bar"><select id="console-level" aria-label="Show messages"><option value="all">All messages</option><option value="error">Errors</option><option value="warn">Warnings</option><option value="log">Logs and info</option></select><button type="button" class="pill" id="console-clear">Clear</button></div>
+      <div id="console-list"><p class="muted">Console messages and errors from every screen show up here, once each, with the screens that sent them.</p></div>
+    </div>
+    <div class="pane" id="pane-checks" hidden>
+      <div class="checks-heading"><h2>Combined results</h2><p class="muted">Run selected checks from the sidebar. Visual items require a tester's decision.</p></div>
+      <div id="checks-summary" role="status" aria-live="polite"></div>
+      <div class="checks-export"><button type="button" class="pill" id="checks-export-html" disabled>Export HTML</button><button type="button" class="pill" id="checks-export-json" disabled>Export JSON</button></div>
+      <div id="checks-results"></div>
     </div>
     <div class="pane" id="pane-log" hidden><div id="log"><p class="muted">Clicks, typing and navigation you perform on one device show up here, with how each other device reached the same state.</p></div></div>
   </aside>
@@ -340,6 +451,38 @@
     </div>
   </section>
 </template>
+<dialog id="design-dialog" class="scale-dialog" aria-labelledby="design-title">
+  <form method="dialog" class="design-form">
+    <h2 id="design-title">Design overlay</h2>
+    <p class="muted" id="design-screen"></p>
+    <label>Image <input type="file" id="design-file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"></label>
+    <label>Exported at <select id="design-scale"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option></select></label>
+    <label>Opacity <input type="range" id="design-opacity" min="0" max="1" step="0.05" value="0.5"></label>
+    <label>Blend <select id="design-mode"><option value="normal">Normal</option><option value="difference">Difference (matching areas turn black)</option><option value="invert">Invert</option></select></label>
+    <label>Split <input type="range" id="design-split" min="0" max="100" step="1" value="0"></label>
+    <div class="design-offsets"><label>X <input type="number" id="design-x" value="0" step="1"></label><label>Y <input type="number" id="design-y" value="0" step="1"></label></div>
+    <label class="row"><input type="checkbox" id="design-visible" checked>Show the overlay</label>
+    <div class="scale-actions"><button type="button" class="pill" id="design-remove">Remove</button><button class="pill" value="close">Done</button></div>
+  </form>
+</dialog>
+<dialog id="grid-dialog" class="scale-dialog" aria-labelledby="grid-title">
+  <form method="dialog" class="design-form">
+    <h2 id="grid-title">Grid settings</h2>
+    <p class="muted">Used by Column grid and Baseline grid on every screen.</p>
+    <div class="design-offsets"><label>Columns <input type="number" id="grid-columns" min="1" max="24" value="12"></label><label>Gutter <input type="number" id="grid-gutter" min="0" max="200" value="24"></label></div>
+    <div class="design-offsets"><label>Max width <input type="number" id="grid-max" min="0" max="5000" value="1200"></label><label>Side margin <input type="number" id="grid-margin" min="0" max="400" value="16"></label></div>
+    <label>Baseline every <input type="number" id="grid-baseline" min="2" max="100" value="8"> px</label>
+    <div class="scale-actions"><button class="pill" value="close">Done</button></div>
+  </form>
+</dialog>
+<dialog id="command-bar" class="command-bar" aria-label="Search tools and features">
+  <div class="command-heading"><div><h2>Search tools &amp; features</h2><p>Find a tool by its name or what you want to do.</p></div><button type="button" id="command-close" aria-label="Close tool search">✕</button></div>
+  <input id="command-input" spellcheck="false" autocomplete="off" placeholder="Try metadata, spacing, recording, or AI…" aria-label="Search tools and features" role="combobox" aria-expanded="true" aria-controls="command-list" aria-autocomplete="list">
+  <div class="command-filters"><label class="sr-only" for="command-category">Tool category</label><select id="command-category"><option value="">All categories</option></select><span id="command-count" role="status" aria-live="polite"></span></div>
+  <p id="command-message" role="status" aria-live="polite"></p>
+  <ul id="command-list" role="listbox" aria-label="Tools and features"></ul>
+  <p class="command-hint">↑↓ to choose · Enter to open or run · Esc to close · ⌘K / Ctrl+K anytime</p>
+</dialog>
 <dialog id="preview-scale" class="scale-dialog" aria-labelledby="preview-scale-title" aria-describedby="preview-scale-note">
   <form method="dialog">
     <h2 id="preview-scale-title">Preview scale</h2>
@@ -378,13 +521,21 @@
     </div>
   </form>
 </dialog>
-<script src="devices.js"></script>
+<script src="devices.js?v=weekly-demo-20261119-final"></script>
 <script src="annotations.js"></script>
-<script src="themes.js"></script>
-<script src="app.js"></script>
+<script src="themes.js?v=clean-20261119"></script>
+<script src="app.js?v=voice-help-20261119-final"></script>
 <script src="capture.js"></script>
 <script src="report.js"></script>
 <script src="workspaces.js"></script>
-<script src="testrun.js"></script>
+<script src="testrun.js?v=weekly-demo-20261119-final"></script>
+<script src="checks.js?v=weekly-demo-20261119-final"></script>
+<script src="outline.js?v=weekly-demo-20261119-final"></script>
+<script src="tour-features.js?v=demo-carousel-20261119"></script>
+<script src="demo/narration/manifest.js?v=voice-help-20261119-final"></script>
+<script src="tour-voice.js?v=voice-help-20261119-final"></script>
+<script src="feature-help-catalog.js?v=voice-help-20261119-final"></script>
+<script src="help/narration/manifest.js?v=voice-help-20261119-final"></script>
+<script src="feature-help.js?v=voice-help-20261119-final"></script>
 </body>
 </html>

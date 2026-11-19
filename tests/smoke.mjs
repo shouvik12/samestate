@@ -4,16 +4,19 @@
 //   node tests/smoke.mjs                  uses Chrome from CHROME_PATH or the usual install location
 //   SMOKE_HEADED=1 node tests/smoke.mjs   shows the browser window while it runs
 //   SMOKE_ROOT=path node tests/smoke.mjs  serves another copy of the web build instead of docs/
+//   SMOKE_PACE=0.05 node tests/smoke.mjs accelerates reading delays; real page/tool waits stay intact
+//   SMOKE_SHOTS=path node tests/smoke.mjs saves Search, Measure and human-review proof screenshots
+//   SMOKE_RECENT=1 node tests/smoke.mjs focuses on the recent-features chapter
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(process.env.SMOKE_ROOT || fileURLToPath(new URL('../docs/', import.meta.url)));
-const PACE = 0.3; // ?tour-pace: shorter reading pauses, same waits for the previews
-const TIMEOUT = 6 * 60_000;
+const PACE = Number(process.env.SMOKE_PACE) || 0.3; // ?tour-pace: shorter reading pauses, same waits for the previews
+const TIMEOUT = 10 * 60_000;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.webm': 'video/webm', '.mp4': 'video/mp4', '.gif': 'image/gif', '.json': 'application/json' };
 
 function serve() {
@@ -88,7 +91,14 @@ class Session {
 // It reads the app's own top-level variables (DEVICES, findings, pageScreens…), which resolve when a check runs.
 const PROBE = `(() => {
   if (window.top !== window) return;
+  localStorage.setItem('samestate.tourMuted','true'); // Scene checks run silently; tour-voice.mjs covers real audio playback.
   const results = [], memory = {};
+  memory.savedTest = JSON.stringify({samestate:'test',version:1,site:'demo:index.html',plan:'Keep my saved test',steps:[{do:'expect',text:'Customer stories'}]});
+  memory.groups = JSON.stringify(['meta','capture']);
+  memory.baseline = JSON.stringify({at:123456,items:[]});
+  localStorage.setItem('samestate.test',memory.savedTest);
+  localStorage.setItem('samestate.checkGroups',memory.groups);
+  localStorage.setItem('samestate.baseline.'+location.origin,memory.baseline);
   window.__smoke = { results, done: false };
   const phone = () => DEVICES.find(d => d.id === 'iphone');
   const byId = id => DEVICES.find(d => d.id === id);
@@ -162,6 +172,28 @@ const PROBE = `(() => {
       const folds = visibleText('#devlist .device-options > *').filter(text => /fold/i.test(text)).length;
       return [document.querySelector('#device-search').value === 'fold' && folds >= 3, 'foldables listed: ' + folds];
     },
+
+    'Preview fixes and baselines': () => [appliedFixes.size > 0 && !findings.some(f => f.kind === 'Table is wider than its container') && compareBaseline().fixed.some(f => f.kind === 'Table is wider than its container'), 'table fixed against a saved baseline'],
+    'Accessibility, vitals and page weight': () => [catFilter === 'Network' && ['Accessibility','Performance','Network'].every(cat => findings.some(f => f.cat === cat)), 'categories ' + [...new Set(findings.map(f=>f.cat))].join(', ')],
+    'Sweep responsive widths': () => [!sweepRun && phone().sweepW == null && findings.some(f=>f.cat === 'Widths' && /320–/.test(f.title)), document.querySelector('#sweep-status').textContent],
+    'Screen settings and long text': () => [longText && !screenSettings && count(d=>d.querySelector('h1').textContent.length > 35) === 7, 'longer text on every preview'],
+    'Breakpoint screens': () => [active().length >= 3 && active().every(d=>d.breakpoint && d.ready) && document.querySelector('#breakpoint-edges').checked, active().length + ' ready breakpoint screens'],
+    'Debug overlays': () => [debugTools(phone()).has('contrast') && debugTools(phone()).has('target') && active().filter(d=>d !== phone()).every(d=>!debugTools(d).size), 'contrast and target overlays on the iPhone only'],
+    'Visual simulators': () => [active().every(d=>debugSim(d) === 'protanopia' && !!d.iframe.style.filter), 'protanopia on every screen'],
+    'Rulers and layout grids': () => [document.querySelector('#grid-dialog').open && ['rulers','columns','baseline'].every(k=>debugTools(phone()).has(k)) && document.querySelector('#tour').parentNode.id === 'grid-dialog', 'grids active, tour controls inside native dialog'],
+    'Design reference overlay': () => [document.querySelector('#design-dialog').open && byId('desktop').design?.mode === 'difference' && !!docOf(byId('desktop')).querySelector('samestate-design') && document.querySelector('#tour-callout').parentNode.id === 'design-dialog', 'actual reference overlay with difference blend'],
+    'Find elements across screens': () => [/^Match 1 highlighted/.test(document.querySelector('#find-status').textContent), document.querySelector('#find-status').textContent],
+    'Forms, typing sync and live reload': () => [SYNC.form[1] && count(d=>d.querySelector('#signin').open && d.querySelector('#signin input[type=email]').value.includes('@')) === 7, 'forms filled on all seven previews; typing sync on'],
+    'Search every tool': () => [document.querySelector('#command-bar').open && commandList[0]?.id === 'panel:meta' && document.querySelector('#tour').parentNode.id === 'command-bar', commandList.length + ' metadata matches; tour remains active'],
+    'Meta and social previews': () => [!document.querySelector('#pane-meta').hidden && !!lastMeta && document.querySelectorAll('#meta-view .cards section').length === 7, 'metadata and seven social cards'],
+    'Console across devices': () => [consoleEntries.get('info|Samestate demo: this message came from the preview.')?.screens.size === 7 && !document.querySelector('#pane-console').hidden, 'one real preview message grouped across seven screens'],
+    'Outline and measurements': () => { const v=samestateOutline.get(); return [!!v.data?.headings.length && v.measurement?.tag === 'h1' && v.measurement.rect.width > 0 && active().some(d=>d.outlineState?.headings), v.measurement?.rect.width + ' CSS px heading']; },
+    'Keyboard order and landmarks': () => [document.querySelector('#outline-mode').value === 'focus' && samestateOutline.get().data.focus.length > 0 && active().some(d=>d.outlineState?.focus), samestateOutline.get().data.focus.length + ' estimated focus stops'],
+    'Replay a saved test': () => [samestateTest.get().steps.length === 4 && !samestateTest.busy && document.querySelectorAll('#test-steps .ok').length === 4 && localStorage.getItem('samestate.test') === memory.savedTest, document.querySelector('#test-status').textContent],
+    'Optional AI test writing': () => [document.querySelector('#test-ai').open && !samestateTest.busy, 'AI setup shown; no AI run'],
+    'Run all checks': () => { const r=samestateChecks.get(); return [!!r.finishedAt && !samestateChecks.running && r.results.filter(x=>!x.manual).length === 4 && r.results.filter(x=>x.manual).every(x=>x.status === 'review'), r.results.length + ' combined results; manual decisions pending']; },
+    'Human review and combined results': () => [samestateChecks.get().results.filter(x=>x.manual && x.status === 'review').length >= 10 && !document.querySelector('#checks-export-json').disabled, 'human reviews pending and exports available'],
+    'Share workspaces and reports': () => [document.querySelector('#workspaces-drawer').open && !!document.querySelector('#workspace-export') && !!document.querySelector('#workspace-import'), 'workspace save/export/import drawer shown'],
     'Themes': () => { const themed = themePreviews().filter(d => d.themeCss).length; return [themed === 7, 'themed previews: ' + themed + ' (' + document.querySelector('#theme-status').textContent + ')']; },
     'Page steps': () => {
       const menu = pageScreens[1] && docOf(pageScreens[1])?.querySelector('#drawer.open');
@@ -181,18 +213,25 @@ const PROBE = `(() => {
     },
     'Day and night': () => {
       const shown = document.documentElement.dataset, saved = [localStorage.getItem('samestate.uiTheme') || 'samestate', localStorage.getItem('samestate.uiMode') || 'dark'];
-      return [shown.uiTheme === 'hive' && shown.uiMode !== saved[1] && saved[0] === 'samestate', 'showing ' + shown.uiTheme + ' ' + shown.uiMode + ', saved ' + saved.join(' ')];
+      return [shown.uiTheme === 'clean' && shown.uiMode !== saved[1] && saved[0] === 'samestate', 'showing ' + shown.uiTheme + ' ' + shown.uiMode + ', saved ' + saved.join(' ')];
     },
     'That is the tour': () => {
       const back = !sitesMode && !pageSteps, theme = document.documentElement.dataset.uiTheme + ' ' + document.documentElement.dataset.uiMode;
-      return [back && theme === 'samestate dark', 'back on the device wall: ' + back + ', theme ' + theme];
+      return [back && theme === 'samestate dark' && localStorage.getItem('samestate.test') === memory.savedTest && samestateTest.get().plan === 'Keep my saved test' && localStorage.getItem('samestate.checkGroups') === memory.groups && localStorage.getItem('samestate.baseline.'+location.origin) === memory.baseline && !samestateTest.busy && !samestateChecks.running && samestateChecks.get() === null && !document.querySelector('#checks-results').childElementCount, 'back on the device wall: ' + back + ', theme ' + theme];
     }
   };
+  addEventListener('DOMContentLoaded', () => {
+    if (!window.__smokeRecent) return;
+    const keep = new Set([...samestateTourFeatures.titles, 'Themes', 'Day and night', 'That is the tour']);
+    const recent = STEPS.filter(step=>keep.has(step.title));
+    STEPS.splice(0,STEPS.length,...recent);
+  },{once:true});
   document.addEventListener('samestate-tour-step', event => {
     const { step, title } = event.detail;
     let ok = false, detail = 'no check for this step';
     try { [ok, detail] = checks[title] ? checks[title]() : [false, detail]; } catch (error) { detail = 'check failed: ' + error.message; }
     results.push({ step, title, ok, detail, at: Math.round(performance.now() / 1000) });
+    if (window.__smokeCaptures?.includes(title)) { __smoke.capture = title; setTourPaused(true); }
     if (step === STEPS.length) window.__smoke.done = true;
   });
 })();`;
@@ -249,14 +288,44 @@ const AFTER_TOUR = `(async () => {
     const darkBg = uiBg(); document.querySelector('#ui-mode').click(); const lightBg = uiBg();
     const themeSelect = document.querySelector('#ui-theme'); themeSelect.value = 'clay'; themeSelect.dispatchEvent(new Event('change')); const clayBg = uiBg();
     themeSelect.value = 'samestate'; themeSelect.dispatchEvent(new Event('change')); document.querySelector('#ui-mode').click();
-    record('Interface themes', new Set([darkBg, lightBg, clayBg]).size === 3 && uiBg() === darkBg && themeSelect.options.length === 5, themeSelect.options.length + ' themes; background ' + darkBg + ' → ' + lightBg + ' (day) → ' + clayBg + ' (Clay day) → ' + uiBg());
+    record('Interface themes', new Set([darkBg, lightBg, clayBg]).size === 3 && uiBg() === darkBg && Array.from(themeSelect.options).some(option => option.value === 'clean'), themeSelect.options.length + ' themes; background ' + darkBg + ' → ' + lightBg + ' (day) → ' + clayBg + ' (Clay day) → ' + uiBg());
     record('Sign-ins option hidden in the web demo', document.querySelector('#sign-ins-row').hidden, 'Use my sign-ins is extension-only');
     record('Screen settings', sizes[1] === parseFloat(sizes[0]) * 2 + 'px', 'root font size ' + sizes.join(' and '));
-    document.querySelector('#ref').value = 'iphone';
-    await sweepWidths();
-    const swept = findings.filter(f => f.cat === 'Widths'), sideways = swept.find(f => f.kind === 'Page scrolls sideways');
-    record('Width sweep', sideways && /at 320–\\d+px/.test(sideways.title) && active().find(d => d.id === 'iphone').sweepW == null, (sideways?.title || 'no sideways finding') + '; ' + swept.length + ' findings');
+
   } catch (error) { record('Report tools', false, error.message); }
+  try { // Debug menu: one screen's tools, then a simulator for every screen
+    const pause = ms => new Promise(done => setTimeout(done, ms));
+    const iphone = active().find(d => d.id === 'iphone');
+    iphone.el.querySelector('[data-a=debug]').click(); await pause(150);
+    const opened = !debugMenu.hidden && debugMenu.querySelectorAll('[role=menuitemcheckbox]').length >= 19 && debugMenu.querySelectorAll('[role=menuitemradio]').length >= 20;
+    debugMenu.querySelector('[data-tool="layout"]').click(); await pause(500);
+    const outline = iphone.iframe.contentWindow.getComputedStyle(iphone.iframe.contentDocument.querySelector('h1')).outlineStyle;
+    const others = active().filter(d => d !== iphone).every(d => d.iframe.contentWindow.getComputedStyle(d.iframe.contentDocument.querySelector('h1')).outlineStyle === 'none');
+    debugMenu.querySelector('[data-tool="layout"]').click(); closeDebugMenu(false);
+    record('Debug tools on one screen', opened && outline === 'solid' && others, 'menu open: ' + opened + ', iPhone outline: ' + outline + ', other screens untouched: ' + others);
+    document.querySelector('#debug-all').click(); await pause(150);
+    debugMenu.querySelector('[data-sim="night"]').click(); await pause(200);
+    const night = active().filter(d => d.iframe.style.filter.includes('sepia')).length;
+    debugMenu.querySelector('[data-sim=""]').click(); closeDebugMenu(false); await pause(100);
+    const cleared = active().every(d => !d.iframe.style.filter);
+    record('Simulator on every screen', night === active().length && cleared, 'night mode on ' + night + ' of ' + active().length + ' screens, then cleared: ' + cleared);
+  } catch (error) { record('Debug menu', false, error.message); }
+  try { // Command bar, Find elements and the Meta panel
+    const pause = ms => new Promise(done => setTimeout(done, ms));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true })); await pause(100);
+    const input = document.querySelector('#command-input'); input.value = 'night mode'; input.dispatchEvent(new Event('input'));
+    const first = commandList[0]?.label;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await pause(300);
+    const night = active().filter(d => d.iframe.style.filter.includes('sepia')).length;
+    debugTarget = 'all'; setSim(''); debugTarget = null;
+    record('Command bar', first === 'Simulator: Night mode' && night === active().length, 'first match: ' + first + ', night mode on ' + night + ' screens');
+    document.querySelector('#find-selector').value = 'h1'; await findElements(1);
+    const findText = document.querySelector('#find-status').textContent;
+    record('Find elements', /^Match 1 highlighted/.test(findText), findText.slice(0, 80));
+    showTab('meta'); await readMeta(); await pause(200);
+    const cards = document.querySelectorAll('#meta-view .cards section').length;
+    record('Meta panel', !!lastMeta && cards === 7, 'title ' + (lastMeta?.title.length ?? 0) + ' characters, ' + cards + ' social previews');
+  } catch (error) { record('Command bar, find and meta', false, error.message); }
   return results;
 })()`;
 
@@ -265,15 +334,18 @@ async function main() {
   const profile = mkdtempSync(join(tmpdir(), 'samestate-smoke-'));
   const { chrome, port } = await launch(profile);
   const errors = [];
+  const captures = new Set(['Search every tool','Outline and measurements','Human review and combined results']);
+  if (process.env.SMOKE_SHOTS) mkdirSync(process.env.SMOKE_SHOTS,{recursive:true});
+  let page;
   try {
     const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
-    const page = new Session(target.webSocketDebuggerUrl);
+    page = new Session(target.webSocketDebuggerUrl);
     await page.open();
     page.on('Runtime.exceptionThrown', ({ exceptionDetails }) => errors.push(exceptionDetails.exception?.description || exceptionDetails.text));
     page.on('Runtime.consoleAPICalled', ({ type, args }) => { if (type === 'error') errors.push('console.error: ' + args.map(a => a.value ?? a.description).join(' ')); });
     await page.send('Runtime.enable');
     await page.send('Page.enable');
-    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: PROBE });
+    await page.send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.__smokeRecent=' + (process.env.SMOKE_RECENT === '1') + ';window.__smokeCaptures=' + JSON.stringify(process.env.SMOKE_SHOTS ? [...captures] : []) + ';' + PROBE });
     const url = `http://127.0.0.1:${server.address().port}/?tour-pace=${PACE}`;
     console.log('Playing the guided demo at ' + url);
     await page.send('Page.navigate', { url });
@@ -282,10 +354,17 @@ async function main() {
     let shown = 0, state;
     while (Date.now() - start < TIMEOUT) {
       await new Promise(done => setTimeout(done, 1000));
-      state = await page.evaluate('window.__smoke && { done: __smoke.done, results: __smoke.results }').catch(() => null);
+      state = await page.evaluate('window.__smoke && { done: __smoke.done, results: __smoke.results, capture: __smoke.capture }').catch(() => null);
       for (const r of state?.results.slice(shown) || []) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${String(r.step).padStart(2)} ${r.title.padEnd(30)} ${r.detail}`);
       shown = state?.results.length || shown;
-      if (state?.done) break;
+      if (process.env.SMOKE_SHOTS && captures.has(state?.capture)) {
+        const shot = await page.send('Page.captureScreenshot',{format:'png'});
+        writeFileSync(join(process.env.SMOKE_SHOTS,state.capture.toLowerCase().replaceAll(' ','-')+'.png'),Buffer.from(shot.data,'base64'));
+        captures.delete(state.capture);
+        await page.evaluate('setTourPaused(false); __smoke.capture=null');
+      }
+
+      if (state?.done || errors.length) break;
     }
     const results = state?.results || [];
     if (state?.done) {
@@ -303,11 +382,13 @@ async function main() {
       process.exitCode = 1;
     }
   } finally {
+    page?.ws.close();
     chrome.kill();
+    server.closeAllConnections();
     server.close();
     await new Promise(done => setTimeout(done, 300));
     rmSync(profile, { recursive: true, force: true });
   }
 }
 
-main().catch(error => { console.error(error); process.exit(1); });
+main().then(() => process.exit(process.exitCode || 0)).catch(error => { console.error(error); process.exit(1); });
