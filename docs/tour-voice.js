@@ -42,10 +42,29 @@
         current.pending = false;
         if (error.name === 'AbortError' && (held || muted)) return;
         blocked = error.name === 'NotAllowedError'; failed = !blocked;
+        if (blocked) armUnlock();
         render();
       });
     } catch { current.pending = false; failed = true; render(); }
     render();
+  }
+
+  // Narration is on by default, but browsers only allow sound after the visitor clicks or presses a key, and the web
+  // demo starts by itself. The first click or key press anywhere starts the current clip. The Mute button handles
+  // its own click, so pressing it then means "turn the voice on", not "mute".
+  let unlockArmed = false, unlockedAt = 0;
+  const UNLOCK = ['pointerdown', 'keydown', 'touchend'];
+  function unlock(event) {
+    if (!event.isTrusted || event.target?.closest?.('#tour-mute')) return;
+    if (event.type === 'keydown' && ['Shift', 'Control', 'Alt', 'Meta', 'Escape', 'CapsLock', 'Fn'].includes(event.key)) return; // browsers don't count these as permission to play
+    UNLOCK.forEach(type => removeEventListener(type, unlock, true)); unlockArmed = false;
+    unlockedAt = Date.now();
+    if (blocked && current && !muted) { blocked = false; play(); }
+  }
+  function armUnlock() {
+    if (unlockArmed) return;
+    unlockArmed = true;
+    UNLOCK.forEach(type => addEventListener(type, unlock, true));
   }
 
   function start(step) {
@@ -92,7 +111,7 @@
       if (Date.now() - current.lastAt > 12000) { failed = true; render(); return false; }
       return true;
     },
-    get() { return { muted, blocked, failed, held, title: current?.title || null, finished: current?.finished ?? true, pending: current?.pending || false, currentTime: audio.currentTime, duration: Number.isFinite(audio.duration) ? audio.duration : null, paused: audio.paused }; }
+    get() { return { muted, blocked, failed, held, unlockedAt, title: current?.title || null, finished: current?.finished ?? true, pending: current?.pending || false, currentTime: audio.currentTime, duration: Number.isFinite(audio.duration) ? audio.duration : null, paused: audio.paused }; }
   };
   addEventListener('pagehide', stop);
   render();

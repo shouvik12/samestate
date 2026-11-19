@@ -551,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **Demo voice on**: the narration starts with the first click or key press anywhere (browsers block sound before that), including the intro, which then plays in full; a prompt says to click while sound is blocked ([details](changelogs/CHANGELOG-demo-voice-on.md)) |
 | **2026-11-19** | | | **Demo intro**: the guided demo opens with 5–7 seconds of the Samestate logo, tagline and purpose, with its own narration, while the sample site loads; Skip intro, Next, the right arrow or a click moves on to step 1 ([details](changelogs/CHANGELOG-demo-intro.md)) |
 | **2026-11-19** | | | **Individual help icons**: small ? shortcuts appear on hover or keyboard focus, with click-to-open contextual voice and the existing always-visible top-bar help search ([details](changelogs/CHANGELOG-contextual-help-icons.md)) |
 | **2026-11-19** | | | **Top-bar help icon**: one small ? opens searchable explanations with natural voice; hovering or focusing individual controls no longer opens help ([details](changelogs/CHANGELOG-topbar-help-icon.md)) |
