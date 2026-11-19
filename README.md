@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-hover-help" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
+<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-demo-intro" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
 
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
@@ -6,7 +6,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center">·
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
-  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-hover-help">Watch the narrated 30s video</a> ·
+  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-demo-intro">Watch the narrated 30s video</a> ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -19,8 +19,8 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
-<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-hover-help" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
-<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-hover-help">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
+<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-demo-intro" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
+<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-demo-intro">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
 
 ## Why Samestate
 
@@ -60,22 +60,22 @@ that are too small, text that disappears.
 
 | Logical sync | Difference report |
 |---|---|
-| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-hover-help) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-hover-help) |
+| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-demo-intro) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-demo-intro) |
 | Desktop clicks **Products**. The phone and tablet open their own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
 
 | Measurements & suggestions | Metadata & social previews |
 |---|---|
-| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-hover-help) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-hover-help) |
+| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-demo-intro) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-demo-intro) |
 | Inspect an element and review its measurements and practical guidance. | Find missing metadata and preview how the page appears when shared. |
 
 | Run all checks | Individual & top-bar help |
 |---|---|
-| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-hover-help) | ![Individual question marks beside controls, with the Measure explanation and voice open](docs/media/screenshot-voice-help.png?v=20261119-hover-help) |
+| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-demo-intro) | ![Individual question marks beside controls, with the Measure explanation and voice open](docs/media/screenshot-voice-help.png?v=20261119-demo-intro) |
 | Run selected groups together. Visual items await the tester’s review. | Hover a control to reveal **?**, then click for its explanation. The top-bar **?** searches all help. |
 
 | Narrated demo & carousel | Clean theme option |
 |---|---|
-| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-hover-help) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-hover-help) |
+| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-demo-intro) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-demo-intro) |
 | Jump between steps, pause and mute. Each step has natural AI narration. | Zinc is the default dark theme; Clean Green is available for the interface and previews. |
 
 ## What it does
@@ -304,7 +304,7 @@ With a preview open in desktop Chrome, click **Screenshot**, **Record** or **Aut
 - **Save to folder…** picks a folder, and every screenshot and recording part is written there as it is made. Chrome remembers the folder and asks again for permission after a restart; **Use Downloads** goes back to downloads. Without a folder, each file starts a download.
 - The pace, its unit and the frame rate are remembered in this browser.
 
-<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-hover-help" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
+<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-demo-intro" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
@@ -551,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **Video opens with the demo intro**: the narrated 30-second video and the README GIF now start with the app's own intro (logo, tagline, purpose, chips) instead of a separate title card; screenshots, banner and link card re-recorded ([details](changelogs/CHANGELOG-promo-demo-intro.md)) |
 | **2026-11-19** | | | **Mute or Unmute only**: the demo's voice button no longer shows Enable voice or Retry voice, and the intro's click prompt is gone; the voice is on by default and a blocked or failed clip starts again with the next click or key press ([details](changelogs/CHANGELOG-demo-voice-mute-only.md)) |
 | **2026-11-19** | | | **Demo voice on**: the narration starts with the first click or key press anywhere (browsers block sound before that), including the intro, which then plays in full; a prompt says to click while sound is blocked ([details](changelogs/CHANGELOG-demo-voice-on.md)) |
 | **2026-11-19** | | | **Demo intro**: the guided demo opens with 5–7 seconds of the Samestate logo, tagline and purpose, with its own narration, while the sample site loads; Skip intro, Next, the right arrow or a click moves on to step 1 ([details](changelogs/CHANGELOG-demo-intro.md)) |
