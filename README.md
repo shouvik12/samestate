@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-help-icon" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
+<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-context-help" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
 
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
@@ -6,7 +6,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center">·
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
-  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-help-icon">Watch the narrated 30s video</a> ·
+  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-context-help">Watch the narrated 30s video</a> ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -19,8 +19,8 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
-<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-help-icon" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
-<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-help-icon">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
+<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-context-help" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
+<p align="center">The animated preview is silent. Open the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261119-context-help">narrated video</a> or the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
 
 ## Why Samestate
 
@@ -60,22 +60,22 @@ that are too small, text that disappears.
 
 | Logical sync | Difference report |
 |---|---|
-| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-help-icon) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-help-icon) |
+| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-context-help) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-context-help) |
 | Desktop clicks **Products**. The phone and tablet open their own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
 
 | Measurements & suggestions | Metadata & social previews |
 |---|---|
-| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-help-icon) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-help-icon) |
+| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-context-help) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-context-help) |
 | Inspect an element and review its measurements and practical guidance. | Find missing metadata and preview how the page appears when shared. |
 
-| Run all checks | Top-bar help & voice |
+| Run all checks | Individual & top-bar help |
 |---|---|
-| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-help-icon) | ![Top-bar question-mark icon opening searchable feature help with its voice playing](docs/media/screenshot-voice-help.png?v=20261119-help-icon) |
-| Run selected groups together. Visual items await the tester’s review. | Click the small **?** in the top bar, find a feature and hear its explanation. |
+| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-context-help) | ![Individual question marks beside controls, with the Measure explanation and voice open](docs/media/screenshot-voice-help.png?v=20261119-context-help) |
+| Run selected groups together. Visual items await the tester’s review. | Click **?** beside a control for its explanation. The top-bar **?** searches all help. |
 
 | Narrated demo & carousel | Clean theme option |
 |---|---|
-| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-help-icon) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-help-icon) |
+| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-context-help) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-context-help) |
 | Jump between steps, pause and mute. Each step has natural AI narration. | Zinc is the default dark theme; Clean Green is available for the interface and previews. |
 
 ## What it does
@@ -172,7 +172,7 @@ Use **Previous / Next**, the **step picker**, or **Left / Right arrows** while f
 
 All 46 stops have bundled **natural AI voice narration**. **Mute / Unmute** sits beside **Pause** and remembers your choice. Pause and Resume control the narrator too; step navigation stops the previous clip, and autoplay waits for the current explanation to finish. If the browser initially blocks sound, click **Enable voice** in the same position. Playback needs no API key or voice-service connection.
 
-**Open voiced help from the small ? icon in the top bar.** Search for a feature, button or section, select its explanation, then choose **Hear explanation** to listen. Help stays closed while you hover or focus other controls. **F1** still opens help for the focused control, and **Esc** closes it. Choosing an explanation leaves the underlying tool’s settings untouched. Voice starts on demand and pauses a running demo until the explanation finishes. Field values, API keys, notes and preview-page content are not used to generate the explanations.
+**Small ? icons sit beside buttons, settings, sections and preview tools throughout the app.** Click one to read that control’s explanation, then choose **Hear explanation** to listen. Help clicks leave the underlying action and its settings untouched, including in dialogs and changing reports. The **? in the top bar** still opens searchable help for all features. Hovering and ordinary focus keep help closed. **F1** opens help for a focused control, and **Esc** closes it; arrow keys move between the individual help shortcuts. Voice starts on demand and pauses a running demo until the explanation finishes. Field values, API keys, notes and preview-page content are not used to generate explanations.
 
 A pointer performs the actions and explains the real results. The test journey and Clean Green palette are bundled,
 so those demonstrations need no AI account or theme download. Visual reviews stay pending for the tester;
@@ -304,7 +304,7 @@ With a preview open in desktop Chrome, click **Screenshot**, **Record** or **Aut
 - **Save to folder…** picks a folder, and every screenshot and recording part is written there as it is made. Chrome remembers the folder and asks again for permission after a restart; **Use Downloads** goes back to downloads. Without a folder, each file starts a download.
 - The pace, its unit and the frame rate are remembered in this browser.
 
-<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-help-icon" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
+<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-context-help" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
@@ -481,7 +481,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 `node tests/tour-voice.mjs` decodes every narration clip and checks real playback, browser autoplay blocking, mute persistence, Pause/Resume, scene synchronization and audio-error recovery. The scene/navigation suites run muted so they can test the visual workflow at accelerated reading speed.
 
-`node tests/feature-help.mjs` checks complete control coverage, all 474 help audio files, the top-bar help browser, quiet hover/focus behaviour, F1/Escape, modal dialogs, private-field exclusions, dynamic reports, responsive layouts and coordination with the demo narrator. Help descriptions live in `extension/feature-help-catalog.js`; Search tools uses the same descriptions. The bundled audio is generated from `tools/feature-help.json` with `tools/build-demo-narration.py --help-catalog tools/feature-help.json --reuse-existing --model /path/to/kokoro-v1.0.onnx --voices /path/to/voices-v1.0.bin`. The reuse flag preserves clips with matching voice, speed and spoken text.
+`node tests/feature-help.mjs` checks complete control coverage, all 474 help audio files, individual question marks and the top-bar help browser, quiet hover/focus, keyboard navigation, modal forms, disabled controls, private-field exclusions, dynamic reports, responsive layouts and demo narration coordination. Help descriptions live in `extension/feature-help-catalog.js`; Search tools uses the same descriptions. The bundled audio is generated from `tools/feature-help.json` with `tools/build-demo-narration.py --help-catalog tools/feature-help.json --reuse-existing --model /path/to/kokoro-v1.0.onnx --voices /path/to/voices-v1.0.bin`. The reuse flag preserves clips with matching voice, speed and spoken text.
 
 ## Known limits
 
@@ -551,6 +551,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **Individual help icons**: small ? shortcuts beside buttons and features throughout the app, with contextual voice, keyboard access, dynamic updates and the existing top-bar help search ([details](changelogs/CHANGELOG-contextual-help-icons.md)) |
 | **2026-11-19** | | | **Top-bar help icon**: one small ? opens searchable explanations with natural voice; hovering or focusing individual controls no longer opens help ([details](changelogs/CHANGELOG-topbar-help-icon.md)) |
 | **2026-11-19** | | | **GitHub demo refresh**: new Zinc banner, animated preview and narrated video; current screenshots for measurements, metadata, combined checks, voice help, demo navigation, themes and capture ([details](changelogs/CHANGELOG-github-demo-refresh.md)) |
 | **2026-11-19** | | | **Voiced tooltips throughout the app**: 473 explanations for controls, sections, preview tools, dialogs and results, with on-demand natural voice and F1/Escape access ([details](changelogs/CHANGELOG-voiced-feature-help.md)) |

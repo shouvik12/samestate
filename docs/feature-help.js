@@ -11,13 +11,13 @@
   const hear=$('#feature-help-hear'), audio=document.createElement('audio');
   audio.id='feature-help-audio'; audio.hidden=true; audio.preload='none';document.body.append(audio);
   const opener=$('#feature-help-open'), browser=$('#feature-help-browser'), search=$('#feature-help-search');
-  let anchor=null, entry=null, watch=0, sequence=0, playing=false, reservation=null, nativeTitles=[], oldDescription=null, browsing=false;
+  let anchor=null, entry=null, watch=0, sequence=0, playing=false, reservation=null, nativeTitles=[], oldDescription=null, browsing=false, returnTo=null;
   const candidates='button,input:not([type=hidden]),select,textarea,summary,a[href],h1,h2,h3,legend,label,.dev-name,.viewport-size,.finding,.check-result,.outline-metrics dt,.debug-heading,.debug-group,[role=option]';
   const clipFor=key=>window.samestateFeatureHelpNarration?.clips.find(clip=>clip.key===key);
   function target(node) {
     if(!(node instanceof Element)||node.closest('#feature-help'))return null;
     const el=node.closest(candidates);
-    return el&&catalog.resolve(el)?el:null;
+    return el&&catalog.resolve(el)?window.samestateFeatureHelpIcons?.targetFor(el)||el:null;
   }
   function available(el) {
     if(!el?.isConnected||el.closest('[inert]')||!el.getClientRects().length)return false;
@@ -40,8 +40,8 @@
   }
   function close(resume=true,focus=false) {
     cancelAnimationFrame(watch);watch=0;
-    const previous=anchor,returnFocus=focus||panel.contains(document.activeElement);
-    stopVoice(resume);restoreAnchor();anchor=entry=null;
+    const previous=returnTo||anchor,returnFocus=focus||panel.contains(document.activeElement);
+    stopVoice(resume);restoreAnchor();anchor=entry=returnTo=null;
     browsing=false;opener.setAttribute('aria-expanded','false');
     if(typeof panel.hidePopover==='function'&&panel.matches(':popover-open'))panel.hidePopover();
     panel.hidden=true;
@@ -58,11 +58,11 @@
     panel.style.top=Math.max(pad,Math.min(top,innerHeight-h-pad))+'px';
   }
   function track() {if(panel.hidden)return;place();if(!panel.hidden)watch=requestAnimationFrame(track);}
-  function show(el,focus=false) {
+  function show(el,focus=false,source=el) {
     if(!available(el))return;
     const help=catalog.resolve(el);if(!help)return;
     if(anchor===el&&entry?.key===help.key&&!panel.hidden){if(focus)hear.focus();return;}
-    close();anchor=el;entry=help;browser.hidden=true;panel.classList.remove('help-browser');
+    close();anchor=el;returnTo=source;entry=help;browser.hidden=true;panel.classList.remove('help-browser');
     nativeTitles=[el,...el.querySelectorAll('[title]')].filter(node=>node.hasAttribute('title')).map(node=>[node,node.getAttribute('title')]);
     for(const [node] of nativeTitles)node.removeAttribute('title');
     oldDescription=el.getAttribute('aria-describedby');
@@ -73,7 +73,7 @@
     $('#feature-help-status').textContent='';hear.disabled=!clipFor(help.key);
     const host=el.closest('dialog[open]')||document.body;if(panel.parentElement!==host)host.append(panel);
     panel.hidden=false;
-    if(typeof panel.showPopover==='function'){try{panel.showPopover({source:el});}catch{panel.showPopover();}}
+    if(typeof panel.showPopover==='function'){try{panel.showPopover({source});}catch{panel.showPopover();}}
     place();watch=requestAnimationFrame(track);if(focus)hear.focus({preventScroll:true});
   }
   function renderBrowser() {
@@ -128,5 +128,5 @@
     if(event.key==='F1'&&!event.ctrlKey&&!event.metaKey&&!event.altKey){event.preventDefault();event.stopImmediatePropagation();const el=target(document.activeElement);if(el)show(el,true);else if(!browsing)openBrowser();}
   },true);
   addEventListener('pagehide',()=>close(false));
-  window.samestateFeatureHelp={open:openBrowser,show,close,stopVoice,resolve:catalog.resolve,catalog:catalog.entries,get:()=>({key:entry?.key||null,open:!panel.hidden,browsing,playing,pausedDemo:!!reservation})};
+  window.samestateFeatureHelp={open:openBrowser,show,close,stopVoice,isFor:el=>!panel.hidden&&!browsing&&anchor===el,resolve:catalog.resolve,catalog:catalog.entries,get:()=>({key:entry?.key||null,open:!panel.hidden,browsing,playing,pausedDemo:!!reservation})};
 })();

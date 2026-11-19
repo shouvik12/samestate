@@ -7,7 +7,7 @@
     {"id":"measure","start":7,"duration":4,"caption":"Measurements & practical suggestions","voice":"Measure elements, and review practical suggestions."},
     {"id":"meta","start":11,"duration":4,"caption":"Metadata & social previews","voice":"Check metadata and preview social cards."},
     {"id":"checks","start":15,"duration":5,"caption":"Automated checks. Human visual review.","voice":"Run grouped checks, and record human reviews."},
-    {"id":"help","start":20,"duration":4,"caption":"Find any tool. Hear its explanation.","voice":"Find any tool, with voice help on demand."},
+    {"id":"help","start":20,"duration":4,"caption":"Click any ?. Hear its explanation.","voice":"Click a question mark for voice help."},
     {"id":"tour","start":24,"duration":3,"caption":"46 narrated steps. Move at your pace.","voice":"Forty-six narrated steps, at your pace."},
     {"id":"outro","start":27,"duration":3,"caption":"One interaction. Every device.","voice":"One interaction. Every device."}
   ]

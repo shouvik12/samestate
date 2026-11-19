@@ -97,7 +97,8 @@ async function main(){
   const evaluate=e=>page.evaluate(e);
   const until=async e=>{for(let i=0;i<300;i++){if(errors.length)throw Error(errors.join('; '));if(await evaluate(e).catch(()=>false))return;await sleep(100)}throw Error('Timed out: '+e+'; '+JSON.stringify(await evaluate('samestateFeatureHelp.get()')))};
   const click=async selector=>{const p=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()`);await page.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await page.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});};
-  const key=async k=>{await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:k,code:k,windowsVirtualKeyCode:k==='Escape'?27:k==='F1'?112:0});await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:k,code:k,windowsVirtualKeyCode:k==='Escape'?27:k==='F1'?112:0});};
+  const key=async k=>{const v={Escape:27,F1:112,Enter:13,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,Home:36,End:35}[k]||0;await page.send('Input.dispatchKeyEvent',{type:'keyDown',key:k,code:k,windowsVirtualKeyCode:v});await page.send('Input.dispatchKeyEvent',{type:'keyUp',key:k,code:k,windowsVirtualKeyCode:v});};
+  const clickHelp=async selector=>{await evaluate(`$(${JSON.stringify(selector)})?.scrollIntoView({block:'nearest',inline:'nearest'})`);await until(`!!samestateFeatureHelpIcons.forTarget($(${JSON.stringify(selector)})) && !samestateFeatureHelpIcons.forTarget($(${JSON.stringify(selector)})).hidden`);await evaluate(`samestateFeatureHelpIcons.forTarget($(${JSON.stringify(selector)})).dataset.testHelp='active'`);await click('.feature-help-trigger[data-test-help="active"]');await evaluate("document.querySelector('[data-test-help]')?.removeAttribute('data-test-help')");};
   await page.send('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.setItem('samestate.tourMuted','true')"});
   await page.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/?tour-pace=0.05`});
   await until('!!window.samestateFeatureHelp && !!window.samestateFeatureHelpNarration && active().length && active().every(d=>d.ready)');
@@ -108,6 +109,18 @@ async function main(){
   record('All tooltip audio files match between extension and web builds',unique.every(f=>{const a=readFileSync(join(ROOT,'help/narration',f)),b=readFileSync(join(ROOT,'../extension/help/narration',f));return a.length>3000&&a.equals(b)}),`${unique.length} audio files`);
   const decoded=await evaluate(`(async()=>{const ctx=new OfflineAudioContext(1,1,44100);let n=0;for(const file of new Set(samestateFeatureHelpNarration.clips.map(c=>c.file))){const response=await fetch('help/narration/'+file);if(!response.ok)throw Error(file);const b=await ctx.decodeAudioData(await response.arrayBuffer());const x=b.getChannelData(0);let peak=0;for(let i=0;i<x.length;i+=160)peak=Math.max(peak,Math.abs(x[i]));if(b.duration<.5||peak<.02)throw Error(file+' is silent');n++;}return n})()`);
   record('Every tooltip voice clip decodes to non-silent audio',decoded===unique.length,`${decoded} decoded clips`);
+  await until('!!window.samestateFeatureHelpIcons && !!samestateFeatureHelpIcons.forTarget($("#search-tools"))');
+  record('Every app control and feature has an individual help shortcut',await evaluate(`(()=>{const els=[...document.querySelectorAll('button,input:not([type=hidden]),select,textarea,summary,a[href],h1,h2,h3,legend,.dev-name,.viewport-size,.finding,.check-result,.outline-metrics dt,.debug-heading,.debug-group,[role=option]')].filter(e=>e.id!=='feature-help-open'&&!e.closest('#feature-help,.feature-help-layer,.sr-only')&&samestateFeatureHelp.resolve(e));return els.every(e=>!!samestateFeatureHelpIcons.forTarget(e))})()`));
+  record('Help icons leave control geometry, labels and preview frames intact',await evaluate(`(()=>{const e=$('#search-tools'),r=e.getBoundingClientRect().toJSON(),text=e.textContent,frames=active().map(d=>d.iframe);const layer=$('.feature-help-layer');layer.hidden=true;const without=e.getBoundingClientRect().toJSON();layer.hidden=false;return JSON.stringify(r)===JSON.stringify(without)&&e.textContent===text&&frames.every((f,i)=>f===active()[i].iframe)})()`));
+  await clickHelp('#search-tools');record('An individual question mark opens its own help without running the button',await evaluate(`samestateFeatureHelp.get().key==='#search-tools'&&!samestateFeatureHelp.get().browsing&&!$('#command-bar').open&&$('#feature-help-audio').paused`));
+  await click('#feature-help-hear');await until('samestateFeatureHelp.get().playing');await key('Escape');
+  record('Individual help plays voice and Escape returns to its question mark',await evaluate(`!samestateFeatureHelp.get().open && document.activeElement===samestateFeatureHelpIcons.forTarget($('#search-tools'))`));
+  await key('ArrowRight');const keyboardKey=await evaluate('samestateFeatureHelp.resolve(document.activeElement)?.key');await key('Enter');
+  record('Arrow keys and Enter operate the help-shortcut toolbar',!!keyboardKey&&await evaluate(`samestateFeatureHelp.get().key===${JSON.stringify(keyboardKey)}`));await key('Escape');
+  await evaluate(`window.helpDisabled=$('#screenshot').disabled;$('#screenshot').disabled=true`);await clickHelp('#screenshot');
+  record('Disabled controls still have readable, voiced help',await evaluate(`samestateFeatureHelp.get().key==='#screenshot'&&!$('#feature-help-availability').hidden&&!$('#feature-help-hear').disabled`));await key('Escape');await evaluate("$('#screenshot').disabled=window.helpDisabled");
+  const drawerOpen=await evaluate("$('#sidebar>details').open");await clickHelp('#sidebar>details>summary');
+  record('Section help leaves its drawer state unchanged',await evaluate(`$('#sidebar>details').open===${drawerOpen}&&samestateFeatureHelp.get().key==='section:Capture'`));await key('Escape');
   const point=await evaluate(`(()=>{const r=$('#search-tools').getBoundingClientRect();return{x:r.x+10,y:r.y+10}})()`);await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await sleep(650);
   record('Hovering a control leaves help closed',await evaluate(`!samestateFeatureHelp.get().open && $('#feature-help-audio').paused`));
   await evaluate("$('#search-tools').focus()");await sleep(650);record('Focusing a control leaves help closed',await evaluate('!samestateFeatureHelp.get().open'));
@@ -129,20 +142,26 @@ async function main(){
   record('Interactive help remains usable in a native modal',await evaluate(`$('#feature-help').parentElement.id==='command-bar' && !$('#feature-help-hear').inert && $('#feature-help').matches(':popover-open')`));
   await click('#feature-help-hear');await until("!$('#feature-help-audio').paused");await key('Escape');
   record('First Escape closes the help before its parent modal',await evaluate(`!samestateFeatureHelp.get().open && $('#command-bar').open && document.activeElement.id==='command-input'`));
+  const resultKey=await evaluate("samestateFeatureHelp.resolve($('#command-list [data-i]')).key");await clickHelp('#command-list [data-i]');
+  record('Search-result question marks explain without executing their command',await evaluate(`$('#command-bar').open&&samestateFeatureHelp.get().key===${JSON.stringify(resultKey)}`));await key('Escape');
   await key('Escape');await until("!$('#command-bar').open");
   await evaluate(`openGridSettings();$('#grid-columns').value='9';samestateFeatureHelp.show($('#grid-columns'),true)`);
   const gridBefore=await evaluate("localStorage.getItem('samestate.grid')");await click('#feature-help-hear');await until("!$('#feature-help-audio').paused");await click('#feature-help-close');
   record('Help playback and closing leave dialog fields and preferences untouched',await evaluate(`$('#grid-dialog').open && $('#grid-columns').value==='9'`) && await evaluate("localStorage.getItem('samestate.grid')")===gridBefore);
+  await clickHelp('#grid-columns');record('Field help in a native modal does not submit or edit the form',await evaluate(`$('#grid-dialog').open&&$('#grid-columns').value==='9'&&$('#feature-help').parentElement.id==='grid-dialog'&&$('.feature-help-layer').parentElement.id==='grid-dialog'&&samestateFeatureHelp.get().key==='#grid-columns'`));await key('Escape');
   await evaluate("$('#grid-dialog').close();$('#tests-drawer').open=true;$('#test-ai').open=true;$('#ai-key').value='SECRET_HELP_KEY_847';$('#test-plan').value='PRIVATE_PLAN_847';samestateFeatureHelp.show($('#test-plan'),true)");
   record('Sensitive field values never enter tooltip text or narration metadata',await evaluate(`!JSON.stringify(samestateFeatureHelp.catalog()).includes('SECRET_HELP_KEY_847') && !$('#feature-help').textContent.includes('SECRET_HELP_KEY_847') && !JSON.stringify(samestateFeatureHelpNarration).includes('PRIVATE_PLAN_847') && samestateFeatureHelp.resolve($('#ai-key')).key==='#ai-key' && samestateFeatureHelp.get().key==='#test-plan'`));
   await evaluate(`samestateFeatureHelp.close();openDebugMenu('all',$('#debug-all'))`);
   audit=await evaluate(AUDIT);record('Every debug overlay, simulator and action has help',audit.missing.length===0,audit.missing.join(', '));
+  const toolsBefore=await evaluate('wallDebug.tools.size');await clickHelp('.debug-menu [data-tool]');
+  record('Debug item help leaves the menu and tool settings unchanged',await evaluate(`!debugMenu.hidden&&wallDebug.tools.size===${toolsBefore}&&samestateFeatureHelp.get().key.startsWith('debug:tool:')`));await key('Escape');
   await evaluate(`closeDebugMenu(false);$('#workspaces-drawer').open=true;$('#workspace-name').value='PRIVATE_WORKSPACE_847';$('#workspace-form').requestSubmit();samestateTest.load({samestate:'test',version:1,site:'demo:index.html',steps:[{do:'expect',text:'PRIVATE_ASSERTION_847'}]});dev('iphone').annotations.note({x:.1,y:.1},'PRIVATE_NOTE_847')`);
   await until("$('.workspace') && $('.test-step-remove') && $('.preview-note')");
   audit=await evaluate(AUDIT);record('Saved workspaces, test-step actions and annotations have help',audit.missing.length===0,audit.missing.join(', '));
   record('Dynamic private names use generic help descriptions',await evaluate(`['.workspace-delete','.test-step-remove','.preview-note'].every(s=>{const e=samestateFeatureHelp.resolve($(s));return e&&!JSON.stringify(e).includes('PRIVATE_')})`));
   await evaluate("detect(true)");await evaluate('saveBaseline();readMeta()');
   audit=await evaluate(AUDIT);record('Findings, fixes, baselines, exports and social previews have help',audit.missing.length===0,audit.missing.join(', '));
+  await evaluate("showTab('diff')");await clickHelp('.finding');record('Dynamic findings receive individual help icons',await evaluate(`samestateFeatureHelp.get().open&&samestateFeatureHelp.get().key===samestateFeatureHelp.resolve($('.finding')).key`));await key('Escape');
   await evaluate('samestateOutline.open()');await until('!!samestateOutline.get().data');await evaluate("$('#outline-list button').click()");await until('!!samestateOutline.get().measurement');
   audit=await evaluate(AUDIT);record('Outline items, measurements and guidance links have help',audit.missing.length===0,audit.missing.join(', '));
   await evaluate(`for(const el of $('#checks-groups').querySelectorAll('input'))el.checked=['meta','capture'].includes(el.value);$('#checks-groups').dispatchEvent(new Event('change',{bubbles:true}));$('#checks-run').click()`);await until('!samestateChecks.running && !!samestateChecks.get()?.finishedAt');
@@ -152,10 +171,11 @@ async function main(){
   let layouts=0;for(const theme of ['samestate','neutral','clay','teal','hive','clean'])for(const mode of ['dark','light']){
    await evaluate(`uiTheme.preview('${theme}','${mode}');document.fonts.ready`);
    for(const width of [320,480,800,1600]){
-    await page.send('Emulation.setDeviceMetricsOverride',{width,height:920,deviceScaleFactor:1,mobile:false});await sleep(60);
-    const fits=await evaluate(`(()=>{const r=$('#feature-help').getBoundingClientRect();return r.width>0&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&$('#feature-help').scrollWidth<=$('#feature-help').clientWidth})()`);if(!fits)throw Error('Tooltip overflow: '+theme+' '+mode+' '+width);layouts++;
+    await page.send('Emulation.setDeviceMetricsOverride',{width,height:920,deviceScaleFactor:1,mobile:false});await evaluate('new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done)))');
+    const fits=await evaluate(`(()=>{const r=$('#feature-help').getBoundingClientRect();return r.width>0&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&$('#feature-help').scrollWidth<=$('#feature-help').clientWidth})()`);if(!fits)throw Error('Tooltip overflow: '+theme+' '+mode+' '+width+' '+JSON.stringify(await evaluate(`({rect:$('#feature-help').getBoundingClientRect().toJSON(),innerWidth,innerHeight,hidden:$('#feature-help').hidden,state:samestateFeatureHelp.get()})`)));layouts++;
    }
   }record('Tooltip text and voice controls fit across themes and window widths',layouts===48,`${layouts} layouts`);
+  record('Visible individual help icons stay inside the window',await evaluate(`[...document.querySelectorAll('.feature-help-trigger')].filter(b=>!b.hidden).every(b=>{const r=b.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight})`));
   await evaluate('samestateFeatureHelp.open()');let browserLayouts=0;
   for(const width of [320,480,800,1600]){
    await page.send('Emulation.setDeviceMetricsOverride',{width,height:740,deviceScaleFactor:1,mobile:false});await sleep(80);

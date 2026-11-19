@@ -28,6 +28,7 @@ If you change what a tour step does, update its check in `tests/smoke.mjs` (the 
 - `extension/emulate.js`: phone and tablet identity inside a preview; it exits at once anywhere else
 - `extension/agent.js`: captures interactions and replays them by meaning
 - `extension/app.js`, `app.html`, `app.css`: the device wall, sync log, difference engine and guided tour
+- `extension/feature-help-icons.js`: individual help shortcuts that follow visible app controls without moving preview frames; `feature-help.js` opens explanations and plays their bundled voice
 - `extension/report.js`: report export; `extension/workspaces.js`: saved setups
 - `extension/testrun.js`: test runs (recording, test files, running steps on every screen, writing tests with AI)
 - `tests/testrun.mjs`: checks test runs in the extension with a stand-in AI service

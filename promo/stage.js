@@ -46,7 +46,7 @@
    for(const input of $('#checks-groups').querySelectorAll('input'))input.checked=['layout','accessibility','meta','performance','visual','capture'].includes(input.value);
    $('#checks-groups').dispatchEvent(new Event('change',{bubbles:true}));showTab('checks');$('#sidebar').scrollTop=0;await fit();
   }else if(id==='help'){
-   $('#feature-help-open').click();$('#feature-help-search').value='measure';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}));
+   await until(()=>!!samestateFeatureHelpIcons.forTarget($('#open-outline'))&&!samestateFeatureHelpIcons.forTarget($('#open-outline')).hidden);
   }else if(id==='tour'){
    startTour({index:0,manual:true});await until(()=>tourPhase==='waiting'&&tourPaused);if(!$('#sidebar').hidden)$('#toggle-sidebar').click();await fit();if(samestateTourVoice.get().muted)$('#tour-mute').click();
   }else if(id==='report'){
@@ -67,7 +67,7 @@
   if(id==='sync'){point(['desktop','.dd-btn']);await wait(650);play('desktop',{do:'click',sel:'.dd-btn'});await wait(700);}
   else if(id==='measure'){point('#outline-list button');await wait(500);$('#outline-list button').click();await until(()=>!!samestateOutline.get().measurement);}
   else if(id==='checks'){point('#checks-run');await wait(500);$('#checks-run').click();await until(()=>!samestateChecks.running&&!!samestateChecks.get()?.finishedAt);await wait(650);const first=$('#pane-checks [data-status="review"]');if(first)$('#pane-checks').scrollTo({top:first.offsetTop-260,behavior:'smooth'});}
-  else if(id==='help'){$('#feature-help-results [data-help-key="#open-outline"]').click();await wait(500);point('#feature-help-hear');$('#feature-help-hear').click();}
+  else if(id==='help'){const icon=samestateFeatureHelpIcons.forTarget($('#open-outline'));point(icon);await wait(500);icon.click();await wait(350);point('#feature-help-hear');$('#feature-help-hear').click();}
   else if(id==='tour'){point('#tourpause');await wait(500);$('#tourpause').click();}
   else if(id==='meta'){point('#pane-meta');await wait(900);$('#pane-meta').scrollTo({top:220,behavior:'smooth'});}
  }
