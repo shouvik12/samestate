@@ -183,6 +183,8 @@ function mountDevicePicker(devices, { toggle, add, remove, isSelected = preset =
   }
 
   function refresh() {
+    // Breakpoint previews add/remove temporary presets after the picker has mounted.
+    if (rows.size !== devices.length || devices.some(preset => !rows.has(preset.id))) { renderRows(); return; }
     const query = normalise(search.value);
     const filtering = !!query || selectedOnly.checked;
     if (filtering && !savedOpen) savedOpen = new Map([...groups].map(([id, drawer]) => [id, drawer.open]));

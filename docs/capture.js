@@ -8,6 +8,9 @@
   const screenshotButton = document.querySelector('#screenshot');
   const recordButton = document.querySelector('#record');
   const status = document.querySelector('#capture-status');
+  const fullPageButton = document.querySelector('#full-page-shot');
+  const overviewButton = document.querySelector('#overview-shot');
+  const screenPicker = document.querySelector('#full-page-screen');
   const autoButton = document.querySelector('#auto-shots');
   const shotRateInput = document.querySelector('#shot-rate');
   const shotUnitInput = document.querySelector('#shot-unit');
@@ -116,6 +119,9 @@
       : !!sites.querySelector('.site-frames:not([hidden]) .dev:not([hidden]), .site-single:not([hidden]) iframe[src]');
     const canScreenshot = sites.hidden ? canCapture && typeof ImageCapture === 'function' : !!videoType;
     screenshotButton.disabled = !canScreenshot || !hasDevices || busy || !!recording?.stopping;
+    const canShoot = sites.hidden && canCapture && typeof ImageCapture === 'function' && hasDevices && !busy && !recording && !auto;
+    fullPageButton.disabled = overviewButton.disabled = !canShoot;
+    fillScreenPicker();
     recordButton.disabled = recording ? recording.stopping : !videoType || !hasDevices || busy;
     // Auto screenshots read frames straight from the wall capture, which the comparison view does not support.
     const canAuto = sites.hidden && canCapture && typeof ImageCapture === 'function';
@@ -153,9 +159,8 @@
       if (track?.getSettings().displaySurface !== 'browser' || !track.cropTo) throw new Error();
       showStatus('Preparing wall capture…');
       // Chrome only accepts this crop target when the source is the current tab.
-      const target = await CropTarget.fromElement(element);
       await Promise.race([
-        track.cropTo(target),
+        CropTarget.fromElement(element).then(target => track.cropTo(target)),
         new Promise((_, reject) => {
           timeout = setTimeout(() => reject(new DOMException('', 'TimeoutError')), 8000);
         })
@@ -203,9 +208,46 @@
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').drawImage(frame, 0, 0);
-    const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-    if (!png) throw new Error('Could not save the screenshot. Try again.');
-    await save(png, name);
+    await saveCanvas(canvas, name);
+  }
+
+  // PNG, JPEG or PDF (one page holding the JPEG), as chosen under Format.
+  const formatSelect = document.querySelector('#shot-format');
+  async function saveCanvas(canvas, name) {
+    const format = ['jpeg', 'pdf'].includes(formatSelect?.value) ? formatSelect.value : 'png';
+    const base = name.replace(/\.png$/, '');
+    if (format === 'png') {
+      const png = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!png) throw new Error('Could not save the screenshot. Try again.');
+      return save(png, base + '.png');
+    }
+    if (format === 'jpeg') {
+      // JPEG has no transparency: paint white under the picture first.
+      const flat = document.createElement('canvas'); flat.width = canvas.width; flat.height = canvas.height;
+      const ctx = flat.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, flat.width, flat.height); ctx.drawImage(canvas, 0, 0);
+      canvas = flat;
+    }
+    const jpeg = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!jpeg) throw new Error('Could not save the screenshot. Try again.');
+    if (format === 'jpeg') return save(jpeg, base + '.jpg');
+    return save(pdfFromJpeg(new Uint8Array(await jpeg.arrayBuffer()), canvas.width, canvas.height), base + '.pdf');
+  }
+  // A one-page PDF with the JPEG drawn at 0.75 points per pixel (96 dpi).
+  function pdfFromJpeg(jpeg, w, h) {
+    const enc = new TextEncoder(), parts = [], offsets = [];
+    let length = 0;
+    const push = chunk => { const bytes = typeof chunk === 'string' ? enc.encode(chunk) : chunk; parts.push(bytes); length += bytes.length; };
+    const pw = (w * 0.75).toFixed(2), ph = (h * 0.75).toFixed(2), content = `q ${pw} 0 0 ${ph} 0 0 cm /Im0 Do Q`;
+    const obj = (n, ...body) => { offsets[n] = length; push(`${n} 0 obj\n`); body.forEach(push); push('\nendobj\n'); };
+    push('%PDF-1.4\n');
+    obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+    obj(4, `<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`, jpeg, '\nendstream');
+    obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    const xref = length;
+    push(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map(n => String(offsets[n]).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+    return new Blob(parts, { type: 'application/pdf' });
   }
 
   const frameFailure = () => new Error('Chrome could not capture a frame. Keep this tab visible and try again.');
@@ -291,6 +333,96 @@
       updateButtons();
     }
   });
+
+  /* ----------------------- full-page and overview screenshots ----------------------- */
+  // Both show one screen at a time in Focus mode, capture the tab cropped to it, and put the layout back after.
+  const pause = ms => new Promise(done => setTimeout(done, ms));
+  function fillScreenPicker() {
+    const screens = active().filter(d => d.el);
+    const keep = screenPicker.value;
+    const html = screens.map(d => `<option value="${esc(d.id)}">${esc(screenName(d))}</option>`).join('');
+    if (screenPicker.innerHTML !== html) { screenPicker.innerHTML = html; if (screens.some(d => d.id === keep)) screenPicker.value = keep; }
+  }
+  async function oneAtATime(run) {
+    const before = { mode, focusDev };
+    try { return await run(async d => { focusDev = d; setMode('focus'); await pause(700); }); }
+    finally { focusDev = before.focusDev; setMode(before.mode); }
+  }
+  async function shoot(job) {
+    busy = true; updateButtons();
+    await folderReady();
+    let stream;
+    try { await job(element => captureWall(element, 10).then(s => (stream = s))); }
+    catch (error) { showStatus(captureError(error)); }
+    finally { stopCapture(stream); busy = false; updateButtons(); }
+  }
+  fullPageButton.addEventListener('click', () => shoot(async capture => {
+    const d = active().find(x => x.id === screenPicker.value && x.ready) || active().find(x => x.ready);
+    if (!d) throw new Error('Wait for the screen to load, then try again.');
+    await oneAtATime(async show => {
+      await show(d);
+      const size = await ask(d, 'page-size');
+      if (!size) throw new Error('The screen did not answer. Reload it and try again.');
+      const stream = await capture(d.iframe);
+      showStatus('Scrolling through the page…');
+      const first = await grabFrame(stream), scale = first.width / size.w; first.close();
+      const height = Math.min(size.h, Math.floor(32000 / scale)); // canvas limit
+      const canvas = document.createElement('canvas'); canvas.width = Math.round(size.w * scale); canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext('2d');
+      try {
+        for (let y = 0; y < height; y += size.vh) {
+          const top = Math.max(0, Math.min(y, height - size.vh));
+          await ask(d, 'scroll-to', { y: top });
+          if (y > 0) post(d, 'hide-fixed', { on: true }); // sticky headers and banners only in the first screenful
+          await pause(400);
+          const frame = await grabFrame(stream);
+          const skip = Math.round((y - top) * scale);
+          ctx.drawImage(frame, 0, skip, frame.width, frame.height - skip, 0, Math.round(y * scale), frame.width, frame.height - skip);
+          frame.close();
+        }
+      } finally { post(d, 'hide-fixed', { on: false }); post(d, 'scroll-to', { y: size.y }); }
+      await saveCanvas(canvas, `samestate-${stamp()}-${d.id}-full-page.png`);
+      showStatus(`Full page of ${screenName(d)} saved ${destination()}` + (height < size.h ? `, cut at ${height}px (a canvas can't be taller).` : '.'));
+    });
+  }));
+  overviewButton.addEventListener('click', () => shoot(async capture => {
+    const screens = active().filter(d => d.el && !d.el.hidden);
+    if (!screens.length) return;
+    const shots = [];
+    // One capture of the wall area; each screen is shown on its own in turn and cut out of the frame by its position.
+    const stream = await capture(canvasView); // before the layout changes, while the wall is as Chrome last drew it
+    await oneAtATime(async show => {
+      for (const d of screens) {
+        await show(d);
+        showStatus(`Capturing ${screenName(d)} (${shots.length + 1} of ${screens.length})…`);
+        await pause(250);
+        const frame = await grabFrame(stream);
+        try {
+          const area = canvasView.getBoundingClientRect(), r = d.el.getBoundingClientRect(), scale = frame.width / area.width;
+          const sx = Math.max(0, (r.left - area.left) * scale), sy = Math.max(0, (r.top - area.top) * scale);
+          const sw = Math.min(frame.width - sx, r.width * scale), sh = Math.min(frame.height - sy, r.height * scale);
+          if (sw >= 1 && sh >= 1) shots.push(await createImageBitmap(frame, sx, sy, sw, sh));
+        } finally { frame.close(); }
+      }
+    });
+    if (!shots.length) throw new Error('No screen could be captured. Keep this tab visible and try again.');
+    // Rows up to 4000px wide, each screen at its captured size.
+    const gap = 24, maxRow = Math.max(4000, ...shots.map(s => s.width));
+    const rows = [[]]; let rowWidth = 0;
+    for (const s of shots) { if (rowWidth && rowWidth + s.width > maxRow) { rows.push([]); rowWidth = 0; } rows[rows.length - 1].push(s); rowWidth += s.width + gap; }
+    const width = Math.max(...rows.map(r => r.reduce((n, s) => n + s.width + gap, gap)));
+    const height = rows.reduce((n, r) => n + Math.max(...r.map(s => s.height)) + gap, gap);
+    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = getComputedStyle(document.body).backgroundColor; ctx.fillRect(0, 0, width, height);
+    let y = gap;
+    for (const row of rows) { let x = gap; for (const s of row) { ctx.drawImage(s, x, y); x += s.width + gap; } y += Math.max(...row.map(s => s.height)) + gap; }
+    shots.forEach(s => s.close());
+    await saveCanvas(canvas, `samestate-${stamp()}-overview.png`);
+    showStatus(`Overview of ${plural(screens.length, 'screen')} saved ${destination()}.`);
+  }));
+
+  screenPicker.addEventListener('focus', fillScreenPicker);
+  screenPicker.addEventListener('pointerdown', fillScreenPicker);
 
   function stopRecording() {
     recording.stopping = true;
@@ -424,6 +556,7 @@
 
   // Used by report.js to take one screenshot per finding.
   globalThis.wallCapture = {
+    get busy() { return busy || !!recording || !!auto; },
     available: canCapture && typeof ImageCapture === 'function',
     start: element => captureWall(element),
     frame: grabFrame,

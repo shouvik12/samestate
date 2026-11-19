@@ -22,3 +22,6 @@ jobs:
 
       - name: Play the guided demo and check every step
         run: CHROME_PATH="$(command -v google-chrome)" node tests/smoke.mjs
+
+      - name: Write a test with a stand-in AI, replay it, and run it in CI
+        run: CHROME_PATH="$(command -v google-chrome)" node tests/testrun.mjs

@@ -9,11 +9,14 @@
 //   --reference=id    the screen the others are compared with (default: desktop)
 //   --sweep           also resize the reference screen from 320 to 1920px and report where problems start and stop
 //   --identity        phones and tablets tell the page's scripts and the server what they are
+//   --links           also check same-origin links (HEAD requests without cookies) and report broken ones
 //   --out=dir         where to write report.md, report.html, report.csv and report.json (default: samestate-report)
 //   --fail-on=level   exit with code 1 when the report has an issue (default), a warning or above (warn), or never (none);
 //                     a screen that did not answer in time also fails the run, except with none
 //   --baseline=file   compare with an earlier report.json: only findings that are new make the run fail
 //   --timeout=seconds how long to wait for the previews to load (default: 60)
+//   --test=file       run a saved Samestate test file on every screen first and write test-results.json; a step that
+//                     fails on any screen fails the run (except with --fail-on=none). The url can then be left out.
 // Environment: CHROME_PATH to pick Chrome, SAMESTATE_HEADED=1 to watch it run.
 import { spawn, execFileSync } from 'node:child_process';
 import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -24,9 +27,17 @@ import { fileURLToPath } from 'node:url';
 const EXTENSION = fileURLToPath(new URL('../extension/', import.meta.url));
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const hit = args.find(a => a === '--' + name || a.startsWith('--' + name + '=')); return hit ? (hit.includes('=') ? hit.slice(hit.indexOf('=') + 1) : true) : fallback; };
-const address = args.find(a => !a.startsWith('--'));
-if (!address) { console.error('Usage: node tools/samestate-ci.mjs <url> [--devices=iphone,pixel,desktop] [--sweep] [--fail-on=issue|warn|none]'); process.exit(2); }
+const testFile = option('test');
+let testData = null;
+if (typeof testFile === 'string') {
+  try { testData = JSON.parse(readFileSync(testFile, 'utf8')); } catch (error) { console.error(`Could not read the test file ${testFile}: ${error.message}`); process.exit(2); }
+  if (testData?.samestate !== 'test' || !Array.isArray(testData.steps)) { console.error(`${testFile} is not a Samestate test file.`); process.exit(2); }
+  if (typeof testData.site !== 'string' || testData.site.startsWith('demo:')) { console.error(`${testFile} is a test for the bundled sample site, which CI does not open. Record the test on your own site.`); process.exit(2); }
+}
+const address = args.find(a => !a.startsWith('--')) || testData?.site;
+if (!address) { console.error('Usage: node tools/samestate-ci.mjs <url> [--devices=iphone,pixel,desktop] [--sweep] [--links] [--fail-on=issue|warn|none] [--test=test.json]'); process.exit(2); }
 const site = new URL(address);
+if (testData && new URL(testData.site).origin !== site.origin) { console.error(`${testFile} is a test for ${new URL(testData.site).origin}, not ${site.origin}.`); process.exit(2); }
 if (!['http:', 'https:'].includes(site.protocol)) { console.error('Only http and https addresses can be checked.'); process.exit(2); }
 const devices = typeof option('devices') === 'string' ? option('devices').split(',').map(s => s.trim()).filter(Boolean) : null;
 const reference = option('reference', 'desktop');
@@ -135,7 +146,7 @@ async function run() {
     return result.result.value;
   };
 
-  for (let tries = 0; !(await evaluate('typeof detect === "function" && typeof samestateReport === "function"').catch(() => false)); tries++) {
+  for (let tries = 0; !(await evaluate('typeof detect === "function" && typeof samestateReport === "function" && typeof samestateTest === "object"').catch(() => false)); tries++) {
     if (tries > 100) throw new Error('Samestate did not start.');
     await sleep(100);
   }
@@ -161,6 +172,18 @@ async function run() {
   }
   await sleep(2500); // late images, fonts and layout shifts
   if (reference) await evaluate(`(() => { const r = $('#ref'); if ([...r.options].some(o => o.value === ${JSON.stringify(reference)})) r.value = ${JSON.stringify(reference)}; })()`);
+  let testResult = null;
+  if (testData) {
+    const loaded = await evaluate(`samestateTest.load(${JSON.stringify(JSON.stringify(testData))})`);
+    console.log(`Running ${testFile}: ${loaded.steps} steps${loaded.dropped ? ` (${loaded.dropped} unreadable steps left out)` : ''}.`);
+    testResult = await evaluate('samestateTest.run()', 10 * 60_000);
+    if (!testResult || testResult.error) throw new Error('The test did not run: ' + (testResult?.error || 'no answer'));
+    console.log('Test: ' + testResult.text);
+    for (const screen of testResult.screens.filter(s => !s.passed)) {
+      for (const f of screen.failures.slice(0, 10)) console.log(`  fail   ${screen.screen}: step ${f.step}, ${f.action}: ${f.result}`);
+    }
+  }
+  if (option('links')) await evaluate(`$('#check-links').checked = true`);
   await evaluate('detect(true)');
   if (option('sweep')) await evaluate('sweepWidths()', 10 * 60_000);
   const report = await evaluate(`({
@@ -171,7 +194,8 @@ async function run() {
   })`);
 
   mkdirSync(outDir, { recursive: true });
-  const json = { site: site.href, at: new Date().toISOString(), screens: report.screens, notMeasured: report.missing, findings: report.findings };
+  const json = { site: site.href, at: new Date().toISOString(), screens: report.screens, notMeasured: report.missing, findings: report.findings, ...(testResult && { test: { file: testFile, passed: testResult.passed, summary: testResult.text } }) };
+  if (testResult) writeFileSync(join(outDir, 'test-results.json'), JSON.stringify({ file: testFile, at: json.at, ...testResult }, null, 2));
   writeFileSync(join(outDir, 'report.md'), report.md);
   writeFileSync(join(outDir, 'report.html'), report.html);
   writeFileSync(join(outDir, 'report.csv'), report.csv);
@@ -182,7 +206,8 @@ async function run() {
     const before = JSON.parse(readFileSync(baselineFile, 'utf8')).findings;
     judged = changedFindings(report.findings, before);
     const measured = new Set(report.screens);
-    const fixed = changedFindings(before, report.findings).filter(f => measured.has(f.screen));
+    const linksChecked = !!option('links'); // without --links, broken links in the baseline are not known to be fixed
+    const fixed = changedFindings(before, report.findings).filter(f => measured.has(f.screen) && (linksChecked || !['Broken links', 'Links not checked'].includes(f.issue)));
     console.log(`Compared with ${baselineFile}: ${judged.length} new, ${fixed.length} fixed.`);
   }
   const count = sev => judged.filter(f => f.severity === sev).length;
@@ -191,7 +216,7 @@ async function run() {
   console.log(`Report written to ${outDir}`);
   // An incomplete scan is not a clean one: screens that did not answer fail the run like an issue does.
   if (report.missing.length) console.log(`  Not measured (no answer in time): ${report.missing.join(', ')}`);
-  return failOn === 'none' ? 0 : (count('issue') || report.missing.length || (failOn === 'warn' && count('warn'))) ? 1 : 0;
+  return failOn === 'none' ? 0 : (count('issue') || report.missing.length || (testResult && !testResult.passed) || (failOn === 'warn' && count('warn'))) ? 1 : 0;
 }
 
 let code = 2;

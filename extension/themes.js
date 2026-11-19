@@ -10,8 +10,82 @@ const tweakcnRegistry = 'https://tweakcn.com/r/';
 const tweakcnThemeName = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const tweakcnThemeCache = new Map();
 
+// Built in from the supplied Clean Green theme; usable offline without a registry request.
+const cleanGreenPalette = {
+  "light": {
+    "background": "oklch(0.9711 0.0034 145.5494)",
+    "foreground": "oklch(0.2235 0.0049 145.4099)",
+    "card": "oklch(1.0000 0 0)",
+    "card-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "popover": "oklch(1.0000 0 0)",
+    "popover-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "primary": "oklch(0.4731 0.0450 149.2237)",
+    "primary-foreground": "oklch(0.9711 0.0034 145.5494)",
+    "secondary": "oklch(0.9247 0.0103 145.4919)",
+    "secondary-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "muted": "oklch(0.9621 0.0034 145.5491)",
+    "muted-foreground": "oklch(0.4889 0.0120 145.3884)",
+    "accent": "oklch(0.9621 0.0034 145.5491)",
+    "accent-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "destructive": "oklch(0.4437 0.1613 26.8994)",
+    "destructive-foreground": "oklch(0.9711 0.0034 145.5494)",
+    "border": "oklch(0.8688 0.0069 145.5154)",
+    "input": "oklch(0.8688 0.0069 145.5154)",
+    "ring": "oklch(0.4731 0.0450 149.2237)",
+    "chart-1": "oklch(0.4731 0.0450 149.2237)",
+    "chart-2": "oklch(0.6147 0.0361 149.2264)",
+    "chart-3": "oklch(0.7440 0.0320 148.2634)",
+    "chart-4": "oklch(0.8504 0.0164 148.3765)",
+    "chart-5": "oklch(0.9482 0.0058 153.7726)",
+    "sidebar": "oklch(0.9711 0.0034 145.5494)",
+    "sidebar-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "sidebar-primary": "oklch(0.4731 0.0450 149.2237)",
+    "sidebar-primary-foreground": "oklch(0.9711 0.0034 145.5494)",
+    "sidebar-accent": "oklch(0.9247 0.0103 145.4919)",
+    "sidebar-accent-foreground": "oklch(0.2235 0.0049 145.4099)",
+    "sidebar-border": "oklch(0.9247 0.0103 145.4919)",
+    "sidebar-ring": "oklch(0.4731 0.0450 149.2237)"
+  },
+  "dark": {
+    "background": "oklch(0.2002 0 0)",
+    "foreground": "oklch(0.8717 0.0093 258.3382)",
+    "card": "oklch(0.2350 0 0)",
+    "card-foreground": "oklch(0.8717 0.0093 258.3382)",
+    "popover": "oklch(0.2002 0 0)",
+    "popover-foreground": "oklch(0.8717 0.0093 258.3382)",
+    "primary": "oklch(0.5017 0.0487 151.7958)",
+    "primary-foreground": "oklch(1.0000 0 0)",
+    "secondary": "oklch(0.2686 0 0)",
+    "secondary-foreground": "oklch(0.8717 0.0093 258.3382)",
+    "muted": "oklch(0.2686 0 0)",
+    "muted-foreground": "oklch(0.6401 0 0)",
+    "accent": "oklch(0.3778 0.0197 153.7965)",
+    "accent-foreground": "oklch(1.0000 0 0)",
+    "destructive": "oklch(0.3958 0.1331 25.7230)",
+    "destructive-foreground": "oklch(1.0000 0 0)",
+    "border": "oklch(0.2850 0 0)",
+    "input": "oklch(0.2850 0 0)",
+    "ring": "oklch(0.5017 0.0487 151.7958)",
+    "chart-1": "oklch(0.5017 0.0487 151.7958)",
+    "chart-2": "oklch(0.4167 0.0363 150.6122)",
+    "chart-3": "oklch(0.3212 0.0260 149.2516)",
+    "chart-4": "oklch(0.5951 0.0461 151.2497)",
+    "chart-5": "oklch(0.6869 0.0349 152.1651)",
+    "sidebar": "oklch(0.1776 0 0)",
+    "sidebar-foreground": "oklch(0.8717 0.0093 258.3382)",
+    "sidebar-primary": "oklch(0.5017 0.0487 151.7958)",
+    "sidebar-primary-foreground": "oklch(1.0000 0 0)",
+    "sidebar-accent": "oklch(0.2350 0 0)",
+    "sidebar-accent-foreground": "oklch(1.0000 0 0)",
+    "sidebar-border": "oklch(0.2350 0 0)",
+    "sidebar-ring": "oklch(0.5017 0.0487 151.7958)"
+  },
+  "radius": "0.6rem"
+};
+
 // Editor presets from tweakcn's utils/theme-presets.ts. The registry index omits some of these.
 const tweakcnPresets = new Map([
+  ['clean-green', 'Clean Green'],
   ['modern-minimal', 'Modern Minimal'],
   ['violet-bloom', 'Violet Bloom'],
   ['t3-chat', 'T3 Chat'],
@@ -73,12 +147,16 @@ async function refreshTweakcnPresets() {
   for (const item of items) {
     if (item?.type !== 'registry:style' && item?.type !== 'registry:theme') continue;
     if (typeof item.name !== 'string' || !tweakcnThemeName.test(item.name) || typeof item.title !== 'string' || !item.title.trim()) continue;
-    tweakcnPresets.set(item.name, item.title.trim());
+    if (item.name !== 'clean-green') tweakcnPresets.set(item.name, item.title.trim());
   }
 }
 
 function loadTweakcnTheme(name) {
   if (!tweakcnPresets.has(name)) throw new Error('Choose a tweakcn theme.');
+  if (name === 'clean-green') return Promise.resolve({
+    light: readRegistryTokens(cleanGreenPalette.light, cleanGreenPalette.radius),
+    dark: readRegistryTokens(cleanGreenPalette.dark, cleanGreenPalette.radius)
+  });
   if (!tweakcnThemeCache.has(name)) {
     const request = fetchTweakcn('themes/' + name + '.json').then(data => {
       if (data.name !== name || !data.cssVars) throw new Error('Theme palette is missing.');

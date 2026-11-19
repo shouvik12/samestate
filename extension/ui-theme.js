@@ -1,8 +1,8 @@
 // Interface theme and day/night mode. Loaded in <head> so the saved choice applies before the page is drawn;
-// app.js wires the controls in the top bar. Colors live in app.css under data-ui-theme and data-ui-mode.
+// app.js wires the controls in the top bar. Colors live in app.css and clean-theme.css under data-ui-theme and data-ui-mode.
 (() => {
   'use strict';
-  const THEMES = { samestate: 'Samestate', neutral: 'Neutral', clay: 'Clay', teal: 'Teal', hive: 'Hive' };
+  const THEMES = { samestate: 'Samestate', neutral: 'Neutral', clay: 'Clay', teal: 'Teal', hive: 'Hive', clean: 'Clean Green' };
   const read = (key, fallback) => { try { return localStorage.getItem(key) || fallback; } catch { return fallback; } };
   const root = document.documentElement;
   function apply(theme, mode) {

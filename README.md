@@ -35,14 +35,22 @@ that are too small, text that disappears.
 | | |
 |---|---|
 | 🔁 **Logical sync** | Clicks, links, scrolls, dialogs and toggles carry over, even across different markup. Dark mode on a phone flips every desktop. |
-| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility and page weight, per device. |
+| 🔍 **Difference report** | Layout, navigation, content, images, typography, tables, input, usability, accessibility (contrast, alt text, names, headings), page weight and Web Vitals, per device. |
 | 📏 **Width sweep** | Resizes a screen from 320 to 1920px and reports the exact widths where each problem starts and stops. |
 | 🛠️ **Fix previews** | Try the suggested CSS fix on every affected screen, check again, undo. Save a baseline to see what is new and what is fixed. |
+| 🔎 **Search tools** | One searchable catalog of tools, panels, settings, debug actions, simulators and exports, with descriptions, aliases, categories and availability hints. Open from the toolbar or ⌘K / Ctrl+K. |
+| 📐 **Outline & measurements** | Inspect headings, landmarks and keyboard focus order; draw overlays, pick an element for CSS measurements, and review linked best-practice suggestions. |
+| ✅ **Run all checks** | Choose report groups, a saved or AI test journey, screen-setting scans and a width sweep. Follow live progress, record visual reviews and export one combined HTML or JSON report. |
+| 🧪 **Test runs** | Write a test plan; an AI (OpenRouter or any OpenAI-compatible service, with your key) turns it into steps on one screen while every screen follows. Save the test and replay it without the AI, in Chrome or in CI. |
 | 🤖 **CI** | `node tools/samestate-ci.mjs <url>` writes the report from headless Chrome and fails the build on new issues. |
 | 🧭 **Page steps** | Walk a user journey: each link or dialog opens as a new step beside the last. |
 | 🆚 **Compare sites** | Two or more sites on side-by-side device walls with linked scrolling. |
 | 🎨 **Themes** | Try a tweakcn preset or your own CSS on every preview at once. |
 | ✏️ **Annotations** | Draw, arrow and note on any preview; marks appear in captures. |
+| 🐞 **Debug tools and simulators** | 26 debug tools (rulers, grids, Peek, measuring, readability…), 20 simulators and form autofill, for one screen or every screen. |
+| 🧾 **Meta and console** | Social card previews and meta checks; console messages and errors from every screen in one list. |
+| 📐 **Breakpoints** | One screen per CSS breakpoint, read from the site's own stylesheets. |
+| ⌨️ **Command bar** | ⌘K / Ctrl+K for every action; Find elements by CSS selector across screens. |
 | 🎬 **Capture** | Save the wall as a PNG or a WebM recording. |
 | 📱 **83 devices** | Phones, tablets, foldables, watches, TVs, plus your own custom sizes. |
 
@@ -82,8 +90,13 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
   findings, list the fixed ones and can show **new** only.
 - **Long text.** **Compare → Long text (+35%)** makes every preview's text about a third longer, with accented
   letters, as translations often do. Run **Detect differences** to see what gets cut off or pushes the layout.
-- **Screen settings.** **Views → Screen settings** gives every second screen dark mode, 200% text or landscape.
+- **Screen settings.** **Views → Screen settings** gives every second screen dark mode, 200% text, landscape,
+  reduced motion, more contrast, print, forced-colors, reduced data, reduced transparency or wide-color styles, right-to-left
+  direction or another page language, or shows it as someone with protanopia, deuteranopia, tritanopia,
+  no color vision or blurred vision would see it.
   With **Same device on every screen**, that shows one device both ways side by side.
+- **Check links.** With **Compare → Check links** on, **Detect differences** also asks the site for each same-origin
+  link on every screen and reports the ones that answer 404, 410 or a server error.
 - **Sync log.** Shows which devices matched, skipped, or could not reach a control.
 - **Screenshots and recordings.** Save the visible device wall as a PNG or a silent WebM video.
 
@@ -95,12 +108,16 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Navigation | Nav collapses behind a menu button, or items that vanish with no way to reach them |
 | Content | Text and controls hidden on smaller screens, cut-off text |
 | Images | Changed shape, stretched or broken images |
-| Typography | Type scale changes, text under 12px |
+| Typography | Type scale changes, text under 12px, lines over 80 characters |
 | Tables | Tables wider than the screen, tables that need a sideways swipe |
 | Input | Tap targets under 24px and 40px |
-| Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag |
-| Accessibility | Controls the Tab key reaches inside closed menus and panels, Tab order that jumps around the screen |
+| Usability | Overlays that sit on top of buttons (cookie banners), missing viewport tag, unknown autocomplete values |
+| Accessibility | Text below WCAG contrast, images without alt text, controls without a name, no main heading, heading levels that skip, no page language, pinch zoom turned off, missing or repeated landmarks, unlabelled navigation, vague link text (“click here”), the same link text for different pages, fields labelled only by a placeholder, positive tabindex, controls the Tab key reaches inside closed menus and panels, Tab order that jumps around the screen |
+| Performance | Web Vitals per screen: layout shifts (CLS) and slow interactions (INP) flagged, largest paint (LCP) shown |
 | Widths | From **Sweep widths**: the widths where each problem appears, including WCAG 1.4.10 Reflow at 320px |
+| Navigation links | With **Check links**: same-origin links that answer 404, 410 or a server error |
+| Errors | JavaScript errors and files that failed to load, per screen (details in the **Console** panel) |
+| Meta | Title and description length, missing social card tags, relative og:image, canonical URL, favicon, noindex, charset, duplicate meta tags, invalid structured data (once, for the reference screen) |
 | Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
 ## Install
@@ -128,14 +145,30 @@ Click the Samestate icon on any page to open that page on every screen, in a new
 your Chrome sign-ins, so a page you are signed in to stays signed in (turn off **Use my sign-ins** to preview signed
 out). The first time you open a site, press Enter and grant Chrome access to it. Clicked anywhere else, the icon
 opens Samestate on the bundled sample site; to preview another site, enter its address. The **Demo** button plays a guided demo on a
-sample site that walks through sync, the difference report, annotations, video playback, free placement, themes,
-Page steps, Compare sites, and the interface themes in day and night mode. A pointer performs each action, with the explanation beside the control it uses.
+sample site with 46 guided stops. Alongside sync, annotations, layout, Page steps and Compare sites, it now shows
+fix previews and baselines, accessibility and page-weight reports, width sweeps, screen settings, breakpoints,
+debug tools and simulators, grids and design overlays, forms and typing sync, tool search, Meta and Console,
+outline and measurements, saved test replay, optional AI setup, grouped checks with human reviews, capture formats
+and workspace sharing. It demonstrates Clean Green and the Zinc night palette too.
+
+Use **Previous / Next**, the **step picker**, or **Left / Right arrows** while focused in the demo controls to move through the walkthrough. You can also swipe across the demo bar. Manual navigation holds the selected step; **Resume** returns to automatic playback. Backward moves and jumps prepare the scene for the selected step.
+
+All 46 stops have bundled **natural AI voice narration**. **Mute / Unmute** sits beside **Pause** and remembers your choice. Pause and Resume control the narrator too; step navigation stops the previous clip, and autoplay waits for the current explanation to finish. If the browser initially blocks sound, click **Enable voice** in the same position. Playback needs no API key or voice-service connection.
+
+**Voiced tooltips work throughout the app.** Hover or focus a button, setting, section heading or preview tool to read its explanation, then choose **Hear explanation** to listen. Press **F1** to focus the help controls and **Esc** to dismiss them; touch users can long-press a control. The same help covers dialogs, debug tools, search results, reports, review actions and measurements. Speech starts on demand, and pauses a running demo until the explanation finishes. Field values, API keys, notes and preview-page content are not used to generate the voice explanations.
+
+A pointer performs the actions and explains the real results. The test journey and Clean Green palette are bundled,
+so those demonstrations need no AI account or theme download. Visual reviews stay pending for the tester;
+capture and file-sharing controls are shown without starting downloads or recording. Skip stops demo-owned checks
+and restores temporary tests, baselines, check selections, overlays and settings.
 
 ## Choose devices and options
 
-Pick the interface theme from the menu next to the reload button: **Samestate** (the original dark blue), **Neutral**,
-**Clay**, **Teal** or **Hive**. The sun and moon button beside it switches any theme between day and night mode.
-Both are remembered. They change Samestate's own colors, not the previews; to try colors on your site, see
+Pick the interface theme from the menu next to the reload button: **Samestate** (Zinc in dark mode), **Neutral**,
+**Clay**, **Teal**, **Hive** or **Clean Green**. The sun and moon button beside it switches any theme between day and night mode.
+Clean Green uses the supplied tweakcn light/dark palette, rounded controls, soft shadows, locally bundled Inter and
+JetBrains Mono, and a Georgia serif fallback. Your interface theme and mode are saved in this browser.
+They change Samestate's own colors, not the previews; to try colors on your site, see
 [Preview a color theme](#preview-a-color-theme).
 
 Open **Devices** to browse Android phones, Apple phones, tablets, and specials such as foldables, watches, and TVs. Search by model or dimensions, or turn on **Selected only** to edit the current wall. Under **My custom devices**, enter a name, width, height, and frame type to save a preset in this browser.
@@ -181,7 +214,68 @@ Open **Theme** in the sidebar. Under **Apply to**, choose a preview, a **Compare
 
 Sites that use shadcn color and radius variables can pick up the theme directly. **Recolor basic elements** also changes the page background, text, links, buttons, and input borders on sites with hard-coded styles. In **Compare sites**, apply the theme to one column to see it beside the original.
 
+**Clean Green** is also a built-in preview preset, available without downloading its palette. Preview presets apply colors and radius; the interface fonts stay in Samestate's own UI.
+
 For your own design, choose **Custom CSS…**, paste the CSS export, and click **Apply theme**. Themes use supported color and radius values and stay in the current Samestate tab. Click **Reset** to restore the selected previews. [tweakcn editor](https://tweakcn.com/editor/theme)
+
+## Debug tools and simulators
+
+Click the bug button in a preview's title bar to open its **Debug** menu, or **Debug** in the top bar for every
+visible screen. Tools can be combined; each screen has one simulator at a time. The bug button shows how many are on.
+In the top-bar menu, a dash means some screens have it and others don't; choosing it turns it on for all of them.
+Screens you open later start with what the top-bar menu set.
+
+**Debug tools**
+
+| Group | Tools |
+|---|---|
+| Layout | **Layout debugging** (outlines every element, marks the ones that stick out past the right edge), **Show z-index**, **Reachability** for the right or left thumb |
+| Accessibility | **Contrast checker** (ratio on text below WCAG AA), **Track focus** (role and name of the focused element), **Target size** (under 24px and 44px), **Small text** (under 12px, fields under 16px), **Text spacing** (WCAG 1.4.12), **Show roles**, **Show ARIA attributes**, **Apply all hover styles**, **Apply all focus-visible styles** |
+| Content | **Edit content**, **Hostile CSS** (ugly defaults that well-isolated components ignore), **Audible changes** (a beep, in each screen's own pitch, when the page changes) |
+| Disable | **Disable CSS**, **Disable images**, **Hide cursor** |
+
+**Simulators**: protanomaly, protanopia, deuteranomaly, deuteranopia, tritanomaly, tritanopia, achromatomaly,
+achromatopsia, cataracts, glaucoma, farsightedness, astigmatism (horizontal or vertical), tunnel vision, macular
+degeneration, CMV retinitis, photophobia, bright sunshine, dimmed screen and night mode. Glaucoma, tunnel vision and
+macular degeneration follow the mouse. Hover the **i** next to any item for what it does.
+
+The marks and overlays are drawn inside the preview, so they appear in screenshots and recordings, and the
+difference report ignores them. Tools that change the page (Text spacing, Disable CSS, Hostile CSS) do change what
+**Detect differences** measures, so you can check what breaks.
+
+## Meta, social previews and console
+
+The right-hand panel has two more tabs. **Meta** shows the reference screen's title, description, canonical URL,
+language, robots, theme color, manifest and structured data, the meta checks, and previews of a shared link on Google,
+X, Facebook, LinkedIn, Slack, Discord and WhatsApp in light or dark. **Console** lists console messages and errors from
+every screen once each, with the screens that sent them; filter by errors, warnings or logs.
+
+## Breakpoints, find and the command bar
+
+- **Views → Breakpoints** reads the width breakpoints from the site's stylesheets (min-width, max-width and range syntax, in
+  px, em or rem). **Open one screen per breakpoint** replaces the wall with one screen at each width (plus 320px below the
+  first), optionally with the width just below each one; **Back to my devices** restores your selection.
+- **Find elements** (in the sidebar, or ⌘⇧F / Ctrl+Shift+F) highlights the elements matching a CSS selector on every screen,
+  says how many each screen has, and steps through them.
+- **Command bar** (⌘K / Ctrl+K): type to run any action: debug tools and simulators for every screen, Screen settings,
+  capture, panels, drawers, live reload and more.
+
+## Forms and live reload
+
+- **Debug → Actions** fills every visible form field with valid test data or with edge cases (invalid email, accented and
+  non-Latin names, very long text, HTML), or clears them. Nothing is submitted.
+- **Sync → Typing & form fields** (off by default) mirrors what you type, select and check to the same field on the
+  other screens. Password and file fields and `data-samestate-private` are never mirrored.
+- **Sync → Live reload** reloads every screen every 5 seconds to a minute, or, for sites on this computer or network,
+  **when the site changes**: Samestate checks the page, its stylesheets and scripts every 1.5 seconds; a CSS change is
+  swapped in place, anything else reloads every screen.
+
+## Design overlay, rulers and grids
+
+- **Debug → Design overlay…** puts an exported design over one screen: exported at 1×, 2× or 3×, opacity, normal,
+  difference or invert blending, a split slider and X/Y offsets. It scrolls with the page and survives reloads.
+- **Rulers and guides**, **Column grid**, **Baseline grid** (set in **Grid settings…**), **Measure area**, **Peek**
+  (hold Alt), **Readability** and **Measure text** are in the Debug menu with the other tools.
 
 ## Capture the device wall
 
@@ -221,7 +315,12 @@ node tools/samestate-ci.mjs https://preview.example.com --devices=iphone,pixel,i
 - `--baseline=old/report.json` compares with an earlier run, so new findings and newly affected elements can fail the build.
   Older reports with no element keys compare counts for grouped findings.
 - `--identity` turns on phone and tablet identity, including the server user-agent.
+- `--links` also checks same-origin links and reports broken ones.
+- The report also includes the Meta, Errors, landmark, link-text and line-length checks.
 - `--devices` takes ids from `extension/devices.js`; `--reference` picks the screen the others are compared with.
+- `--test=test.json` runs a saved test file on every screen before the report and writes `test-results.json`.
+  A step that fails on any screen fails the run (unless `--fail-on=none`). With `--test`, the url can be left out: the
+  test's own site is used. The AI is never called in CI.
 
 In GitHub Actions, run it after the preview deploy and attach the folder as an artifact:
 
@@ -233,6 +332,74 @@ In GitHub Actions, run it after the preview deploy and attach the folder as an a
   if: always()
   with: { name: samestate-report, path: samestate-report }
 ```
+
+## Search every tool and feature
+
+Press **Search tools** in the toolbar, or **⌘K / Ctrl+K**, to open one lookup for Samestate's features. Search by name or purpose: try **metadata**, **spacing**, **recording**, **best practices**, **PDF**, **OpenRouter**, or **where can I find meta data**. Minor spelling mistakes are tolerated, and exact tool names rank first.
+
+Every result has a description and category. Filter by category, browse the full catalog with an empty search, or use the arrow keys and **Enter** to open or run a result. **Escape** closes the lookup and returns focus. All matches remain available in the scrollable list; the old 60-result cap is removed.
+
+The catalog includes the current sidebar/panel controls, all debug tools and simulators, reference-screen design overlays, Outline/measurements, Run all checks, Meta/social previews, form tools, sync settings, theme choices, captures/formats, workspace actions, test/AI setup, report exports and baselines. It is rebuilt from the current UI so its availability stays current. Disabled or context-dependent features remain discoverable with a reason; choosing one explains its requirement and performs no action. Existing capture permissions, test confirmations and AI settings continue to apply. Searching itself makes no AI request and does not read API-key or text-field values.
+
+## Outline, measurements and suggestions
+
+Press **Measure** in the top bar, or open the **Outline** tab in the right panel. Choose a screen and use **Refresh** after the page changes.
+
+- **Headings** shows native and ARIA headings, their levels, hidden states and structure suggestions. **Landmarks** shows page regions and their names. **Keyboard focus order** lists estimated Tab stops, including positive tabindex, off-screen skip links and the selected radio option; disabled, inert and closed-details content is excluded.
+- Turn on **Headings**, **Landmarks** or **Focus order** overlays to see structure, region boxes, and numbered stops connected by arrows on that screen. **Clear** removes inspection overlays from every preview. The overlays are isolated from the page's CSS and excluded from reports.
+- Choose an outline item or press **Pick element** and click inside the selected preview. Picking measures the element without activating its control or mirroring the click. Press **Escape**, **Cancel pick**, or leave the Outline tab to end picking.
+- The measurements include CSS width/height, page coordinates, margin/padding/border, viewport-edge distances, display/gap, font size/line height/weight, colors, estimated line length and contrast when measurable. They are before preview scaling and visual simulation filters.
+- Suggestions link to W3C guidance and distinguish checks, recommendations and human-review cases. For example, small target guidance includes the WCAG spacing and inline exceptions; the 44px AAA touch target goal is distinguished from the 24px AA minimum. Reading-line and line-spacing advice is labelled as guidance rather than an automatic conformance verdict.
+- **Suggestions only** filters the outline. **Export JSON** saves the outline, selected measurements and guidance locally. Input values and content marked `data-samestate-private` are not included. The **Run all checks** visual group also includes an Outline/measurement review task.
+
+The outline is derived from the DOM, not the browser's full accessibility tree. Nested frames and shadow roots are not traversed; test actual Tab/Shift+Tab, screen-reader behaviour, custom widgets and modal focus. Contrast is unavailable on hidden content, opacity, image/gradient backgrounds and some composite text. A clean inspector is not a complete accessibility assessment.
+
+Guidance references: [headings](https://www.w3.org/WAI/tutorials/page-structure/headings/), [page regions](https://www.w3.org/WAI/tutorials/page-structure/regions/), [focus order](https://www.w3.org/WAI/WCAG22/Understanding/focus-order.html), [contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html), and [target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+
+## Run all checks from the UI
+
+Press **Run all checks** in the top bar. Select the groups in the sidebar, then press **Run selected checks**:
+
+- **Layout & content**, **Accessibility & usability**, **Meta & page errors**, **Performance & page weight**, and optional **Broken links** share one scan across the current device wall.
+- **Test journey** runs the saved test without AI, or follows the plan with the OpenRouter / OpenAI-compatible connection configured in **Test runs**. Use **Set up test / AI connection…** to write the plan, open a test file or configure the service. The selected journey runs before the report groups, which scan its final page state; add layout-check steps to the journey to measure earlier states. AI writing runs first so Chrome can request service access from the Run button. It sends the same page text and control names as **Write test with AI**; credentials are never included in combined exports.
+- **Screen settings & long text** scans each non-vision setting in turn and then longer text. Select at least two devices for the alternating-screen settings. **Responsive width sweep** samples the reference screen between 320 and 1920px. These scans can take a few minutes.
+- **Visual tools & interactions**, **Capture & file output**, and **Workspace portability** create specific human-review tasks covering panels, breakpoints, debug tools, simulators, overlays, search, forms, synchronization, live reload, capture formats and saved workspaces. **Open tools** takes you to the relevant controls. Record **Pass**, **Fail** or **Skip**, and optional notes; unreviewed tasks stay **Needs human review**.
+
+The **Checks** tab combines findings, journey step results and human decisions. Missing previews, unmeasured Web Vitals and incomplete scans stay visible; a successful journey does not approve the visual tasks. Layout checks inside a journey retain their issue/warning counts. **Stop** ends the run after the current measurement and marks unfinished checks; temporary screen settings, rotation, long text, link-check selection and live reload are restored. Other preview controls are locked only while automated checks run.
+
+Use **Export HTML** or **Export JSON** for a combined report, including notes and pending reviews. Results remain in the current tab until a new run or reload, so export before leaving. This workflow runs from the UI and requires no CI setup. It does not automatically judge visual correctness or exercise every Samestate control: those items explicitly require a tester's decision.
+
+## Test runs
+
+Open **Test runs** in the sidebar. A test is a list of steps that runs on every linked screen at once, and passes
+when every step works on every screen.
+
+- **Write test with AI.** Describe what to do and what should happen in **Test plan** ("Sign up with
+  test@example.com and check the thank-you message, then open About"). Under **AI connection**, keep **OpenRouter**
+  or pick **Other (OpenAI-compatible)** for another service, such as Ollama on your computer
+  (`http://localhost:11434/v1`). Enter the model (default `anthropic/claude-sonnet-5.5`) and your API key, then
+  press **Write test with AI**. Chrome asks once for access to the service. The AI drives the screen chosen in
+  **Compare → Compare to**, one step at a time, and each step also runs on the other screens. It adds checks for the
+  outcomes in your plan, and can run the difference report at a step. Press **Stop** at any time.
+- **Record clicks.** Your clicks on buttons and menus, and the pages you open, become steps.
+- **Add check.** Adds a step that passes on a screen when the text you enter is visible on it.
+- **Run test.** Opens the start page on every screen, runs every step and shows, per step, on how many screens
+  it worked (hover for each screen). A step that found no control on a screen names the screen.
+- **Save test file** and **Open test file…** keep tests as JSON. A saved test runs without the AI, so it takes the
+  same steps every time.
+
+Steps find each control by its role and visible name (button "Sign in"), so the same step works across layouts.
+On a screen where a navigation item sits behind a menu button, the step opens the menu first.
+
+Safety:
+- With **Use my sign-ins** on, Samestate asks before a test runs: every step acts on your real account, on each screen.
+- Before the AI clicks something like Delete, Buy, Pay or Unsubscribe, Samestate asks you.
+- The AI can only open pages on the site you opened. Page text is passed to it as untrusted content.
+- Only the reference screen's address, visible text and control names go to the AI service, and only while it
+  writes. Field values and `data-samestate-private` text never do. Your key stays in the extension's storage for the
+  browser session (or on this computer with **Remember the key**) and is never written to a test file.
+
+Writing with AI needs the extension. The web demo can open, record and run tests.
 
 ## Save and reopen a setup
 
@@ -256,9 +423,17 @@ personal data. Mark elements with `data-samestate-private` to exclude their text
 The **Network** findings use the browser's resource timing: each request's address, type and size. Query strings
 are dropped, path segments that look like IDs show as `:id`, and request and response contents are never read.
 
-Form fields, editable regions, page titles, cookies, and site storage are excluded from inspection. Form input
-and submissions stay in the preview where you use them. **Page steps** uses the destination of a same-origin link
+Form fields, editable regions, page titles, cookies, and site storage are excluded from the difference report. Form
+input and submissions stay in the preview where you use them, unless you turn on **Sync → Typing & form fields**, which
+copies typed values (never passwords or file fields) to the other previews in the same tab. The **Meta** panel reads the
+page's title and meta tags, and the **Console** panel its console messages and errors; both are shown only in
+Samestate, and the report carries only lengths, counts and tag names. **Live reload** set to *when the site changes*
+fetches the page, its stylesheets and scripts from your local site to compare them; nothing is sent elsewhere. **Page steps** uses the destination of a same-origin link
 or the structure of a supported control to open the next preview. Samestate scopes inspection to the device wall’s site.
+**Write test with AI** sends the reference screen's address, visible text and control names (never field values) to
+the AI service you set up, only while it writes a test; see [Test runs](#test-runs).
+**Check links** (off by default) sends a HEAD request without cookies to each same-origin link on the page, at most 60
+per screen, and skips links whose path looks like an action (sign out, delete, unsubscribe, cancel). Only the status code is kept.
 **Compare sites** applies the same inspection rules to each opened site and mirrors interactions only within that site’s column. Previews use your Chrome cookies and site storage for the site, so a page you are signed in to opens signed in on every screen. Turn off **Use my sign-ins** under **Views** to start each preview signed out, with separate, temporary storage.
 
 ## How it works
@@ -275,13 +450,21 @@ extension/
   capture.js      Local screenshots and recordings of the device wall.
   report.js       Exports the difference report as Markdown, CSV or HTML.
   workspaces.js   Saves and reopens setups in the browser's local storage.
+  testrun.js      Test runs: recording, test files, running steps on every screen, and writing tests with AI.
   demo/           The sample site used by the guided demo.
 docs/             The same app as a static page for the live demo (GitHub Pages).
 tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
+tests/testrun.mjs Writes a test with a stand-in AI service in the extension, replays it, and runs it in CI.
 tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
 ```
 
-Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, takes about two minutes, and runs on every push and pull request to `main`.
+Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, plays all 46 demo steps, and runs on every push and pull request to `main`. `node tests/tool-search.mjs` checks the lookup, ranking, keyboard navigation, availability, discoverability and field-value exclusions. `node tests/outline.mjs` checks outlines, measurements, overlays, safe picking and privacy. `node tests/checks.mjs` checks the grouped UI workflow, review decisions, exports, missing measurements and cancellation. `node tests/testrun.mjs` checks test runs in the extension, with a stand-in for the AI service, and needs no key.
+
+`node tests/tour-navigation.mjs` checks Previous/Next, direct jumps, keyboard navigation, swipes, interrupted work and saved preferences against the live demo scenes. `node tests/tour-cleanup.mjs` checks that Skip and manual tool takeover restore the tester’s previous state.
+
+`node tests/tour-voice.mjs` decodes every narration clip and checks real playback, browser autoplay blocking, mute persistence, Pause/Resume, scene synchronization and audio-error recovery. The scene/navigation suites run muted so they can test the visual workflow at accelerated reading speed.
+
+`node tests/feature-help.mjs` checks complete control coverage, all 473 help audio files, hover/focus/F1/Escape behaviour, modal dialogs, private-field exclusions, dynamic reports, responsive layouts and coordination with the demo narrator. Help descriptions live in `extension/feature-help-catalog.js`; Search tools uses the same descriptions. The bundled audio is generated from `tools/feature-help.json` with `tools/build-demo-narration.py --help-catalog tools/feature-help.json --model /path/to/kokoro-v1.0.onnx --voices /path/to/voices-v1.0.bin`.
 
 ## Known limits
 
@@ -297,10 +480,40 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
   opens with `location.href` gets the desktop user-agent. It needs the extension; the web demo has no server.
 - **Screen settings → Light and dark** rewrites the page's `prefers-color-scheme` rules in the stylesheets it can
   read. Stylesheets from other sites and scripts that ask `matchMedia()` still get your computer's setting.
+- **Reduced motion**, **More contrast** and **Print** rewrite the page's media rules the same way, so scripts that ask
+  `matchMedia()` still get your computer's answer. **Print** keeps the screen's width; it does not lay the page out on paper.
+- Vision settings are a color filter over the preview (Machado et al. matrices at full severity), not a model of every eye.
+- The contrast check skips text over images, video, gradients and background images, and reads opacity and
+  `mix-blend-mode` as if they were not there.
+- LCP is measured while every preview loads at once, and previews off screen paint late, so it is shown but never flagged.
+  Chrome can stop drawing previews that are out of view (in headless CI, for example); their CLS then reads
+  "not measured". Layout shifts that happen within 0.8 s of a Samestate action (a mirrored click, a new setting) are left out.
+- A baseline compares broken links only when both scans checked links.
+- **Check links** judges only same-origin links. Links that need a sign-in answer 401 or 403 without cookies and are not reported.
+- Debug tools and simulators are not saved in workspaces, and turn off when the Samestate tab closes.
+- **Forced-colors** only switches the page's `forced-colors` media rules; it does not repaint the page in system colors.
+- The **Console** panel shows messages from when Samestate's script starts in a preview. In the web demo that is after
+  the sample page's first scripts; in the extension it is from the start of the page.
+- **Live reload when the site changes** fetches the page with your cookies every 1.5 seconds, so it is for sites on
+  this computer or network only. If the HTML changes on every load, only stylesheets and scripts are watched.
+- **Full page** scrolls one screen and stitches the screenfuls; fixed and sticky elements show only in the first one.
+  Pages taller than about 32,000 pixels in the capture are cut there.
+- **Typing & form fields** finds the same field by its place in the page or its name; fields with neither in common
+  are not mirrored.
+- Breakpoints come only from stylesheets Samestate can read, not from other sites or container queries.
+- **Apply all hover/focus-visible styles** copy the rules from stylesheets Samestate can read; stylesheets from other
+  sites are left out, and so are hover styles set by scripts.
+- Simulators are approximations (color blindness uses the Machado et al. matrices), meant to catch clearly broken
+  designs, not to show what any one person sees. Overlays are redrawn for what is on screen as you scroll.
+- **Disable CSS** and **Hostile CSS** do not reach styles added after they are turned on, or inside shadow DOM.
 - **Long text** lengthens the text on the page as it is; text the page adds later is not lengthened.
 - **Sweep widths** keeps the screen's kind (touch or not) at every width, and **Check journey on every device**
   resizes the steps without reloading them, so pages that pick a layout when they load can differ.
 - Fix previews set inline styles on the elements of one scan; a page reload removes them.
+- Test steps use synthetic clicks and key presses. Pages that ignore events that are not from a real user, and
+  controls inside other sites' frames, cannot be driven. Recorded clicks are matched by their place in the page, so
+  they can miss on layouts with different markup; steps written by the AI or by hand use the control's name.
+- A link a test step follows loads as a full page, also in single-page apps.
 - CSS `hover`, `pointer` and resolution media queries in stylesheets still describe your computer; only
   `matchMedia()` in scripts answers as the device.
 - Device identity is read when a page loads: after rotating a preview or changing its preset, reload it.
@@ -312,7 +525,7 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 
 ## Roadmap
 
-- Fix previews for more findings (overlays, images), and fixes written as a stylesheet to copy
+- Fix previews for more findings (overlays, images, contrast), and fixes written as a stylesheet to copy
 - Server user-agent for a preview's images, scripts and API calls, not only its page loads
 
 ## Release Notes
@@ -321,6 +534,21 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-19** | | | **Voiced tooltips throughout the app**: 473 explanations for controls, sections, preview tools, dialogs and results, with on-demand natural voice and F1/Escape access ([details](changelogs/CHANGELOG-voiced-feature-help.md)) |
+| **2026-11-19** | | | **Demo voice explainer**: natural AI narration for all 46 steps, Mute beside Pause, synchronized playback and a saved mute preference ([details](changelogs/CHANGELOG-demo-voice.md)) |
+| **2026-11-19** | | | **Sidebar width fix**: wrap long labels and button text, stack breakpoint actions, and keep capture controls within their drawers at narrow widths ([details](changelogs/CHANGELOG-sidebar-width.md)) |
+| **2026-11-19** | | | **Demo carousel navigation**: Previous/Next, direct step selection, keyboard arrows and swiping, with prepared scenes and Resume for autoplay ([details](changelogs/CHANGELOG-demo-carousel.md)) |
+| **2026-11-19** | | | **Guided demo refresh**: 21 new stops demonstrate the past week’s missing tools, real test replay and grouped checks, pending human reviews and safe cleanup ([details](changelogs/CHANGELOG-demo-weekly-refresh.md)) |
+| **2026-11-19** | | | **Samestate Zinc dark mode**: Zinc gray surfaces, neutral text and borders replace Rust, retaining the original blue accents ([details](changelogs/CHANGELOG-zinc-dark-theme.md)) |
+| **2026-11-19** | | | **Samestate Rust dark mode**: Rust surfaces replace the default blue dark surfaces, retaining the original blue accents ([details](changelogs/CHANGELOG-rust-dark-theme.md)) |
+| **2026-11-19** | | | **Clean Green theme**: supplied light/dark interface palette, local Inter and JetBrains Mono, rounded controls and shadows; built-in preview palette ([details](changelogs/CHANGELOG-clean-green-theme.md)) |
+| **2026-11-19** | | | **Search tools**: visible unified lookup, full feature catalog, descriptions and aliases, category filters, typo-tolerant purpose search, availability hints and keyboard navigation ([details](changelogs/CHANGELOG-tool-search.md)) |
+| **2026-11-19** | | | **Outline & measurements**: per-screen headings/landmarks/focus-order lists and overlays, safe element picking, CSS measurements, W3C-linked best-practice suggestions and JSON export ([details](changelogs/CHANGELOG-outline-measurements.md)) |
+| **2026-11-19** | | | **Run all checks**: selectable UI check groups, saved or AI journeys, live progress and Stop, screen-setting scans, combined results, explicit human reviews with notes, and HTML/JSON export ([details](changelogs/CHANGELOG-run-all-checks.md)) |
+| **2026-11-18** | | | **Preview tools**: Meta panel with social previews, Console panel, CSS breakpoint screens, forced-colors / reduced data / transparency / wide color / RTL / language settings, design overlay, rulers and guides, column and baseline grids, Measure area, Peek, readability, Measure text, Find elements, command bar (⌘K), form autofill, typing sync, live reload, full-page and overview screenshots in PNG, JPEG or PDF, workspace export and import, and report checks for meta tags, landmarks, link text, form labels, line length and errors ([details](changelogs/CHANGELOG-preview-tools.md)) |
+| **2026-11-18** | | | **Debug menu**: Debug tools (layout, z-index, reachability, contrast, focus, target size, small text, text spacing, roles, ARIA, forced hover and focus styles, edit content, hostile CSS, audible changes, disable CSS or images, hide cursor) and 20 simulators, from a bug button on every screen or Debug in the top bar for all screens ([details](changelogs/CHANGELOG-debug-menu.md)) |
+| **2026-11-18** | | | **Accessibility, media and Web Vitals**: Screen settings add reduced motion, more contrast, print and five vision filters; the report adds contrast, alt text, control names, headings, page language and zoom checks, a Performance category with Web Vitals, and an optional same-origin link check (`--links` in CI) ([details](changelogs/CHANGELOG-a11y-media-vitals.md)) |
+| **2026-11-16** | | | **Test runs** — write a test plan and let an AI (OpenRouter or any OpenAI-compatible service, with your key) turn it into steps that run on every screen; record clicks, add text checks, save and open test files, and replay them in CI with `--test` ([details](changelogs/CHANGELOG-test-runs.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **Incomplete reports** — Difference and Journey reports list previews that have yet to load. Only measured previews can contribute fixes to the baseline comparison. ([details](changelogs/CHANGELOG-incomplete-reports.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **CI baseline** — catches regressions that affect new elements under an existing finding. ([details](changelogs/CHANGELOG-ci-baseline-elements.md)) |
 | **2026-11-16** | 15:03:23 +09:00 | `aafac1c` | **Stop auto screenshots** — cancels the wait between screenshots immediately. ([details](changelogs/CHANGELOG-stop-auto-screenshots.md)) |

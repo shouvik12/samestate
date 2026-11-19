@@ -11,15 +11,27 @@ let pageSteps = false, sameDevice = false, sharedDeviceId = 'iphone', nextPage =
 const allScreens = () => [...DEVICES, ...pageScreens];
 const viewScreens = () => pageSteps ? pageScreens : DEVICES.filter(d => d.on);
 const presetFor = d => (sameDevice || d.step) ? DEVICES.find(device => device.id === sharedDeviceId) || d : d;
-const SYNC = { click: ['Clicks & menus', true], nav: ['Links & pages', true], scroll: ['Scrolling', true], hover: ['Hover', true], media: ['Video playback', true] };
-const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover', media: 'media' };
+const SYNC = { click: ['Clicks & menus', true], nav: ['Links & pages', true], scroll: ['Scrolling', true], hover: ['Hover', true], media: ['Video playback', true], form: ['Typing & form fields', false] };
+const KIND_SYNC = { click: 'click', navigate: 'nav', scroll: 'scroll', escroll: 'scroll', swipe: 'scroll', hover: 'hover', unhover: 'hover', media: 'media', field: 'form' };
 
 let target = null, previewUrl = null, leader = null, zoom = 1, mode = 'grid', focusDev = null, aid = 0, findings = [], catFilter = null;
 let textSalt = null, wallRevision = 0;
 let videoRequest = null;
 // Screen settings show one page two ways side by side: every second screen on the wall gets the other setting.
-const SETTING_NAMES = { dark: 'Dark', light: 'Light', text200: '200% text', landscape: 'Landscape', portrait: 'Portrait' };
-let screenSettings = ''; // '', 'scheme', 'text' or 'orientation'
+const SETTING_NAMES = {
+  dark: 'Dark', light: 'Light', text200: '200% text', landscape: 'Landscape', portrait: 'Portrait',
+  motion: 'Reduced motion', contrast: 'More contrast', print: 'Print', forced: 'Forced colors', reduceddata: 'Reduced data',
+  transparency: 'Reduced transparency', gamut: 'Wide color', rtl: 'Right-to-left', lang: 'Language',
+  protanopia: 'Protanopia', deuteranopia: 'Deuteranopia', tritanopia: 'Tritanopia', achromatopsia: 'No color', blur: 'Blurred vision'
+};
+let screenSettings = ''; // '', 'scheme', 'text', 'orientation', or one setting from SECOND_ONLY
+// The page rewrites its own media rules for these (agent.js); vision is a filter over the preview.
+const PAGE_VARIANTS = ['dark', 'light', 'text200', 'motion', 'contrast', 'print', 'forced', 'reduceddata', 'transparency', 'gamut', 'rtl', 'lang'];
+const VISION = {
+  protanopia: 'url(#vision-protanopia)', deuteranopia: 'url(#vision-deuteranopia)', tritanopia: 'url(#vision-tritanopia)',
+  achromatopsia: 'grayscale(1)', blur: 'blur(1.5px)'
+};
+const SECOND_ONLY = ['motion', 'contrast', 'print', 'forced', 'reduceddata', 'transparency', 'gamut', 'rtl', 'lang', ...Object.keys(VISION)]; // every second screen gets it, the others stay as they are
 let longText = false; // every preview's text about a third longer, as translations often are
 function screenSetting(d) {
   if (!screenSettings || d.settingShown || d.site || d.step || d.label) return '';
@@ -28,9 +40,108 @@ function screenSetting(d) {
   const second = index % 2 === 1;
   if (screenSettings === 'scheme') return second ? 'dark' : 'light';
   if (screenSettings === 'text') return second ? 'text200' : '';
+  if (SECOND_ONLY.includes(screenSettings)) return second ? screenSettings : '';
   return presetFor(d).kind === 'desktop' ? '' : second ? 'landscape' : 'portrait'; // desktops don't rotate
 }
-const screenVariant = d => { const setting = screenSetting(d); return ['dark', 'light', 'text200'].includes(setting) ? setting : ''; };
+const screenVariant = d => { const setting = screenSetting(d); return PAGE_VARIANTS.includes(setting) ? setting : ''; };
+const visionFilter = d => VISION[screenSetting(d)] || '';
+/* --------------------------- debug menu: items --------------------------- */
+// Debug tools and Simulators, for one screen (the bug button in its title bar) or every
+// visible screen (Debug in the top bar). Tools run in the preview (agent.js); most simulators are a filter here.
+const DEBUG_MENU = [
+  { heading: 'Debug tools' },
+  { group: 'Layout' },
+  { id: 'layout', label: 'Layout debugging', info: 'Outlines every element and marks the ones that stick out past the right edge in red, with how far.' },
+  { id: 'zindex', label: 'Show z-index', info: 'Labels positioned elements with their z-index.' },
+  { id: 'reach-right', label: 'Reachability', note: 'Right hand', info: 'How easy each part of the screen is to reach with the right thumb: green is easy, red is a stretch.' },
+  { id: 'reach-left', label: 'Reachability', note: 'Left hand', info: 'How easy each part of the screen is to reach with the left thumb: green is easy, red is a stretch.' },
+  { id: 'rulers', label: 'Rulers and guides', info: 'Pixel rulers along the top and left. Click a ruler to add a guide there; click the same spot again to remove it.' },
+  { id: 'columns', label: 'Column grid', info: 'A column grid over the page. Set columns, gutter and width in Grid settings.' },
+  { id: 'baseline', label: 'Baseline grid', info: 'Horizontal lines every few pixels (8 by default, in Grid settings) to check vertical rhythm.' },
+  { id: 'measure', label: 'Measure area', info: 'Drag to draw boxes that show their size and distance to the edges. The page can\'t be clicked while this is on.' },
+  { id: 'peek', label: 'Peek', note: 'hold Alt', info: 'Hold Alt (Option) and hover: size, font, colors, contrast, box model, role and name. The same element lights up on the other screens.' },
+  { group: 'Accessibility' },
+  { id: 'contrast', label: 'Contrast checker', info: 'Marks text below WCAG AA contrast (4.5:1, or 3:1 for large text) with its ratio. Text over images and gradients is skipped.' },
+  { id: 'focus', label: 'Track focus', info: 'Outlines the focused element as you Tab, with its role and accessible name.' },
+  { id: 'target', label: 'Target size', info: 'Marks controls under 24px in red and under 44px in amber. Links inside a sentence are exempt.' },
+  { id: 'smalltext', label: 'Small text', info: 'Marks text under 12px, and form fields under 16px (iOS zooms into those).' },
+  { id: 'spacing', label: 'Text spacing', note: 'WCAG 1.4.12', info: 'Line height 1.5, letter spacing 0.12em, word spacing 0.16em and paragraph spacing 2em. Content should not get cut off.' },
+  { id: 'roles', label: 'Show roles', info: 'Labels elements that have a role attribute.' },
+  { id: 'aria', label: 'Show ARIA attributes', info: 'Labels elements with their aria- attributes and values.' },
+  { id: 'hover', label: 'Apply all hover styles', info: 'Shows every :hover style at once. Stylesheets from other sites can\'t be read, so their hover styles are left out.' },
+  { id: 'focusvisible', label: 'Apply all focus-visible styles', info: 'Shows every :focus-visible and :focus style at once. Stylesheets from other sites can\'t be read.' },
+  { group: 'Content' },
+  { id: 'edit', label: 'Edit content', info: 'Makes the whole page editable so you can try out copy. Changes go away on reload.' },
+  { id: 'hostile', label: 'Hostile CSS', info: 'Gives plain elements ugly default styles. Components that set their own styles stay as they are.' },
+  { id: 'audible', label: 'Audible changes', info: 'Beeps when the page changes, to hear updates you might not see.' },
+  { id: 'readability', label: 'Readability', info: 'Grades each paragraph with the Automated Readability Index: green is easy (grade 8 or below), amber is harder, red is hard (above 12).' },
+  { id: 'textlen', label: 'Measure text', info: 'Select text to see its characters, words and sentences. 45–75 characters per line reads best.' },
+  { group: 'Disable' },
+  { id: 'nocss', label: 'Disable CSS', info: 'Turns off the page\'s stylesheets and style attributes.' },
+  { id: 'noimages', label: 'Disable images', info: 'Hides images, video, SVG and background images.' },
+  { id: 'nocursor', label: 'Hide cursor', info: 'Hides the mouse cursor in the preview, to test with the keyboard.' },
+  { group: 'Actions' },
+  { action: 'design', single: true, label: 'Design overlay…', info: 'Put a design export over this screen to compare: opacity, difference blend, split view and offsets.' },
+  { action: 'grid', label: 'Grid settings…', info: 'Columns, gutter, width and baseline for Column grid and Baseline grid.' },
+  { action: 'fill-valid', label: 'Fill forms with test data', info: 'Fills every visible field with valid values: an email, a phone number, dates, names. Nothing is submitted.' },
+  { action: 'fill-edge', label: 'Fill forms with edge cases', info: 'Fills fields with values that often break things: an invalid email, accented and non-Latin names, very long text, HTML.' },
+  { action: 'fill-clear', label: 'Clear forms', info: 'Empties every visible field.' },
+  { heading: 'Simulators' },
+  { sim: '', label: 'None', info: 'No simulator.' },
+  { group: 'Color blindness (red-green)' },
+  { sim: 'protanomaly', label: 'Protanomaly', info: 'Weak red sensitivity. About 1% of men.' },
+  { sim: 'protanopia', label: 'Protanopia', info: 'No red cones. About 1% of men.' },
+  { sim: 'deuteranomaly', label: 'Deuteranomaly', info: 'Weak green sensitivity, the most common color vision deficiency. About 5% of men.' },
+  { sim: 'deuteranopia', label: 'Deuteranopia', info: 'No green cones. About 1% of men.' },
+  { group: 'Color blindness (blue-yellow)' },
+  { sim: 'tritanomaly', label: 'Tritanomaly', info: 'Weak blue sensitivity. Rare.' },
+  { sim: 'tritanopia', label: 'Tritanopia', info: 'No blue cones. Rare.' },
+  { group: 'Full color blindness' },
+  { sim: 'achromatomaly', label: 'Achromatomaly', info: 'Very little color.' },
+  { sim: 'achromatopsia', label: 'Achromatopsia', info: 'No color at all.' },
+  { group: 'Visual impairments' },
+  { sim: 'cataracts', label: 'Cataracts', info: 'Cloudy, blurred, yellowed and low-contrast vision.' },
+  { sim: 'glaucoma', label: 'Glaucoma', info: 'Blurred, dark edges. The clear area follows the mouse.' },
+  { sim: 'farsighted', label: 'Farsightedness', info: 'Close-up details are blurred.' },
+  { sim: 'astig-h', label: 'Astigmatism', note: 'Horizontal', info: 'Blur and a ghost image to the side.' },
+  { sim: 'astig-v', label: 'Astigmatism', note: 'Vertical', info: 'Blur and a ghost image above and below.' },
+  { sim: 'tunnel', label: 'Tunnel vision', info: 'Only the center is visible. It follows the mouse.' },
+  { sim: 'macular', label: 'Macular degeneration', info: 'The center is blurred out. The spot follows the mouse.' },
+  { sim: 'cmv', label: 'CMV retinitis', info: 'Dark specks across the view.' },
+  { sim: 'photophobia', label: 'Photophobia', info: 'Light sensitivity: a bright, glaring screen.' },
+  { group: 'Other' },
+  { sim: 'sunshine', label: 'Bright sunshine', info: 'A phone in direct sunlight: washed-out colors, low contrast is lost.' },
+  { sim: 'dimmed', label: 'Dimmed screen', info: 'Brightness at about 40%, like a laptop on battery or a phone at minimum.' },
+  { sim: 'night', label: 'Night mode', info: 'Less blue and more red, like Night Shift.' },
+];
+const SIM_FILTER = {
+  protanomaly: 'url(#sim-protanomaly)', protanopia: 'url(#vision-protanopia)', deuteranomaly: 'url(#sim-deuteranomaly)', deuteranopia: 'url(#vision-deuteranopia)',
+  tritanomaly: 'url(#sim-tritanomaly)', tritanopia: 'url(#vision-tritanopia)', achromatomaly: 'grayscale(.7)', achromatopsia: 'grayscale(1)',
+  cataracts: 'blur(1.6px) contrast(.6) brightness(1.12) sepia(.35)', farsighted: 'blur(2.2px)', 'astig-h': 'url(#sim-astig-h)', 'astig-v': 'url(#sim-astig-v)',
+  photophobia: 'brightness(1.5) contrast(.8) saturate(.85)', sunshine: 'brightness(1.4) contrast(.5) saturate(.55)', dimmed: 'brightness(.4)',
+  night: 'sepia(.55) saturate(1.35) hue-rotate(-12deg) brightness(.92)'
+};
+const SIMS = new Set(DEBUG_MENU.filter(item => item.sim).map(item => item.sim));
+const TOOL_IDS = DEBUG_MENU.filter(item => item.id).map(item => item.id);
+const wallDebug = { tools: new Set(), sim: '' }; // what the all-screens menu last set; screens opened later start with it
+const debugTools = d => d.debug ??= new Set(wallDebug.tools);
+const debugSim = d => d.sim ??= wallDebug.sim;
+function showDebugState(d) {
+  const button = d.el?.querySelector('[data-a=debug]');
+  if (!button) return;
+  const n = debugTools(d).size + (debugSim(d) ? 1 : 0) + (d.design ? 1 : 0);
+  button.classList.toggle('on', n > 0);
+  button.dataset.count = n || '';
+  button.title = n ? `Debug tools and simulators: ${n} on` : 'Debug tools and simulators';
+}
+function applyDebug(d) {
+  if (!d.el) return;
+  d.iframe.style.filter = previewFilter(d);
+  if (d.ready) configure(d);
+  showDebugState(d);
+}
+// The Screen settings vision filter, then the screen's own simulator from the Debug menu.
+const previewFilter = d => [visionFilter(d), SIM_FILTER[debugSim(d)] || ''].filter(Boolean).join(' ');
 const active = () => viewScreens().filter(d => d.el);
 const siteScreens = site => site.picker.value === 'wall' ? site.devices.filter(d => d.el && !d.el.hidden) : [];
 const workspaceScreens = () => sitesMode ? sitePanels.flatMap(siteScreens) : active();
@@ -67,7 +178,7 @@ $('#synclist').addEventListener('change', e => {
 });
 
 /* --------------------------------- frames --------------------------------- */
-const IC = { link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', rot: '<svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="14" rx="2"/><path d="M4 17a8 8 0 0 0 8 4M20 7a8 8 0 0 0-5-4"/></svg>', rel: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>', foc: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>' };
+const IC = { debug: '<svg viewBox="0 0 24 24"><rect x="8" y="7" width="8" height="13" rx="4"/><path d="M12 7v13M9.5 7.5 8 4.5M14.5 7.5 16 4.5M4 13h4M16 13h4M5 19l3-2M19 19l-3-2M5 8l3 2M19 8l-3 2"/></svg>', link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>', rot: '<svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="14" rx="2"/><path d="M4 17a8 8 0 0 0 8 4M20 7a8 8 0 0 0-5-4"/></svg>', rel: '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>', foc: '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>' };
 const NAVIC = '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg><svg viewBox="0 0 24 24"><path d="M12 15V4m-4 4 4-4 4 4M6 12v8h12v-8"/></svg><svg viewBox="0 0 24 24"><rect x="5" y="5" width="11" height="11" rx="2"/><path d="M9 19h8a2 2 0 0 0 2-2V9"/></svg>';
 const ANDIC = '<svg viewBox="0 0 24 24"><path d="M15 6l-7 6 7 6z"/></svg><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>';
 function deviceChrome(preset, landscape) {
@@ -193,6 +304,7 @@ function layout(d) {
   d.scaled.style.transform = 'scale(' + scale + ')';
   d.iframe.style.width = w + 'px';
   d.iframe.style.height = h + 'px';
+  d.iframe.style.filter = previewFilter(d);
   d.annotations.redraw();
   d.el.querySelector('.viewport-size').textContent = '(' + w + ' × ' + h + ')';
   const scaleButton = d.el.querySelector('[data-a=scale]');
@@ -234,7 +346,7 @@ function addFrame(d) {
   const el = document.createElement('div');
   const closeLabel = d.step ? 'Close this step' : 'Close this preview';
   el.className = 'dev' + (d.linked ? '' : ' unlinked');
-  el.innerHTML = `<div class="dev-head"><i class="dot"></i><b class="dev-name"></b><span class="dims"><span class="viewport-size" title="Page viewport in CSS pixels"></span><button type="button" data-a="scale" class="preview-scale-button" aria-haspopup="dialog" title="Change preview scale"></button></span><span class="sp"></span><button data-a="link" title="Toggle screen link"${d.step ? ' hidden' : ''}>${IC.link}</button><button data-a="rot" title="Rotate">${IC.rot}</button><button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button><button type="button" data-a="close" title="${closeLabel}" aria-label="${closeLabel}">×</button></div><div class="dev-body"><div class="scaled"><div class="device-top"></div><iframe sandbox="${PREVIEW_SANDBOX}" allow="autoplay; clipboard-write"></iframe><div class="device-bottom"></div></div></div>`;
+  el.innerHTML = `<div class="dev-head"><i class="dot"></i><b class="dev-name"></b><span class="dims"><span class="viewport-size" title="Page viewport in CSS pixels"></span><button type="button" data-a="scale" class="preview-scale-button" aria-haspopup="dialog" title="Change preview scale"></button></span><span class="sp"></span><button type="button" data-a="debug" class="debug-button" aria-haspopup="menu" aria-expanded="false" title="Debug tools and simulators">${IC.debug}</button><button data-a="link" title="Toggle screen link"${d.step ? ' hidden' : ''}>${IC.link}</button><button data-a="rot" title="Rotate">${IC.rot}</button><button data-a="rel" title="Reload">${IC.rel}</button><button data-a="foc" title="Focus this device">${IC.foc}</button><button type="button" data-a="close" title="${closeLabel}" aria-label="${closeLabel}">×</button></div><div class="dev-body"><div class="scaled"><div class="device-top"></div><iframe sandbox="${PREVIEW_SANDBOX}" allow="autoplay; clipboard-write"></iframe><div class="device-bottom"></div></div></div>`;
   d.el = el;
   d.body = el.querySelector('.dev-body');
   d.scaled = el.querySelector('.scaled');
@@ -249,6 +361,7 @@ function addFrame(d) {
     const button = event.target.closest('button');
     const action = button?.dataset.a;
     if (action === 'scale') editPreviewScale(d, button);
+    if (action === 'debug') openDebugMenu(d, button);
     if (action === 'rot') { d.rot = !d.rot; layout(d); fitWall(d.site); }
     if (action === 'rel') post(d, 'reload');
     if (action === 'link') {
@@ -272,6 +385,7 @@ function addFrame(d) {
     }
   });
   arrangeable(d);
+  showDebugState(d);
   d.themeTargetId = d.token = crypto.randomUUID();
   d.identity = d.iframe.name = identityName(d); // before the first load
   if (d.site) {
@@ -730,6 +844,8 @@ cv.addEventListener('scroll', () => {
 const IS_EXT = typeof chrome !== 'undefined' && !!(chrome.runtime && chrome.runtime.id);
 const EXT = location.origin;
 const DEMO_URL = new URL('./demo/index.html', location.href);
+// The web demo can retain old iframe resources after the shell reloads. Load this feature's matching agent.
+if (!IS_EXT) DEMO_URL.searchParams.set('samestate-build', 'weekly-demo-20261119-final');
 const DEMO_PATH = new URL('./demo/', location.href).pathname;
 const REPO = 'https://github.com/shouvik12/samestate';
 let openId = 0, openingId = 0;
@@ -1188,7 +1304,7 @@ async function changeTheme(reset = false) {
       if (name === customTheme) {
         css = buildPreviewTheme($('#theme-css').value, palette, basicColors);
       } else {
-        themeStatus.textContent = `Loading ${label} from tweakcn…`;
+        themeStatus.textContent = name === 'clean-green' ? `Loading ${label}…` : `Loading ${label} from tweakcn…`;
         css = renderPreviewTheme(await loadTweakcnTheme(name), palette, basicColors);
       }
     } catch (error) {
@@ -1245,12 +1361,14 @@ const within = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 // ?tour-pace=0.3 shortens the reading time and the pause after each step, for tests. Waits a step needs are unchanged.
 const tourPace = within(Number(new URLSearchParams(location.search).get('tour-pace')) || 1, 0.05, 1);
 let tour = 0, tourRunning = false, tourPaused = false, tourAnchor = null, tourSide = null, tourWatch = 0;
+let tourStep = 0, tourPhase = 'idle', tourManual = false, tourAdvance = false, tourNavigation = 0;
 const touring = id => id === tour;
 
 // Waits that stop when the demo is skipped and hold while it is paused. Both answer whether the demo is still on.
 async function nap(id, ms) {
   for (let t = 0; t < ms || tourPaused; t += tourPaused ? 0 : 100) {
     if (!touring(id)) return false;
+    if (tourAdvance && ['waiting', 'advancing'].includes(tourPhase)) return true;
     await sleep(100);
   }
   return touring(id);
@@ -1292,7 +1410,7 @@ async function tourReveal(id, target) {
   if (!el) return;
   const drawer = el.closest('details.sidebar-drawer');
   if (drawer) drawer.open = true;
-  if (el.closest('#sidebar')) { el.scrollIntoView({ block: 'nearest' }); return; }
+  if (el.closest('#sidebar') || el.closest('#panel') || el.closest('dialog[open]')) { el.scrollIntoView({ block: 'nearest' }); return; }
   let r = cv.contains(el) && tourRect(target);
   if (!r) return;
   const view = cv.getBoundingClientRect(), pad = 30;
@@ -1305,13 +1423,13 @@ async function tourReveal(id, target) {
   }
   const dx = r.left < view.left + pad ? r.left - view.left - pad : r.right > view.right - pad ? Math.min(r.right - view.right + pad, r.left - view.left - pad) : 0;
   const dy = r.top < view.top + pad ? r.top - view.top - pad : r.bottom > bottom - pad ? Math.min(r.bottom - bottom + pad, r.top - view.top - pad) : 0;
-  if (Math.abs(dx) >= 2 || Math.abs(dy) >= 2) await scrollWall(cv.scrollLeft + dx, cv.scrollTop + dy);
+  if (Math.abs(dx) >= 2 || Math.abs(dy) >= 2) await scrollWall(cv.scrollLeft + dx, cv.scrollTop + dy, 450, () => touring(id));
 }
 // Scrolls the wall step by step, so it is where the demo expects by the time the pointer moves.
-async function scrollWall(left, top, ms = 450) {
+async function scrollWall(left, top, ms = 450, ok = () => true) {
   const from = [cv.scrollLeft, cv.scrollTop];
   cvAllow = Date.now() + ms + 500;
-  await glide(ms, t => { cv.scrollLeft = from[0] + (left - from[0]) * t; cv.scrollTop = from[1] + (top - from[1]) * t; });
+  await glide(ms, t => { if (ok()) { cv.scrollLeft = from[0] + (left - from[0]) * t; cv.scrollTop = from[1] + (top - from[1]) * t; } });
   cvPos = [cv.scrollLeft, cv.scrollTop];
 }
 
@@ -1385,7 +1503,8 @@ async function tourPoint(id, target) {
   const touch = Array.isArray(resolved) && !!resolved[0].touch; // previews of touch devices show a fingertip
   if (!touch) tourPointer.classList.remove('touch');
   const from = { ...pointerAt }, to = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  await glide(within(Math.hypot(to.x - from.x, to.y - from.y) * 1.2 + 260, 380, 1050), t => setPointer(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t));
+  await glide(within(Math.hypot(to.x - from.x, to.y - from.y) * 1.2 + 260, 380, 1050), t => { if (touring(id)) setPointer(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t); });
+  if (!touring(id)) return false;
   tourPointer.classList.toggle('touch', touch);
   return touring(id);
 }
@@ -1402,7 +1521,7 @@ async function tourScroll(t, id, section) { // the pointer rests on the preview 
   tourBadge(dev(id), 'scrolling here', 'lead');
   play(id, { do: 'scroll', sel: section });
   const on = await t.nap(1300);
-  tourPointer.classList.remove('wheel');
+  if (t.ok()) tourPointer.classList.remove('wheel');
   return on;
 }
 
@@ -1447,11 +1566,13 @@ async function tourAnnotate(t) {
   tourPointer.classList.add('down');
   const mark = notes.draw('arrow', [a, { ...a }]);
   await glide(750, k => {
+    if (!t.ok()) return;
     const tip = { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }, r = spot(tip.x, tip.y)();
     mark.points[1] = tip;
     notes.redraw();
     setPointer(r.x, r.y);
   });
+  if (!t.ok()) return;
   tourPointer.classList.remove('down');
   if (!await t.click(tool('note'))) return;
   notes.setTool('note');
@@ -1481,26 +1602,21 @@ async function tourPlace(t) {
     Object.assign(phone, { x: desk.x + desk.el.offsetWidth + gap, y: desk.y });
     frames.classList.add('tour-glide');
     placeScreens();
-    scrollWall(Math.max(0, phone.x + phone.el.offsetWidth / 2 - cv.clientWidth / 2), cv.scrollTop, 900);
-    await glide(1000,() => { const r = phone.el.getBoundingClientRect(); setPointer(r.left + grip.x, r.top + grip.y); });
+    scrollWall(Math.max(0, phone.x + phone.el.offsetWidth / 2 - cv.clientWidth / 2), cv.scrollTop, 900, t.ok);
+    await glide(1000,() => { if (t.ok()) { const r = phone.el.getBoundingClientRect(); setPointer(r.left + grip.x, r.top + grip.y); } });
   }
+  if (!t.ok()) return;
   frames.classList.remove('tour-glide');
   phone.el.classList.remove('dragging');
   tourPointer.classList.remove('down');
 }
 
-// A small tweakcn-style palette, used when the tweakcn registry cannot be reached.
-const TOUR_THEME = ':root{--background:#f6e6ee;--foreground:#5b5b5b;--primary:#d04f99;--primary-foreground:#ffffff;--input:#e4c4d6;--radius:0.4rem}';
+// The bundled Clean Green preset keeps this demonstration available offline.
 async function tourTheme() {
   themeTarget.value = 'all';
   $('#theme-palette').value = 'light';
   $('#theme-basic').checked = true;
-  themePreset.value = 'bubblegum';
-  updateThemeControls();
-  await changeTheme();
-  if (themePreviews().some(d => d.themeCss)) return;
-  themePreset.value = customTheme;
-  $('#theme-css').value = TOUR_THEME;
+  themePreset.value = 'clean-green';
   updateThemeControls();
   await changeTheme();
 }
@@ -1535,7 +1651,14 @@ function tourCompare() {
 
 // One step: `at` is what the ring and the message attach to, `run` moves the pointer and does the work.
 const demoClick = (id, sel) => async t => { if (await t.click(inScreen(id, sel))) play(id, { do: 'click', sel }); };
-const demoLink = (id, sel) => async t => { if (await t.click(inScreen(id, sel))) play(id, { do: 'link', sel }); };
+const demoLink = (id, sel) => async t => {
+  if (!await t.click(inScreen(id, sel))) return;
+  const link = dev(id).iframe.contentDocument?.querySelector(sel);
+  if (!link) return;
+  const path = new URL(link.href).pathname;
+  play(id, { do: 'link', sel });
+  await t.until(() => active().every(d => d.ready && d.iframe.contentDocument?.readyState === 'complete' && d.iframe.contentDocument.location.pathname === path), 15000);
+};
 const STEPS = [
   {
     title: 'Click sync', at: inScreen('desktop', '.dd-btn'), wait: 4400,
@@ -1663,7 +1786,7 @@ const STEPS = [
       if (!await t.click('#mode [data-v=grid]')) return;
       dev('iphone').scaleOverride = null;
       $('#mode [data-v=grid]').click();
-      await scrollWall(0, 0);
+      await scrollWall(0, 0, 450, t.ok);
     }
   },
   {
@@ -1679,7 +1802,7 @@ const STEPS = [
   },
   {
     title: 'Themes', at: '#theme-preset', wait: 4600,
-    text: 'Pick a <b>tweakcn</b> preset and it is applied to the previews, here Bubblegum. A theme can go on every preview, one preview, or one comparison column.',
+    text: 'Pick a <b>tweakcn</b> preset and it is applied to the previews, here the bundled Clean Green palette. A theme can go on every preview, one preview, or one comparison column.',
     run: async t => {
       searchDevices('');
       if (!await t.click('#theme-preset')) return;
@@ -1707,18 +1830,18 @@ const STEPS = [
   },
   {
     title: 'Screenshot and Record', at: '.capture-actions', wait: 2600,
-    text: '<b>Screenshot</b> saves what is on the wall as a PNG, and <b>Record</b> as a silent video. Both include comparison columns and annotations.',
-    run: async t => { if (await t.point('#screenshot') && await t.nap(1100)) await t.point('#record'); }
+    text: '<b>Screenshot</b>, <b>Full page</b> and <b>Overview</b> support PNG, JPEG and PDF. Auto screenshots have a pace; recordings have a frame rate and split into 10 MB parts. Choose a save folder when capturing.',
+    run: async t => { for (const id of ['#screenshot', '#full-page-shot', '#overview-shot', '#auto-shots', '#shot-rate', '#record-rate', '#capture-folder']) { if (!await t.point(id) || !await t.nap(350)) return; } }
   },
   {
     title: 'Day and night', at: '#ui-mode', wait: 1400,
-    text: 'The sun and moon button switches Samestate between <b>day</b> and <b>night</b> mode. The menu beside it picks the theme: Samestate, Neutral, Clay, Teal or Hive. Your choice is remembered.',
+    text: 'The sun and moon button switches Samestate between <b>day</b> and <b>night</b> mode. The menu picks Samestate (Zinc at night), Neutral, Clay, Teal, Hive or Clean Green. Your saved choice returns after this demo.',
     run: async t => {
       if (!await t.point('#ui-mode')) return;
       const mode = uiTheme.mode === 'dark' ? 'light' : 'dark';
       uiTheme.preview(uiTheme.theme, mode); showUiTheme();
       if (!await t.nap(1300) || !await t.point('#ui-theme')) return;
-      for (const id of ['neutral', 'clay', 'teal', 'hive']) {
+      for (const id of ['neutral', 'clay', 'teal', 'hive', 'clean']) {
         uiTheme.preview(id, mode); showUiTheme();
         if (!await t.nap(900)) return;
       }
@@ -1727,35 +1850,89 @@ const STEPS = [
   {
     title: 'That is the tour', wait: 0,
     text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
-    run: () => {
+    run: async t => {
+      await window.samestateTourFeatures?.reset();
+      if (!t.ok()) return;
       setSitesMode(false);
       restoreDeviceIdentity();
       restoreUiTheme();
-      scrollWall(0, 0);
+      scrollWall(0, 0, 450, t.ok);
       tourPointer.hidden = true;
-      $('#tourpause').hidden = true;
       $('#skip').textContent = IS_EXT ? 'Use my own site' : 'Close';
     }
   }
 ];
 
 function showStep(i) {
+  tourStep = i;
   const step = STEPS[i];
   $('#tourcount').textContent = (i + 1) + ' / ' + STEPS.length;
   $('#tourname').textContent = $('#tourtitle').textContent = step.title;
   $('#tourtext').innerHTML = step.text;
   document.querySelectorAll('#tourdots i').forEach((dot, k) => { dot.classList.toggle('on', k < i); dot.classList.toggle('now', k === i); });
+  updateTourNavigation();
+}
+
+function updateTourNavigation() {
+  const select = $('#tour-step');
+  if (select.options.length !== STEPS.length) select.replaceChildren(...STEPS.map((step, i) => new Option(`${i + 1}. ${step.title}`, String(i))));
+  select.value = String(tourStep);
+  $('#tour-prev').disabled = tourStep <= 0;
+  $('#tour-next').disabled = tourStep >= STEPS.length - 1;
+  const preparing = ['preparing', 'advancing'].includes(tourPhase);
+  $('#tourpause').disabled = preparing;
+  $('#tour').setAttribute('aria-busy', String(preparing));
+  $('#tour-navigation-status').textContent = preparing ? `Preparing step ${tourStep + 1}: ${STEPS[tourStep].title}.` : tourPaused ? `Paused on step ${tourStep + 1}. Use Previous or Next, or Resume for automatic playback.` : `Step ${tourStep + 1} of ${STEPS.length}: ${STEPS[tourStep].title}.`;
+}
+
+function showTourLoading(index) {
+  window.samestateFeatureHelp?.close(false);
+  window.samestateTourVoice?.stop();
+  tourPhase = 'preparing';
+  $('#tour').hidden = $('#tour-callout').hidden = $('#tourpause').hidden = false;
+  $('#skip').textContent = 'Skip demo';
+  showStep(index);
+  $('#tourtext').textContent = 'Preparing this demo step…';
+  tourPointer.hidden = true; tourFocus(null);
+}
+
+async function goTourStep(index) {
+  if (!Number.isInteger(index) || index < 0 || index >= STEPS.length) return;
+  if (!tourRunning && !window.samestateTourFeatures?.active && (window.samestateChecks?.running || window.samestateTest?.busy || window.wallCapture?.busy || sweepRun || pendingSnap.size)) return;
+  if (tourRunning && tourPhase === 'waiting' && index === tourStep + 1) {
+    // The current step has finished: keep its live state and advance immediately.
+    tourManual = true; tourAdvance = true; setTourPaused(false);
+    showTourLoading(index); tourPhase = 'advancing';
+    return;
+  }
+  const cleanup = endTour(false), request = tourNavigation;
+  tourManual = true; showTourLoading(index);
+  await cleanup;
+  while (request === tourNavigation && pendingSnap.size) await sleep(50);
+  if (request !== tourNavigation) return;
+  await startTour({ index, manual: true });
 }
 
 function setTourPaused(paused) {
   tourPaused = paused;
+  window.samestateTourVoice?.pause(paused);
   const button = $('#tourpause');
   button.textContent = paused ? 'Resume' : 'Pause';
   button.setAttribute('aria-pressed', String(paused));
   $('#tour').classList.toggle('paused', paused);
+  updateTourNavigation();
 }
 
-async function startTour() {
+async function startTour(options = {}) {
+  if (!tourRunning && (window.samestateChecks?.running || window.samestateTest?.busy || window.wallCapture?.busy || sweepRun || pendingSnap.size)) return;
+  if (tourRunning) endTour(false);
+  tourNavigation++;
+  const id = ++tour;
+  await window.samestateTourFeatures?.reset();
+  if (!touring(id)) return;
+  const index = Number.isInteger(options.index) ? within(options.index, 0, STEPS.length - 1) : 0;
+  tourManual = options.manual === true; tourAdvance = false; tourPhase = 'preparing'; tourStep = index;
+  window.samestateTourFeatures?.begin();
   setSitesMode(false);
   setPageSteps(false);
   sameDevice = false;
@@ -1766,56 +1943,92 @@ async function startTour() {
   unpinScreens();
   DEVICES.forEach(d => Object.assign(d, { on: !!d.starter, rot: false, linked: true, scaleOverride: null, physicalScale: null }));
   refreshViews();
-  const id = ++tour;
   tourRunning = true;
   setTourPaused(false);
   tourPointer.hidden = true;
   tourPointer.className = 'tour-cursor';
   $('#tour').hidden = $('#tour-callout').hidden = $('#tourpause').hidden = false;
   $('#skip').textContent = 'Skip demo';
-  $('#tourcount').textContent = '';
-  $('#tourname').textContent = $('#tourtitle').textContent = 'Guided demo';
-  $('#tourtext').textContent = 'Loading the sample site on every screen…';
   $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join('');
-  tourFocus(null);
+  showTourLoading(index);
   clearInterval(tourWatch);
   tourWatch = setInterval(placeTour, 120); // the wall scrolls and screens move, so the ring and the message keep up
   renderLeft(); setMode('grid'); $('#panel').hidden = true;
   $('#src').value = ''; await open(DEMO_URL);
   await until(id, () => target && active().length && active().every(d => d.ready), 15000);
-  if (!await nap(id, 1200)) return;
+  if (!await nap(id, tourManual ? 150 : 1200)) return;
   const t = {
     ok: () => touring(id), nap: ms => nap(id, ms), until: (ready, ms) => until(id, ready, ms),
     point: target => tourPoint(id, target), click: target => tourClick(id, target), focus: tourFocus
   };
-  for (let i = 0; i < STEPS.length; i++) {
+  if (index > 0) await window.samestateTourFeatures?.prepareStep(STEPS[index].title, t);
+  if (!touring(id)) return;
+  for (let i = index; i < STEPS.length; i++) {
     const step = STEPS[i];
+    tourAdvance = false; tourPhase = 'reading';
     await tourReveal(id, step.at);
     if (!touring(id)) return;
     showStep(i);
+    window.samestateTourVoice?.start(step);
     tourFocus(step.at, step.side);
     // Time to read the message before the pointer moves.
-    if (!await nap(id, Math.min(3000, 900 + step.text.split(' ').length * 70) * tourPace)) return;
+    if (!tourManual && !await nap(id, Math.min(3000, 900 + step.text.split(' ').length * 70) * tourPace)) return;
+    tourPhase = 'running'; updateTourNavigation();
     await step.run?.(t);
-    if (!await nap(id, step.wait * tourPace)) return;
+    if (!touring(id)) return;
+    if (tourManual && !await nap(id, Math.min(step.wait, 900))) return;
+    tourPhase = 'waiting';
+    if (!tourManual && !await nap(id, step.wait * tourPace)) return;
+    while (touring(id) && !tourAdvance && (tourPaused || window.samestateTourVoice?.waiting)) {
+      if (!await nap(id, 100)) return;
+    }
+    if (!touring(id)) return;
+    if (tourManual && !tourAdvance) setTourPaused(true);
+    if (i === STEPS.length - 1) $('#tourpause').hidden = true;
     document.dispatchEvent(new CustomEvent('samestate-tour-step', { detail: { step: i + 1, title: step.title } })); // read by tests/smoke.mjs
+    if (!await nap(id, 0)) return; // Pause holds this step's explanation, including after an async tool finishes.
   }
   tourFocus(null);
-  tourRunning = false;
+  tourRunning = false; tourPhase = 'complete'; updateTourNavigation();
 }
 function endTour(clear) {
+  window.samestateFeatureHelp?.close(false);
+  window.samestateTourVoice?.stop();
   if (tourRunning) { restoreDeviceIdentity(); restoreUiTheme(); } // skipped part-way, possibly after the identity or theme step
-  tour++;
+  const ended = ++tour;
+  tourNavigation++; tourAdvance = false; tourPhase = 'idle';
+  const cleanup = window.samestateTourFeatures?.reset();
   tourRunning = false;
   setTourPaused(false);
   clearInterval(tourWatch);
   tourAnchor = null;
   $('#tour').hidden = $('#tour-callout').hidden = $('#tour-ring').hidden = tourPointer.hidden = true;
   $('#frames').classList.remove('tour-glide');
+  document.querySelectorAll('.dev.dragging').forEach(el => el.classList.remove('dragging'));
   document.querySelectorAll('.tour-badge').forEach(badge => badge.remove());
-  if (clear) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; lastScan = null; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
+  return Promise.resolve(cleanup).then(() => {
+    if (clear && tour === ended) { openId++; target = previewUrl = textSalt = null; $('#match-text').checked = false; buildFrames(); $('#panel').hidden = true; $('#joblog').textContent = ''; $('#src').value = ''; $('#src').focus(); findings = []; lastScan = null; renderFindings(); $('#findings').innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b>.</p>'; }
+  });
 }
-$('#tourpause').onclick = () => setTourPaused(!tourPaused);
+$('#tourpause').onclick = () => { if (tourPaused) tourManual = false; setTourPaused(!tourPaused); };
+$('#tour-prev').onclick = () => goTourStep(tourStep - 1);
+$('#tour-next').onclick = () => goTourStep(tourStep + 1);
+$('#tour-step').addEventListener('input', event => event.stopPropagation());
+$('#tour-step').addEventListener('change', event => { event.stopPropagation(); goTourStep(Number(event.target.value)); });
+$('#tour').addEventListener('keydown', event => {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('select,input,textarea,[contenteditable]')) return;
+  const index = event.key === 'ArrowLeft' ? tourStep - 1 : event.key === 'ArrowRight' ? tourStep + 1 : event.key === 'Home' ? 0 : event.key === 'End' ? STEPS.length - 1 : null;
+  if (index !== null) { event.preventDefault(); goTourStep(index); }
+});
+let tourSwipe = null;
+$('#tour').addEventListener('pointerdown', event => { tourSwipe = !event.target.closest('button,select,input,a') && event.button === 0 ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null; });
+$('#tour').addEventListener('pointercancel', () => { tourSwipe = null; });
+$('#tour').addEventListener('pointerup', event => {
+  const start = tourSwipe; tourSwipe = null;
+  if (!start || start.id !== event.pointerId) return;
+  const dx = event.clientX - start.x, dy = event.clientY - start.y;
+  if (Math.abs(dx) >= 45 && Math.abs(dx) > Math.abs(dy) * 1.5) goTourStep(tourStep + (dx < 0 ? 1 : -1));
+});
 $('#skip').onclick = () => endTour(IS_EXT); // on the web demo the sample site stays open to play with
 $('#demo').onclick = $('#watch').onclick = startTour;
 $('#own').onclick = () => { if (IS_EXT) $('#src').focus(); else window.open(REPO + '#install', '_blank', 'noopener'); };
@@ -1828,12 +2041,16 @@ $('#match-text').onchange = event => {
 
 /* ------------------------------ message routing ------------------------------ */
 const pendingSnap = new Map(), entries = new Map();
+const pendingTest = new Map(); // test runs (testrun.js): answers to look and step, by request id
+let testRecorder = null; // set by testrun.js while it records clicks and pages
 function configure(device) {
   const inspect = device !== device.site?.singleDevice;
   post(device, 'config', {
     touch: device.touch, inspect, textSalt: inspect ? textSalt : null,
     pageSteps: pageSteps && !!device.step, themeCss: device.themeCss || '',
-    longText: inspect && longText, variant: inspect ? screenVariant(device) : ''
+    longText: inspect && longText, variant: inspect ? screenVariant(device) : '',
+    debug: [...debugTools(device)], sim: SIMS.has(debugSim(device)) ? debugSim(device) : '',
+    lang: $('#screen-lang').value.trim(), grid: gridSettings, outline: device.outlineState || null
   });
 }
 const reportName = device => device.site ? screenName(device) + ' · ' + device.site.url.host : screenName(device);
@@ -1844,8 +2061,11 @@ function handleMessage(device, message) {
   switch (message.type) {
     case 'hello': {
       device.ready = true;
+      device.loads = (device.loads || 0) + 1; // test runs wait for a screen that left its page to load the next one
       device.el.classList.add('ready');
+      window.samestateOutline?.loaded(device);
       configure(device);
+      if (device.design) post(device, 'design', { design: device.design });
       if (device.identity !== undefined) post(device, 'identity', { name: device.identity }); // in case it changed while loading
       if (device.replayPending) {
         device.replayPending = false;
@@ -1883,8 +2103,30 @@ function handleMessage(device, message) {
         if (pageSteps) $('#page-steps-status').textContent = `Step ${device.step} opened. Continue the interaction there.`;
       }
       break;
+    case 'outlined': case 'element-measured':
+    case 'found': case 'breakpoints': case 'fingerprint': case 'page-size': case 'scrolled':
+      if (typeof message.rid === 'string') asks.get(message.rid)?.(message);
+      break;
+    case 'inspection-pick':
+      window.samestateOutline?.picked(device, message.data);
+      break;
+    case 'console':
+      noteConsole(device, message);
+      break;
+    case 'filled':
+      break; // forms were filled; the fields show it
+    case 'peek':
+      for (const other of device.site ? siteScreens(device.site) : active()) if (other !== device && other.ready && message.d) post(other, 'peek-twin', { d: message.d });
+      break;
+    case 'changed':
+      if (debugTools(device).has('audible')) beep(device);
+      break;
     case 'snapshot':
       pendingSnap.get(message.rid)?.(device, message.data);
+      break;
+    case 'looked':
+    case 'stepped':
+      if (typeof message.rid === 'string') pendingTest.get(message.rid)?.(message);
       break;
     case 'fixed':
       if (Number.isInteger(message.count)) fixCounts.set(message.id, (fixCounts.get(message.id) || 0) + message.count);
@@ -1897,6 +2139,7 @@ function handleMessage(device, message) {
       if ((!device.site && pageSteps) || !workspaceScreens().includes(device)) return;
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;
       setLeader(device);
+      testRecorder?.(device, message);
       if (!device.linked) return; // an unlinked screen moves on its own
       const id = ['click', 'swipe', 'media', 'navigate'].includes(message.kind) ? ++aid : 0;
       if (id) startEntry(id, device, message);
@@ -2083,7 +2326,7 @@ function addResult(message, device) {
 }
 
 /* ----------------------------- difference engine ----------------------------- */
-const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Network', 'Widths'];
+const CATS = ['Content', 'Images', 'Typography', 'Layout', 'Tables', 'Navigation', 'Input', 'Usability', 'Accessibility', 'Errors', 'Meta', 'Network', 'Performance', 'Widths'];
 // Network findings use resource timing sizes from each preview; request and response contents are never read.
 const API_TYPES = new Set(['fetch', 'xmlhttprequest']);
 const kb = bytes => !bytes ? '0 KB' : bytes >= 1048576 ? (bytes / 1048576).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
@@ -2213,6 +2456,58 @@ function analyze(snaps, refId) {
     const kept = keptInOrder(visual.map(i => i.dom));
     const jumps = visual.filter((_, k) => !kept.has(k));
     if (tabbable.length >= 4 && jumps.length && jumps.length <= tabbable.length / 2) add('warn', 'Accessibility', dev, 'Tab order differs from what you see', `Tab order skips around for ${plural(jumps.length, 'control')}`, `The Tab key reaches these in a different order than they appear: ${list(jumps.map(i => i.name))}`, jumps.map(i => i.key));
+    const lowContrast = vis.filter(i => i.contrast && i.contrast < (i.large ? 3 : 4.5)).sort((a, b) => a.contrast - b.contrast);
+    if (lowContrast.length) add(lowContrast.some(i => i.contrast < (i.large ? 2 : 3)) ? 'issue' : 'warn', 'Accessibility', dev, 'Low contrast text', `${plural(lowContrast.length, 'text element')} below WCAG contrast`,
+      more(lowContrast.map(i => `${q(i.name)} ${i.contrast}:1, needs ${i.large ? 3 : 4.5}:1`)) + '. Text over images and gradients is not checked.', lowContrast.map(i => i.key));
+    const noAlt = vis.filter(i => i.cat === 'image' && i.noAlt);
+    if (noAlt.length) add('issue', 'Accessibility', dev, 'Images without alt text', `${plural(noAlt.length, 'image')} without alt text`, 'Screen readers read out the file name or skip them. Use alt="" for decorative images.', noAlt.map(i => i.key));
+    const unnamed = vis.filter(i => i.unnamed && (i.cat === 'link' || i.cat === 'button' || i.cat === 'input'));
+    if (unnamed.length) add('issue', 'Accessibility', dev, 'Controls without a name', `${plural(unnamed.length, 'control')} without an accessible name`, `${list(unnamed.map(i => i.kind || i.cat), 4)}: screen readers announce only the role. Add visible text, a label or aria-label.`, unnamed.map(i => i.key));
+    const headings = vis.filter(i => i.cat === 'heading');
+    if (!headings.some(h => h.level === 1)) add('warn', 'Accessibility', dev, 'No main heading', 'No visible main heading (h1)', headings.length ? `The first heading on this screen is an h${headings[0].level}.` : 'This screen shows no headings, so screen reader users cannot jump through the page.');
+    const skips = headings.filter((h, k) => k > 0 && h.level > headings[k - 1].level + 1);
+    if (skips.length) add('warn', 'Accessibility', dev, 'Heading levels skip', `Heading levels skip ${plural(skips.length, 'time')}`, more(skips.map(h => `h${headings[headings.indexOf(h) - 1].level} → h${h.level}`)), skips.map(i => i.key));
+    if (data.lang === false) add('warn', 'Accessibility', dev, 'Page has no language', 'Page has no language set', 'Add lang to the html element so screen readers pronounce the page correctly.');
+    if (dev.touch && data.zoomBlocked) add('issue', 'Accessibility', dev, 'Zoom is turned off', 'Pinch zoom is turned off', 'The viewport tag sets user-scalable=no or a maximum-scale under 2, so people who need larger text cannot zoom.');
+    // ---- links (with Check links on)
+    const links = data.links;
+    if (links?.broken.length) add('issue', 'Navigation', dev, 'Broken links', `${plural(links.broken.length, 'broken link')}`, more(links.broken.map(b => `${q(requestPath(b.url))} answers ${b.status}`)), links.broken.map(b => b.key));
+    if (links && links.checked < links.total) add('info', 'Navigation', dev, 'Links not checked', `${plural(links.total - links.checked, 'link')} not checked in time`, `Checked ${links.checked} of ${links.total} links on this site.`);
+    // ---- Web Vitals
+    const v = data.vitals;
+    if (v) {
+      const sec = ms => (ms / 1000).toFixed(1) + ' s';
+      const hidden = v.drawn === false && !v.cls; // Chrome was not drawing this preview, so shifts would not have been recorded
+      add('info', 'Performance', dev, 'Web Vitals', `LCP ${v.lcp ? sec(v.lcp) : 'not measured'} · CLS ${hidden ? 'not measured' : v.cls.toFixed(2)} · slowest interaction ${v.inp ? v.inp + ' ms' : 'none yet'}`,
+        (hidden ? 'Chrome is not drawing this preview while it is out of view, so it records no paints or layout shifts. Scroll it into view and detect again. ' : '')
+        + 'LCP is measured while every preview loads at once, and previews off screen paint late, so it is shown here but never flagged. Layout shifts and interactions are flagged.', v.shifted);
+      if (v.cls > .1) add(v.cls > .25 ? 'issue' : 'warn', 'Performance', dev, 'Layout shifts', `Layout shifts by ${v.cls.toFixed(2)} (CLS)`, 'Good is under 0.1. Content moves after it appears: reserve space for images, ads and late content.', v.shifted);
+      if (v.inp > 200) add(v.inp > 500 ? 'issue' : 'warn', 'Performance', dev, 'Slow interaction', `Slowest interaction took ${v.inp} ms`, 'Good is under 200 ms (INP): the page took this long to show the result of a click or key press here.');
+    }
+    // ---- outline: landmarks, links and form fields
+    const o = data.outline;
+    if (o) {
+      const L = o.landmarks;
+      if (!L.main) add('warn', 'Accessibility', dev, 'No main landmark', 'No main landmark', 'Add a main element (or role=main) so screen reader users can jump straight to the content.');
+      else if (L.main > 1) add('warn', 'Accessibility', dev, 'More than one main landmark', `${L.main} main landmarks`, 'A page should have one main landmark.');
+      if (L.banner > 1 || L.contentinfo > 1) add('info', 'Accessibility', dev, 'Repeated header or footer landmark', `${L.banner} header and ${L.contentinfo} footer landmarks`, 'A page should have at most one page-level header (banner) and footer (contentinfo).');
+      if (L.navigation > 1 && o.unlabeledNav) add('warn', 'Accessibility', dev, 'Navigation landmarks without a label', `${plural(o.unlabeledNav, 'navigation landmark')} without a label`, `This screen has ${L.navigation} navigation landmarks. Give each an aria-label, like “Main” and “Footer”, so they can be told apart.`);
+      if (o.vague.length) add('warn', 'Accessibility', dev, 'Links with vague text', `${plural(o.vague.length, 'link')} with vague text`, `${list(o.vague.map(v => v.phrase))}: link text should say where the link goes.`, o.vague.map(v => v.key));
+      if (o.sameText.length) add('info', 'Accessibility', dev, 'Same link text, different pages', `${plural(o.sameText.length, 'link text')} used for different pages`, 'Links with the same text should go to the same page, or say how they differ.', o.sameText.map(v => v.key));
+      if (o.placeholderOnly.length) add('warn', 'Accessibility', dev, 'Fields labelled only by a placeholder', `${plural(o.placeholderOnly.length, 'field')} labelled only by a placeholder`, 'The placeholder disappears once someone types. Add a visible label.', o.placeholderOnly);
+      if (o.autocomplete.length) add('warn', 'Usability', dev, 'Unknown autocomplete values', `${plural(o.autocomplete.length, 'field')} with an unknown autocomplete value`, `${list(o.autocomplete.map(a => a.token))}: browsers ignore it, so autofill and password managers can't help.`, o.autocomplete.map(a => a.key));
+      if (o.positiveTabindex.length) add('warn', 'Accessibility', dev, 'Positive tabindex', `${plural(o.positiveTabindex.length, 'element')} with a positive tabindex`, 'Tab visits these first, out of the page order. Use tabindex="0", or change the order in the HTML.', o.positiveTabindex);
+    }
+    // ---- line length (WCAG 1.4.8: at most 80 characters)
+    const longLines = vis.filter(i => i.cpl > 80).sort((a, b) => b.cpl - a.cpl);
+    if (longLines.length) add('warn', 'Typography', dev, 'Lines too long', `${plural(longLines.length, 'paragraph')} with lines over 80 characters`, more(longLines.map(i => `${q(i.name)} about ${i.cpl} per line`)) + '. 45–75 characters is easiest to read; limit the width, for example max-width: 70ch.', longLines.map(i => i.key));
+    // ---- errors from the page
+    const errs = data.errors || [], jsErrors = errs.filter(e => e.kind !== 'resource'), failed = errs.filter(e => e.kind === 'resource');
+    const refErrors = (ref.data.errors || []).filter(e => e.kind !== 'resource').length;
+    if (jsErrors.length) add('issue', 'Errors', dev, 'JavaScript errors', `${plural(jsErrors.reduce((n, e) => n + e.count, 0), 'JavaScript error')}`, more(jsErrors.map(e => q(e.message)), 2) + (dev !== ref.dev && !refErrors ? ` None on ${screenName(ref.dev)}.` : '') + ' See the Console panel.');
+    if (failed.length) add('warn', 'Errors', dev, 'Files that failed to load', `${plural(failed.length, 'file')} failed to load`, more(failed.map(e => q(e.message.replace(/^\w+ failed to load:? (\(\d+\): )?/, ''))), 3));
+    // ---- meta tags, once: they belong to the page, not the screen size
+    if (dev === ref.dev && data.meta) for (const f of metaFindings(data.meta)) add(f.sev, 'Meta', dev, f.kind, f.title, f.detail);
     if (dev === ref.dev) continue;
     // ---- compared with the reference device
     const rn = screenName(ref.dev);
@@ -2293,12 +2588,15 @@ async function detect(quiet) {
   const scanPreview = openId;
   const scanWall = wallRevision;
   const ready = devs.filter(d => d.ready);
-  const measured = ready.length ? await snapshotScreens(ready, 4000) : new Map();
+  const links = $('#check-links').checked;
+  const measured = ready.length ? await snapshotScreens(ready, links ? 9000 : 4000, { links }) : new Map();
   if (scanSalt !== textSalt || scanPreview !== openId || scanWall !== wallRevision || sweepRun || journeyRunning) { $('#detect span').textContent = 'Detect differences'; return; }
   const snaps = [...measured].map(([dev, data]) => ({ dev, data })).sort((a, b) => a.dev.slot - b.dev.slot);
   const ref = $('#ref').value;
   findings = sitesMode ? sitePanels.flatMap(site => analyze(snaps.filter(s => s.dev.site === site), ref)) : analyze(snaps, ref);
-  lastScan = { at: new Date(), screens: snaps.map(s => s.dev), missing: devs.filter(d => !measured.has(d)) };
+  const metaFrom = snaps.find(s => s.dev.id === ref) || snaps[0];
+  if (metaFrom?.data?.meta) { lastMeta = metaFrom.data.meta; renderMeta(); }
+  lastScan = { at: new Date(), screens: snaps.map(s => s.dev), missing: devs.filter(d => !measured.has(d)), links };
   $('#detect span').textContent = 'Detect differences'; renderFindings(); if (quiet !== true) showTab('diff');
 }
 // The report lists each problem once with the screens it affects ("By issue"), or every screen's own list ("By device").
@@ -2445,6 +2743,7 @@ function undoAllFixes() {
 let newOnly = false;
 const baselineKey = () => 'samestate.baseline.' + (sitesMode ? sitePanels.map(site => site.url?.origin).join('|') : target);
 const findingId = f => reportName(f.dev) + '|' + f.kind;
+const LINK_KINDS = new Set(['Broken links', 'Links not checked']); // only judged when Check links was on for the scan
 function loadBaseline() { try { return JSON.parse(localStorage.getItem(baselineKey()) || 'null'); } catch { return null; } }
 function saveBaseline() {
   const items = findings.map(f => ({ id: findingId(f), kind: f.kind, screen: reportName(f.dev), sev: f.sev }));
@@ -2461,7 +2760,7 @@ function compareBaseline() {
   for (const f of findings) f.isNew = !before.has(findingId(f));
   const measured = new Set(lastScan.screens.map(reportName));
   const missing = new Set((lastScan.missing || []).map(reportName));
-  const fixed = baseline.items.filter(item => measured.has(item.screen) && !missing.has(item.screen) && !now.has(item.id));
+  const fixed = baseline.items.filter(item => measured.has(item.screen) && !missing.has(item.screen) && !now.has(item.id) && (lastScan.links || !LINK_KINDS.has(item.kind)));
   return { at: new Date(baseline.at), added: findings.filter(f => f.isNew).length, fixed, unchanged: findings.length - findings.filter(f => f.isNew).length };
 }
 function renderBaseline(state) {
@@ -2486,14 +2785,14 @@ $('#baseline').addEventListener('click', e => {
 });
 
 /* ------------------------------ snapshots of several screens ------------------------------ */
-function snapshotScreens(screens, ms = 5000) {
+function snapshotScreens(screens, ms = 5000, options = {}) {
   const rid = crypto.randomUUID(), out = new Map();
   let answered = 0;
   return new Promise(done => {
     const finish = () => { pendingSnap.delete(rid); clearTimeout(timer); done(out); };
     pendingSnap.set(rid, (d, data) => { if (data) out.set(d, data); if (++answered >= screens.length) finish(); });
     const timer = setTimeout(finish, ms);
-    screens.forEach(d => post(d, 'snapshot', { rid }));
+    screens.forEach(d => post(d, 'snapshot', { rid, ...options }));
   });
 }
 const settle = ms => new Promise(done => setTimeout(done, ms)); // a snapshot forces layout; this gives the page's resize handlers time to run
@@ -2510,7 +2809,7 @@ async function sweepWidths() {
   if (sweepRun) { sweepRun = 0; return; } // a second press stops it
   const d = active().find(x => x.id === $('#ref').value && x.ready) || active().find(x => x.ready);
   if (!d || sitesMode) { label.textContent = sitesMode ? 'Turn off Compare sites to sweep' : 'Open a site first'; setTimeout(() => { label.textContent = 'Sweep widths'; }, 2500); return; }
-  const run = sweepRun = Date.now(), scan = openId, probes = new Map();
+  const run = sweepRun = Date.now(), scan = openId, probes = new Map(), missingWidths = new Set();
   const probe = async w => {
     if (probes.has(w)) return probes.get(w);
     if (sweepRun !== run || scan !== openId || !d.el) throw new Error('stopped');
@@ -2519,9 +2818,10 @@ async function sweepWidths() {
     await settle(160);
     const data = (await snapshotScreens([d], 4000)).get(d);
     const kinds = new Map();
+    if (!data) missingWidths.add(w);
     if (data) {
       const probeScreen = { ...d, sweepW: w }; // the screen keeps its own kind: touch checks don't switch on and off with width
-      for (const f of analyze([{ dev: probeScreen, data }], probeScreen.id)) if (f.cat !== 'Network' && !kinds.has(f.kind)) kinds.set(f.kind, f);
+      for (const f of analyze([{ dev: probeScreen, data }], probeScreen.id)) if (!['Network', 'Performance', 'Meta', 'Errors'].includes(f.cat) && !kinds.has(f.kind)) kinds.set(f.kind, f);
     }
     probes.set(w, kinds);
     return kinds;
@@ -2543,7 +2843,7 @@ async function sweepWidths() {
   d.sweepW = null;
   if (d.el) { layout(d); fitWall(d.site); }
   sweepRun = 0; button.classList.remove('busy'); label.textContent = 'Sweep widths';
-  if (!finished) return;
+  if (!finished) return { complete: false, widths: probes.size, missing: [...missingWidths] };
   const widths = [...probes.keys()].sort((a, b) => a - b), kinds = new Map();
   for (const w of widths) for (const [kind, f] of probes.get(w)) if (!kinds.has(kind)) kinds.set(kind, f);
   const swept = [];
@@ -2561,7 +2861,8 @@ async function sweepWidths() {
   lastScan = lastScan || { at: new Date(), screens: [d] };
   catFilter = swept.length ? 'Widths' : catFilter;
   renderFindings(); showTab('diff');
-  $('#sweep-status').textContent = `Checked ${widths.length} widths from 320 to 1920px on ${screenName(d)}: ${plural(swept.length, 'finding')}.`;
+  $('#sweep-status').textContent = `Checked ${widths.length} widths from 320 to 1920px on ${screenName(d)}: ${plural(swept.length, 'finding')}.` + (missingWidths.size ? ` ${missingWidths.size} widths not measured.` : '');
+  return { complete: true, widths: widths.length, missing: [...missingWidths] };
 }
 
 /* ------------------------------ journey report ------------------------------ */
@@ -2621,6 +2922,7 @@ function applyScreenSettings() {
     const rot = setting === 'landscape' && d.touch;
     if ((screenSettings === 'orientation' || d.settingRot) && d.rot !== rot) { d.rot = rot; d.settingRot = rot; layout(d); rotated = true; }
     if (d.ready) configure(d);
+    d.iframe.style.filter = previewFilter(d);
     const name = screenName(d);
     d.el.querySelector('.dev-name').textContent = name;
     d.iframe.title = name + ' preview';
@@ -2632,6 +2934,7 @@ function applyScreenSettings() {
 $('#screen-settings').addEventListener('change', event => {
   screenSettings = event.target.value;
   $('#screen-settings-help').hidden = !screenSettings;
+  $('#screen-lang-row').hidden = screenSettings !== 'lang';
   findings = []; lastScan = null; renderFindings();
   applyScreenSettings();
 });
@@ -2669,7 +2972,15 @@ $('#findings').addEventListener('click', e => {
   showFindings(group.items.filter(f => f.dev === screen));
 });
 $('#detect').onclick = () => detect();
-function showTab(t) { $('#panel').hidden = false; if (mode === 'focus') relayout(); document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $('#pane-diff').hidden = t !== 'diff'; $('#pane-log').hidden = t !== 'log'; }
+async function showTab(t, options) {
+  if (t === 'outline' && !options?.fromTour && (tourRunning || window.samestateTourFeatures?.active)) await endTour(false);
+  $('#panel').hidden = false; if (mode === 'focus') relayout();
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  for (const pane of document.querySelectorAll('#panel > .pane')) pane.hidden = pane.id !== 'pane-' + t;
+  if (t === 'outline') window.samestateOutline?.open(options);
+  if (t === 'console') renderConsole();
+  if (t === 'meta' && !lastMeta) readMeta();
+}
 document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.tab) showTab(b.dataset.tab); });
 $('#closepanel').onclick = () => { $('#panel').hidden = true; if (mode === 'focus') relayout(); };
 document.querySelector('.right-tools').addEventListener('click', e => { const b = e.target.closest('[data-panel]'); if (!b) return; const t = b.dataset.panel, open = !$('#panel').hidden && !$('#pane-' + t).hidden; if (open) $('#closepanel').onclick(); else showTab(t); });
@@ -2739,4 +3050,576 @@ async function openClickedPage(address) {
   $('#joblog').textContent = `Press Enter to open ${url.host}. Chrome asks once for access to the site.`;
 }
 const clickedPage = IS_EXT && new URLSearchParams(location.search).get('open');
-if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else startTour();
+addEventListener('DOMContentLoaded', () => { if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else startTour(); }, { once: true });
+
+/* ------------------------------ debug menu ------------------------------ */
+// The menu's items and each screen's state are defined near the top of this file (DEBUG_MENU).
+let debugAudio = null, lastBeep = 0;
+function beep(d) {
+  const t = performance.now();
+  if (!debugAudio || t - lastBeep < 90) return;
+  lastBeep = t;
+  const tone = debugAudio.createOscillator(), gain = debugAudio.createGain();
+  tone.frequency.value = 520 + (Math.max(0, connectedScreens().indexOf(d)) % 8) * 70; // each screen its own pitch
+  gain.gain.setValueAtTime(.05, debugAudio.currentTime); gain.gain.exponentialRampToValueAtTime(.0001, debugAudio.currentTime + .08);
+  tone.connect(gain).connect(debugAudio.destination);
+  tone.start(); tone.stop(debugAudio.currentTime + .09);
+}
+
+const debugMenu = document.createElement('div');
+debugMenu.className = 'debug-menu'; debugMenu.setAttribute('role', 'menu'); debugMenu.hidden = true; debugMenu.tabIndex = -1;
+document.body.append(debugMenu);
+let debugTarget = null, debugOpener = null; // a screen, or 'all'
+const debugScreens = () => debugTarget === 'all' ? workspaceScreens() : debugTarget?.el ? [debugTarget] : [];
+function renderDebugMenu() {
+  const screens = debugScreens();
+  const toolState = id => { const on = screens.filter(d => debugTools(d).has(id)).length; return on === 0 ? 'false' : on === screens.length ? 'true' : 'mixed'; };
+  const simState = sim => { const on = screens.filter(d => debugSim(d) === sim).length; return on === 0 ? 'false' : on === screens.length ? 'true' : 'mixed'; };
+  const title = debugTarget === 'all' ? `Every screen (${screens.length})` : screenName(debugTarget);
+  debugMenu.setAttribute('aria-label', 'Debug tools and simulators: ' + title);
+  debugMenu.innerHTML = `<p class="debug-for">${esc(title)}</p>` + DEBUG_MENU.map(item => {
+    if (item.heading) return `<p class="debug-heading" role="presentation">${esc(item.heading)}</p>`;
+    if (item.group) return `<p class="debug-group" role="presentation">${esc(item.group)}</p>`;
+    if (item.action) return item.single && debugTarget === 'all' ? '' : `<button type="button" role="menuitem" data-action="${esc(item.action)}" tabindex="-1"><span class="debug-check debug-act" aria-hidden="true"></span><span class="debug-label">${esc(item.label)}</span><span class="debug-info" title="${esc(item.info)}" aria-hidden="true">i</span><span class="sr-only">. ${esc(item.info)}</span></button>`;
+    const tool = !!item.id, state = tool ? toolState(item.id) : simState(item.sim);
+    return `<button type="button" role="${tool ? 'menuitemcheckbox' : 'menuitemradio'}" aria-checked="${state}" data-${tool ? 'tool' : 'sim'}="${esc(tool ? item.id : item.sim)}" tabindex="-1">`
+      + `<span class="debug-check" aria-hidden="true"></span><span class="debug-label">${esc(item.label)}${item.note ? ` <small>${esc(item.note)}</small>` : ''}</span>`
+      + `<span class="debug-info" title="${esc(item.info)}" aria-hidden="true">i</span><span class="sr-only">. ${esc(item.info)}</span></button>`;
+  }).join('');
+}
+function placeDebugMenu() {
+  const r = debugOpener.getBoundingClientRect();
+  debugMenu.style.maxHeight = Math.max(200, innerHeight - 16) + 'px';
+  const h = Math.min(debugMenu.scrollHeight, innerHeight - 16), w = debugMenu.offsetWidth;
+  debugMenu.style.left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8)) + 'px';
+  debugMenu.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - h - 8)) + 'px';
+}
+function openDebugMenu(target, opener) {
+  if (!debugMenu.hidden && debugTarget === target) { closeDebugMenu(); return; }
+  debugTarget = target; debugOpener = opener;
+  renderDebugMenu();
+  debugMenu.hidden = false;
+  opener.setAttribute('aria-expanded', 'true');
+  placeDebugMenu();
+  (debugMenu.querySelector('[aria-checked=true]') || debugMenu.querySelector('[role^=menuitem]'))?.focus();
+}
+function closeDebugMenu(returnFocus = true) {
+  if (debugMenu.hidden) return;
+  debugMenu.hidden = true;
+  debugOpener?.setAttribute('aria-expanded', 'false');
+  if (returnFocus && debugOpener?.isConnected) debugOpener.focus();
+  debugTarget = null;
+}
+function setTool(id) {
+  const screens = debugScreens();
+  if (!screens.length) return;
+  const on = !screens.every(d => debugTools(d).has(id));
+  if (id === 'audible' && on) { try { debugAudio ??= new AudioContext(); debugAudio.resume(); } catch {} }
+  for (const d of screens) {
+    const tools = debugTools(d);
+    if (on) { tools.add(id); if (id === 'reach-right') tools.delete('reach-left'); if (id === 'reach-left') tools.delete('reach-right'); }
+    else tools.delete(id);
+    applyDebug(d);
+  }
+  if (debugTarget === 'all') {
+    if (on) { wallDebug.tools.add(id); if (id.startsWith('reach-')) wallDebug.tools.delete(id === 'reach-right' ? 'reach-left' : 'reach-right'); }
+    else wallDebug.tools.delete(id);
+  }
+}
+function setSim(sim) {
+  for (const d of debugScreens()) { d.sim = sim; applyDebug(d); }
+  if (debugTarget === 'all') wallDebug.sim = sim;
+}
+debugMenu.addEventListener('click', event => {
+  const item = event.target.closest('[role^=menuitem]');
+  if (!item) return;
+  if (item.dataset.action) { runDebugAction(item.dataset.action); return; }
+  if (item.dataset.tool) setTool(item.dataset.tool); else setSim(item.dataset.sim || '');
+  const focusKey = item.dataset.tool ? `[data-tool="${item.dataset.tool}"]` : `[data-sim="${item.dataset.sim}"]`;
+  renderDebugMenu();
+  debugMenu.querySelector(focusKey)?.focus();
+});
+debugMenu.addEventListener('keydown', event => {
+  const items = [...debugMenu.querySelectorAll('[role^=menuitem]')], at = items.indexOf(document.activeElement);
+  const go = i => { event.preventDefault(); items[(i + items.length) % items.length]?.focus(); };
+  if (event.key === 'ArrowDown') go(at + 1);
+  else if (event.key === 'ArrowUp') go(at - 1);
+  else if (event.key === 'Home') go(0);
+  else if (event.key === 'End') go(items.length - 1);
+  else if (event.key === 'Escape') { event.preventDefault(); closeDebugMenu(); }
+  else if (event.key === 'Tab') closeDebugMenu(false);
+});
+document.addEventListener('pointerdown', event => {
+  if (!debugMenu.hidden && !debugMenu.contains(event.target) && !debugOpener?.contains(event.target)) closeDebugMenu(false);
+}, true);
+addEventListener('resize', () => { if (!debugMenu.hidden) placeDebugMenu(); });
+$('#debug-all').addEventListener('click', event => openDebugMenu('all', event.currentTarget));
+
+/* ---------------------------- asking one screen ---------------------------- */
+// A request to one preview that answers with the same rid; resolves with null if the screen does not answer.
+const asks = new Map();
+function ask(d, type, data = {}, ms = 4000) {
+  const rid = crypto.randomUUID();
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { asks.delete(rid); resolve(null); }, ms);
+    asks.set(rid, message => { clearTimeout(timer); asks.delete(rid); resolve(message); });
+    post(d, type, { ...data, rid });
+  });
+}
+const referenceScreen = () => { const screens = workspaceScreens().filter(d => d.ready); return screens.find(d => d.id === $('#ref').value) || screens[0] || null; };
+
+/* ------------------------------ meta checks and panel ------------------------------ */
+let lastMeta = null, cardTheme = 'light';
+function metaFindings(meta) {
+  const out = [], add = (sev, kind, title, detail) => out.push({ sev, kind, title, detail });
+  const tl = meta.title.length, dl = meta.description.length;
+  if (!tl) add('issue', 'No page title', 'No page title', 'Browsers, bookmarks and search results show the title. Add a title element.');
+  else if (tl > 60) add('warn', 'Title may be cut off', `Title is ${tl} characters`, 'Search results show about 60 characters.');
+  else if (tl < 10) add('info', 'Very short title', `Title is ${tl} characters`, 'A short title says little in search results and tabs.');
+  if (!dl) add('warn', 'No meta description', 'No meta description', 'Search results and some social cards fall back to text from the page.');
+  else if (dl > 160) add('warn', 'Description may be cut off', `Description is ${dl} characters`, 'Search results show about 155–160 characters.');
+  else if (dl < 50) add('info', 'Short description', `Description is ${dl} characters`, '50–160 characters works best in search results.');
+  const missing = [['og:title', meta.og.title], ['og:description', meta.og.description], ['og:image', meta.og.image], ['og:url', meta.og.url], ['twitter:card', meta.twitter.card]].filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length) add(missing.includes('og:image') ? 'warn' : 'info', 'Social card tags missing', `${plural(missing.length, 'social card tag')} missing`, missing.join(', ') + '. Shared links fall back to guesses or show no image.');
+  if (meta.og.imageRelative) add('issue', 'og:image is not a full URL', 'og:image is not a full URL', 'Social sites need an absolute https:// address for the image.');
+  if (meta.og.image && !meta.og.imageAlt) add('info', 'No og:image:alt', 'No og:image:alt', 'Describe the share image for screen reader users on social sites.');
+  if (!meta.canonical) add('info', 'No canonical URL', 'No canonical URL', 'A link rel=canonical tells search engines which address is the real one.');
+  if (!meta.hasIcon) add('info', 'No favicon link', 'No favicon link', 'Browsers try /favicon.ico; a link rel=icon makes it explicit.');
+  if (/noindex/i.test(meta.robots)) add('warn', 'Page asks not to be indexed', 'Page asks not to be indexed', `The robots meta tag says “${meta.robots.slice(0, 60)}”. Fine for staging, not for a live page.`);
+  if (!meta.charset) add('info', 'No charset declared', 'No charset declared', 'Add <meta charset="utf-8"> near the top of the head.');
+  if (meta.duplicates.length) add('warn', 'Duplicate meta tags', `${plural(meta.duplicates.length, 'meta tag')} set more than once`, meta.duplicates.slice(0, 6).join(', ') + '. Sites read one of them, and not always the same one.');
+  if (meta.jsonld.includes('invalid JSON')) add('issue', 'Invalid structured data', 'Invalid structured data', 'A JSON-LD script could not be read, so search engines ignore it.');
+  return out;
+}
+function renderMeta() {
+  const view = $('#meta-view');
+  if (!lastMeta) { view.innerHTML = '<p class="muted">Open a site, then press <b>Detect differences</b> or <b>Read meta</b> to see its title, description, social cards and meta checks.</p><button type="button" class="pill" data-meta="read">Read meta</button>'; return; }
+  const m = lastMeta, host = (() => { try { return new URL(m.og.url || m.url).host; } catch { return ''; } })();
+  const title = m.og.title || m.twitter.title || m.title || host, desc = m.og.description || m.twitter.description || m.description;
+  const image = /^https?:\/\//.test(m.og.image || m.twitter.image) ? (m.og.image || m.twitter.image) : '';
+  const img = cls => image ? `<img class="${cls}" src="${esc(image)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<div class="${cls} card-noimg">No image</div>`;
+  const icon = /^https?:\/\//.test(m.icon) ? `<img class="meta-icon" src="${esc(m.icon)}" alt="" referrerpolicy="no-referrer">` : '';
+  const site = m.og.siteName || host;
+  const row = (k, v) => `<div class="meta-row"><span>${esc(k)}</span><b>${v}</b></div>`;
+  const len = (n, max) => `<small class="${n > max ? 'over' : ''}">${n}/${max}</small>`;
+  const cards = {
+    Google: `<div class="card-google"><div class="g-site">${icon}<span>${esc(site)}<br><small>${esc(m.url.slice(0, 70))}</small></span></div><div class="g-title">${esc(m.title || title)}</div><div class="g-desc">${esc((m.description || desc).slice(0, 160))}${(m.description || desc).length > 160 ? '…' : ''}</div></div>`,
+    X: `<div class="card-x">${img('card-img wide')}<div class="card-x-host">${esc(host)}</div><div class="card-x-title">${esc(title.slice(0, 70))}</div></div>`,
+    Facebook: `<div class="card-fb">${img('card-img wide')}<div class="card-body"><small>${esc(host.toUpperCase())}</small><b>${esc(title.slice(0, 88))}</b><span>${esc(desc.slice(0, 110))}</span></div></div>`,
+    LinkedIn: `<div class="card-li">${img('card-img wide')}<div class="card-body"><b>${esc(title.slice(0, 70))}</b><small>${esc(host)}</small></div></div>`,
+    Slack: `<div class="card-slack"><div class="card-slack-site">${icon}${esc(site)}</div><a>${esc(title)}</a><span>${esc(desc.slice(0, 200))}</span>${image ? img('card-img slack') : ''}</div>`,
+    Discord: `<div class="card-discord"><small>${esc(site)}</small><a>${esc(title)}</a><span>${esc(desc.slice(0, 200))}</span>${image ? img('card-img') : ''}</div>`,
+    WhatsApp: `<div class="card-wa"><div class="card-wa-inner">${image ? img('card-img wa') : ''}<div><b>${esc(title.slice(0, 60))}</b><span>${esc(desc.slice(0, 80))}</span><small>${esc(host)}</small></div></div><a>${esc(m.url.slice(0, 60))}</a></div>`,
+  };
+  const checks = metaFindings(m);
+  view.innerHTML = `<div class="meta-head">${icon}<div><b>${esc(m.title || 'No title')}</b> ${len(m.title.length, 60)}<br><small class="muted">${esc(m.url)}</small></div></div>`
+    + row('Description', m.description ? `${esc(m.description)} ${len(m.description.length, 160)}` : '<i>none</i>')
+    + row('Canonical', m.canonical ? esc(m.canonical) : '<i>none</i>') + row('Language', m.lang ? esc(m.lang) : '<i>none</i>')
+    + row('Robots', m.robots ? esc(m.robots) : '<i>not set (indexable)</i>') + row('Theme color', m.themeColor ? `<span class="swatch" style="background:${esc(m.themeColor)}"></span>${esc(m.themeColor)}` : '<i>none</i>')
+    + row('Web app manifest', m.manifest ? 'yes' : 'no') + row('Apple touch icon', m.appleIcon ? 'yes' : 'no')
+    + row('Structured data', m.jsonld.length ? esc(m.jsonld.join(', ')) : '<i>none</i>')
+    + `<h3 class="meta-h">Checks</h3>` + (checks.length ? checks.map(f => `<div class="finding ${f.sev}"><div class="t">${esc(f.title)}</div><div class="d">${esc(f.detail)}</div></div>`).join('') : '<p class="muted">No problems found.</p>')
+    + `<h3 class="meta-h">Social previews <span class="report-view"><button type="button" data-card-theme="light" class="${cardTheme === 'light' ? 'on' : ''}">Light</button><button type="button" data-card-theme="dark" class="${cardTheme === 'dark' ? 'on' : ''}">Dark</button></span></h3>`
+    + `<p class="muted">Approximations of how each site shows a shared link. They use og: and twitter: tags, then the title and description.</p>`
+    + `<div class="cards ${cardTheme}">` + Object.entries(cards).map(([name, html]) => `<section><h4>${name}</h4>${html}</section>`).join('') + '</div>'
+    + '<button type="button" class="pill" data-meta="read">Read meta again</button>';
+}
+async function readMeta() {
+  const d = referenceScreen(); if (!d) return;
+  const data = (await snapshotScreens([d], 5000)).get(d);
+  if (data?.meta) { lastMeta = data.meta; renderMeta(); }
+}
+$('#pane-meta').addEventListener('click', event => {
+  const theme = event.target.closest('[data-card-theme]');
+  if (theme) { cardTheme = theme.dataset.cardTheme; renderMeta(); }
+  if (event.target.closest('[data-meta=read]')) readMeta();
+});
+renderMeta();
+
+/* ------------------------------ console panel ------------------------------ */
+const consoleEntries = new Map(); let consoleTimer = 0;
+function noteConsole(d, m) {
+  if (!['log', 'info', 'warn', 'error', 'debug'].includes(m.level) || typeof m.message !== 'string') return;
+  const key = m.level + '|' + m.message;
+  let entry = consoleEntries.get(key);
+  if (!entry) {
+    if (consoleEntries.size >= 500) consoleEntries.delete(consoleEntries.keys().next().value);
+    entry = { level: m.level, message: m.message, kind: m.kind, screens: new Map(), at: Date.now() }; consoleEntries.set(key, entry);
+  }
+  const name = reportName(d); entry.screens.set(name, (entry.screens.get(name) || 0) + 1); entry.at = Date.now();
+  clearTimeout(consoleTimer); consoleTimer = setTimeout(renderConsole, 150);
+}
+function renderConsole() {
+  const errors = [...consoleEntries.values()].filter(e => e.level === 'error').length;
+  $('#console-count').textContent = errors || '';
+  if ($('#pane-console').hidden) return;
+  const level = $('#console-level').value;
+  const shown = [...consoleEntries.values()].filter(e => level === 'all' || (level === 'log' ? ['log', 'info', 'debug'].includes(e.level) : e.level === level)).sort((a, b) => b.at - a.at);
+  $('#console-list').innerHTML = shown.length ? shown.map(e => `<div class="console-entry ${e.level}"><div class="console-msg"><span class="console-level">${e.level === 'debug' ? 'log' : e.level}</span>${esc(e.message)}</div><div class="console-screens">${[...e.screens].map(([name, n]) => `<span class="chip">${esc(name)}${n > 1 ? ' ×' + n : ''}</span>`).join('')}</div></div>`).join('')
+    : '<p class="muted">No messages yet. Console messages and errors from every screen show up here, once each, with the screens that sent them.</p>';
+}
+$('#console-level').addEventListener('change', renderConsole);
+$('#console-clear').addEventListener('click', () => { consoleEntries.clear(); renderConsole(); });
+
+/* ------------------------------ CSS breakpoints ------------------------------ */
+let breakpoints = [], breakpointView = null; // { before: ids of the screens that were on }
+async function findBreakpoints() {
+  const d = referenceScreen(), status = $('#breakpoint-status');
+  if (!d) { status.textContent = 'Open a site first.'; return; }
+  status.textContent = 'Reading stylesheets…';
+  const answer = await ask(d, 'breakpoints');
+  breakpoints = answer?.values || [];
+  $('#breakpoint-list').innerHTML = breakpoints.map(v => `<span class="chip">${v}px</span>`).join('');
+  $('#breakpoint-list').hidden = $('#breakpoint-actions').hidden = $('#breakpoint-edges-row').hidden = !breakpoints.length;
+  status.textContent = answer ? (breakpoints.length ? `${plural(breakpoints.length, 'width')} where the site's layout rules change. Stylesheets from other sites can't be read.` : 'No width breakpoints in the stylesheets Samestate can read.') : 'The screen did not answer. Try again.';
+}
+function breakpointWidths() {
+  const widths = new Set(breakpoints[0] > 320 ? [320] : []);
+  for (const v of breakpoints) { widths.add(v); if ($('#breakpoint-edges').checked && v - 1 >= 240) widths.add(v - 1); }
+  return [...widths].sort((a, b) => a - b).slice(0, 16);
+}
+function openBreakpoints() {
+  if (sitesMode || pageSteps) { $('#breakpoint-status').textContent = 'Turn off Compare sites and Page steps first.'; return; }
+  closeBreakpoints(false);
+  breakpointView = { before: DEVICES.filter(d => d.on).map(d => d.id) };
+  for (const d of DEVICES.filter(x => x.on)) selectDevice(d, false);
+  for (const w of breakpointWidths()) {
+    const kind = w < 600 ? 'phone' : w < 1024 ? 'tablet' : 'desktop';
+    const d = previewDevice(device('bp-' + w, w + 'px', w, kind === 'phone' ? 800 : kind === 'tablet' ? 1024 : 900, 'specials', { kind, os: kind === 'phone' ? 'android' : '', breakpoint: true }), nextDeviceSlot++);
+    DEVICES.push(d); selectDevice(d, true);
+  }
+  refreshDevicePicker();
+  $('#close-breakpoints').hidden = false;
+  $('#breakpoint-status').textContent = `Showing ${plural(breakpointWidths().length, 'screen')}, one per breakpoint.`;
+}
+function closeBreakpoints(restore = true) {
+  if (!breakpointView) return;
+  for (const d of DEVICES.filter(x => x.breakpoint)) { selectDevice(d, false); DEVICES.splice(DEVICES.indexOf(d), 1); }
+  if (restore) for (const id of breakpointView.before) { const d = DEVICES.find(x => x.id === id); if (d && !d.on) selectDevice(d, true); }
+  breakpointView = null;
+  refreshDevicePicker();
+  $('#close-breakpoints').hidden = true;
+  if (restore) $('#breakpoint-status').textContent = 'Back to your devices.';
+}
+$('#find-breakpoints').addEventListener('click', findBreakpoints);
+$('#open-breakpoints').addEventListener('click', openBreakpoints);
+$('#close-breakpoints').addEventListener('click', () => closeBreakpoints());
+
+/* ------------------------------ page language setting ------------------------------ */
+$('#screen-lang').addEventListener('change', () => { for (const d of connectedScreens()) if (d.ready) configure(d); });
+
+/* ------------------------------ grid settings ------------------------------ */
+let gridSettings = { columns: 12, gutter: 24, maxWidth: 1200, margin: 16, baseline: 8 };
+try { Object.assign(gridSettings, JSON.parse(localStorage.getItem('samestate.grid') || '{}')); } catch {}
+const GRID_INPUTS = { columns: '#grid-columns', gutter: '#grid-gutter', maxWidth: '#grid-max', margin: '#grid-margin', baseline: '#grid-baseline' };
+function openGridSettings() {
+  for (const [key, sel] of Object.entries(GRID_INPUTS)) $(sel).value = gridSettings[key];
+  $('#grid-dialog').showModal();
+}
+$('#grid-dialog').addEventListener('input', () => {
+  for (const [key, sel] of Object.entries(GRID_INPUTS)) { const v = Number($(sel).value); if (Number.isFinite(v)) gridSettings[key] = v; }
+  try { localStorage.setItem('samestate.grid', JSON.stringify(gridSettings)); } catch {}
+  for (const d of connectedScreens()) if (d.ready) configure(d);
+});
+
+/* ------------------------------ design overlay ------------------------------ */
+let designScreen = null;
+function openDesign(d) {
+  designScreen = d;
+  const s = d.design || { scale: 1, opacity: .5, mode: 'normal', split: 0, x: 0, y: 0, visible: true };
+  $('#design-screen').textContent = screenName(d) + (d.design ? '' : ' · choose an image exported from your design tool');
+  $('#design-scale').value = s.scale; $('#design-opacity').value = s.opacity; $('#design-mode').value = s.mode; $('#design-split').value = s.split;
+  $('#design-x').value = s.x; $('#design-y').value = s.y; $('#design-visible').checked = s.visible !== false; $('#design-file').value = '';
+  $('#design-dialog').showModal();
+}
+function sendDesign(d) { if (d?.ready) post(d, 'design', { design: d.design || null }); showDebugState(d); }
+function readDesignControls() {
+  const d = designScreen; if (!d?.design) return;
+  Object.assign(d.design, { scale: Number($('#design-scale').value), opacity: Number($('#design-opacity').value), mode: $('#design-mode').value, split: Number($('#design-split').value), x: Number($('#design-x').value) || 0, y: Number($('#design-y').value) || 0, visible: $('#design-visible').checked });
+  sendDesign(d);
+}
+$('#design-dialog').addEventListener('input', event => { if (event.target.id !== 'design-file') readDesignControls(); });
+$('#design-file').addEventListener('change', () => {
+  const file = $('#design-file').files[0], d = designScreen;
+  if (!file || !d) return;
+  if (file.size > 15 * 1024 * 1024) { $('#design-screen').textContent = 'Choose an image under 15 MB.'; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const image = new Image();
+    image.onload = () => { d.design = { src: reader.result, w: image.naturalWidth, h: image.naturalHeight }; $('#design-screen').textContent = `${screenName(d)} · ${file.name}, ${image.naturalWidth} × ${image.naturalHeight}`; readDesignControls(); };
+    image.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+$('#design-remove').addEventListener('click', () => { if (designScreen) { designScreen.design = null; sendDesign(designScreen); } $('#design-dialog').close(); });
+
+/* ------------------------------ debug menu actions ------------------------------ */
+function runDebugAction(action) {
+  const screens = debugScreens();
+  closeDebugMenu(false);
+  if (action === 'grid') openGridSettings();
+  else if (action === 'design' && screens.length === 1) openDesign(screens[0]);
+  else if (action.startsWith('fill-')) for (const d of screens) if (d.ready) post(d, 'autofill', { mode: action.slice(5) });
+}
+
+/* ------------------------------ find elements ------------------------------ */
+let findIndex = 0, findSelector = '';
+async function findElements(step) {
+  const selector = $('#find-selector').value.trim(), status = $('#find-status');
+  if (!selector) { status.textContent = ''; return; }
+  findIndex = selector === findSelector ? findIndex + step : 0; findSelector = selector;
+  const screens = workspaceScreens().filter(d => d.ready);
+  const answers = await Promise.all(screens.map(d => ask(d, 'find', { selector, index: findIndex })));
+  const error = answers.find(a => a?.error)?.error;
+  if (error) { status.textContent = error + '.'; return; }
+  const parts = screens.map((d, i) => `${screenName(d)} ${answers[i] ? answers[i].count : '–'}`);
+  const total = answers.reduce((n, a) => n + (a?.count || 0), 0);
+  status.textContent = total ? `Match ${findIndex + 1} highlighted. ${parts.join(' · ')}` : 'No matches on any screen.';
+}
+$('#find-form').addEventListener('submit', event => { event.preventDefault(); findElements(1); });
+$('#find-prev').addEventListener('click', () => findElements(-1));
+$('#find-selector').addEventListener('input', () => { findSelector = ''; findIndex = 0; });
+function openFind() { const drawer = $('#find-drawer'); drawer.open = true; if ($('#sidebar').hidden) $('#toggle-sidebar').click(); drawer.scrollIntoView({ block: 'nearest' }); $('#find-selector').focus(); }
+
+/* ------------------------------ live reload ------------------------------ */
+let liveTimer = 0, livePolling = false, liveLast = null;
+const LOCAL_HOST = /^(localhost|127(\.\d+){3}|0\.0\.0\.0|\[::1\]|.+\.(localhost|local|test)|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2})$/i;
+function reloadAll() { for (const d of workspaceScreens()) if (d.ready && d.linked) post(d, 'reload'); }
+function setLiveReload(value) {
+  clearInterval(liveTimer); liveTimer = 0; liveLast = null; liveReloads = []; liveIgnoreHtml = false;
+  const status = $('#live-reload-status');
+  if (!value) { status.textContent = ''; return; }
+  if (value === 'change') {
+    let host = ''; try { host = new URL(previewUrl || target).hostname; } catch {}
+    if (!LOCAL_HOST.test(host)) { status.textContent = 'Watching for changes is for sites on this computer or network (localhost, .test, 192.168…). Use a timer for other sites.'; $('#live-reload').value = ''; return; }
+    status.textContent = 'Watching the page, its stylesheets and scripts. CSS changes swap in place; other changes reload every screen.';
+    liveTimer = setInterval(pollSite, 1500);
+  } else {
+    status.textContent = `Reloading every screen every ${value} seconds.`;
+    liveTimer = setInterval(() => { if (!sweepRun && !journeyRunning) reloadAll(); }, Number(value) * 1000);
+  }
+}
+let liveReloads = [], liveIgnoreHtml = false;
+async function pollSite() {
+  if (livePolling || sweepRun || journeyRunning) return;
+  const d = leader?.ready ? leader : referenceScreen(); if (!d) return;
+  livePolling = true;
+  try {
+    const now = await ask(d, 'fingerprint', {}, 5000);
+    if (!now) return;
+    const last = liveLast;
+    liveLast = { screen: d.id, url: now.url, html: now.html, js: now.js, css: now.css };
+    if (!last || last.screen !== d.id || last.url !== now.url) return; // a new page or screen: start comparing from here
+    const time = new Date().toLocaleTimeString(), status = $('#live-reload-status');
+    if (last.js !== now.js || (!liveIgnoreHtml && last.html !== now.html)) {
+      liveReloads = [...liveReloads.filter(t => Date.now() - t < 30000), Date.now()];
+      if (last.js === now.js && liveReloads.length > 3) { liveIgnoreHtml = true; status.textContent = "The page's HTML changes on every load, so only its stylesheets and scripts are watched now."; return; }
+      status.textContent = `Changed at ${time}: reloaded every screen.`; liveLast = null; reloadAll();
+    } else if (last.css !== now.css) {
+      status.textContent = `CSS changed at ${time}: swapped in place.`;
+      for (const s of workspaceScreens()) if (s.ready) post(s, 'reload-css');
+    }
+  } finally { livePolling = false; }
+}
+$('#live-reload').addEventListener('change', event => setLiveReload(event.target.value));
+
+/* ------------------------------ tool and feature lookup ------------------------------ */
+// Keep names, descriptions and synonyms separate from actions. Searching never runs a tool.
+function commandText(value) { return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
+function revealToolControl(el) {
+  if (!el) return;
+  const pane = el.closest('#panel > .pane');
+  if (pane) showTab(pane.id.slice(5));
+  if (el.closest('#sidebar') && $('#sidebar').hidden) $('#toggle-sidebar').click();
+  for (let parent = el.parentElement; parent; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
+  const scroller = pane || el.closest('#sidebar');
+  if (scroller) scroller.scrollTop += el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 16;
+}
+function toolControlLabel(el) {
+  const own = el.getAttribute('aria-label') || (el.matches('button') ? el.textContent.trim() : '') || el.getAttribute('title');
+  if (own) return own;
+  const source = el.labels?.[0] || (el.matches('button') ? el : null);
+  if (!source) return '';
+  const copy = source.cloneNode(true); copy.querySelectorAll('input,select,textarea,button,small,svg').forEach(n => n.remove());
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+}
+function toolAvailability(el) {
+  if (!el) return 'This feature is unavailable in this build.';
+  if (window.samestateChecks?.running || el.closest('[inert]')) return 'Wait for the current checks to finish.';
+  if ((el.id === 'test-write' || el.closest('#test-ai') || el.id === 'sign-ins') && !IS_EXT) return 'Available in the installed Chrome extension.';
+  if (el.matches(':disabled')) {
+    if (el.closest('#checks-drawer')) return 'Choose check groups, or finish the current run first.';
+    if (el.closest('#tests-drawer')) return 'Set up a test, or finish the current test or recording first.';
+    if (/screenshot|record|shot/.test(el.id)) return 'Requires a loaded preview and supported desktop Chrome capture. Finish any active capture first.';
+    return 'Configure this feature or open a preview first.';
+  }
+  for (let p = el; p && p !== document.body; p = p.parentElement) if (p.hidden && p.id !== 'sidebar' && p.id !== 'panel' && !p.classList.contains('pane')) return 'Available when the related mode or operation is active.';
+  return '';
+}
+function commands() {
+  const list = [], covered = new Set(), ids = new Set();
+  const add = (label, hint, description, aliases, run, reason = '', id = label) => {
+    if (ids.has(id)) return; ids.add(id);
+    list.push({ id, label, hint, description, aliases: Array.isArray(aliases) ? aliases : [aliases || ''], run, available: !reason, reason });
+  };
+  const control = (label, selector, hint, description, aliases = []) => {
+    const el = $(selector); covered.add(el);
+    add(label, hint, description || el?.title || label, aliases, () => { revealToolControl(el); el?.click(); }, toolAvailability(el), selector);
+  };
+  const pageReady = () => workspaceScreens().some(d => d.ready) ? '' : 'Open a site and wait for a preview to load.';
+  const drawer = (name, element, description, aliases = []) => {
+    add('Open ' + name, name, description, aliases, () => { if (element) element.open = true; revealToolControl(element); element?.querySelector('summary')?.focus({ preventScroll: true }); }, '', 'drawer:' + name);
+  };
+  control('Outline and measurements', '#open-outline', 'Inspect', 'Headings, landmarks, keyboard focus order, element size, spacing and best-practice suggestions.', ['inspect','measurement','dimensions','padding','margin','tab order','heading','landmark','best practices','accessibility tree']);
+  control('Run all checks', '#open-checks', 'Checks', 'Choose groups, run automated checks and record visual reviews in one combined report.', ['all checks','test suite','QA','regression','human review','manual review','combined results']);
+  control('Detect differences', '#detect', 'Reports', 'Measure responsive layout, content, accessibility, errors and performance across devices.', ['scan','audit','accessibility','a11y','contrast','web vitals','CLS','LCP','INP']);
+  control('Sweep widths', '#sweep', 'Reports', 'Find responsive problems between 320 and 1920 CSS pixels.', ['responsive','breakpoint sweep','reflow','overflow']);
+  for (const [label, sel, desc, aliases] of [
+    ['Screenshot','#screenshot','Save the visible device wall.',['capture','png','image']], ['Record','#record','Record the device wall as video.',['recording','webm','video']],
+    ['Full-page screenshot','#full-page-shot','Scroll and stitch the full length of a preview.',['full page','capture','jpeg','pdf']], ['Overview screenshot','#overview-shot','Capture every screen on one sheet.',['all screens','capture','contact sheet']],
+    ['Auto screenshots','#auto-shots','Save screenshots repeatedly at your chosen pace.',['timelapse','interval','automatic capture']], ['Save captures to folder','#capture-folder','Choose where screenshots and recording parts are saved.',['downloads','destination','save folder']]
+  ]) control(label, sel, 'Capture', desc, aliases);
+  control('Compare sites', '#sites-toggle', 'Views', 'Compare different websites side by side.', ['multiple sites','staging','production','side by side']);
+  control('Reload every screen', '#reload', 'Navigation', 'Reload the current previews.', ['refresh all','reload all']);
+  control('Day or night mode', '#ui-mode', 'Appearance', 'Switch the interface between light and dark.', ['dark mode','light mode','appearance']);
+  control('Show or hide the sidebar', '#toggle-sidebar', 'Navigation', 'Toggle preview settings.', ['sidebar','settings']);
+  control('Guided demo', '#demo', 'Help', 'Walk through Samestate features on the sample site.', ['tour','tutorial','help','getting started']);
+  control('Find breakpoints', '#find-breakpoints', 'Views', 'Read width breakpoints from accessible stylesheets.', ['media queries','responsive css']);
+  control('Open one screen per breakpoint', '#open-breakpoints', 'Views', 'Open temporary previews at the detected breakpoint widths.', ['breakpoint previews','responsive']);
+  control('Back to my devices', '#close-breakpoints', 'Views', 'Restore the device selection used before breakpoint previews.', ['restore devices']);
+  control('Export workspaces', '#workspace-export', 'Workspaces', 'Download saved setups as JSON.', ['backup','share setup','workspace export']);
+  control('Import workspaces', '#workspace-import', 'Workspaces', 'Load setups from a workspace JSON file.', ['restore backup','workspace import']);
+  control('Long text (+35%)', '#long-text', 'Reports', 'Expand preview text to test translation and content growth.', ['localization','translation','text stress']);
+  control('Check links', '#check-links', 'Reports', 'Include same-origin broken-link checks in the report.', ['broken links','404','dead links']);
+  add('Find elements', 'Inspect', 'Search every preview by CSS selector and move between matches.', ['CSS selector','find','search page','element search'], openFind);
+  add('Grid settings', 'Debug', 'Set columns, gutters, margins and the baseline grid.', ['grid','columns','baseline','spacing'], openGridSettings);
+  control('Debug menu for every screen', '#debug-all', 'Debug', 'Open debugging tools and visual simulators for the whole wall.', ['debug','simulators','overlays']);
+  for (const [tab, label, description, aliases] of [
+    ['diff','Differences','Review grouped findings, fixes, baselines and exports.',['report','findings','baseline','fixes']],
+    ['log','Sync log','See how mirrored actions were matched across devices.',['synchronization','activity','click log']],
+    ['meta','Meta and social previews','Spot metadata issues: missing values, duplicate tags, long/short titles and descriptions, and share previews.',['meta','metadata','meta data','metadata issues','too long','too short','seo','open graph','og tags','social cards','title','description','canonical','favicon','structured data']],
+    ['outline','Outline panel','Inspect headings, landmarks, focus order and CSS measurements.',['outline','page structure','tab order']],
+    ['checks','Combined check results','Automated findings, test steps, visual reviews and HTML/JSON export.',['combined report','check results','reviews']],
+    ['console','Console','Messages and errors from every preview, grouped with a level filter.',['javascript','js errors','logs','console']]
+  ]) add('Open ' + label, 'Panels', description, aliases, () => showTab(tab), '', 'panel:' + tab);
+  for (const summary of document.querySelectorAll('#sidebar > .sidebar-drawer > summary')) {
+    const name = summary.firstChild?.textContent.trim();
+    if (name) drawer(name, summary.parentElement, 'Open ' + name + ' settings and controls.', name === 'Test runs' ? ['tests','AI','OpenRouter','record clicks','replay','test plan','api key'] : name === 'Devices' ? ['device','phone','tablet','custom devices',...DEVICES.map(d => d.name)] : name === 'Theme' ? ['theme','tweakcn','colors'] : []);
+  }
+  for (const [selector, category, prefix] of [['#screen-settings','Screen settings','Screen settings'],['#live-reload','Sync','Live reload'],['#ui-theme','Appearance','Interface theme'],['#theme-preset','Themes','Preview theme'],['#outline-mode','Inspect','Outline view'],['#shot-format','Capture','Screenshot format']]) {
+    const el = $(selector); covered.add(el);
+    for (const option of el.options) {
+      if (option.disabled || !option.value && selector === '#theme-preset') continue;
+      add(prefix + ': ' + option.text, category, selector === '#screen-settings' ? 'Compare the page with this setting on alternating screens.' : 'Choose ' + option.text + ' in ' + prefix + '.', [option.value, prefix, option.text, selector === '#screen-settings' ? 'emulation media preferences' : ''], () => { revealToolControl(el); el.value = option.value; el.dispatchEvent(new Event('change', { bubbles: true })); }, toolAvailability(el), selector + ':' + option.value);
+    }
+  }
+  let debugGroup = '';
+  for (const item of DEBUG_MENU) {
+    if (item.group) debugGroup = item.group;
+    if (item.id) add(item.label + (item.note ? ' (' + item.note + ')' : ''), 'Debug tools', item.info + ' Applies to every visible screen.', [item.id,debugGroup,item.note || ''], () => { debugTarget = 'all'; try { setTool(item.id); } finally { debugTarget = null; } }, pageReady());
+    else if (item.sim !== undefined) add('Simulator: ' + item.label + (item.note ? ' (' + item.note + ')' : ''), 'Simulators', item.info + ' Applies to every visible screen.', [item.sim,debugGroup,'vision','simulation'], () => { debugTarget = 'all'; try { setSim(item.sim); } finally { debugTarget = null; } }, pageReady());
+    else if (item.action && item.action !== 'grid') add(item.label.replace('…',''), 'Debug tools', item.info + (item.single ? ' Uses the reference screen.' : ' Applies to every visible screen.'), [item.action,'forms',item.single ? 'reference design image comparison' : 'autofill test data'], () => {
+      if (item.single) { const d = referenceScreen(); if (d) openDesign(d); }
+      else { debugTarget = 'all'; try { runDebugAction(item.action); } finally { debugTarget = null; } }
+    }, pageReady());
+  }
+  add('Configure AI connection', 'Test runs', 'Set up OpenRouter or another OpenAI-compatible service and its API key.', ['AI','OpenRouter','api key','model','Ollama','local model'], () => { const el=$('#test-ai'); revealToolControl(el); el.open=true; $('#ai-provider').focus({preventScroll:true}); });
+  add('Save workspace', 'Workspaces', 'Name and save the current preview setup.', ['save setup','save devices','workspace'], () => { revealToolControl($('#workspace-name')); $('#workspace-name').focus({preventScroll:true}); }, pageReady());
+  add('Add expected-text check', 'Test runs', 'Add an assertion for text that should appear on every screen.', ['assert','expectation','text check'], () => { revealToolControl($('#test-check')); $('#test-check').focus({preventScroll:true}); });
+  add('Preview scale and physical size', 'Views', 'Set a preview percentage or calibrate its physical size on your monitor.', ['actual size','millimetres','physical','calibration','DPI','scale'], () => referenceScreen()?.el.querySelector('[data-a=scale]')?.click(), pageReady());
+  for (const [format,label] of [['md','Markdown'],['csv','CSV'],['html','HTML'],['html-shots','HTML with screenshots']]) {
+    const el=$('[data-export="'+format+'"]');
+    add('Export difference report: '+label, 'Reports', 'Save the current findings as '+label+'.', ['report export',format,'download findings'], () => {revealToolControl(el);el?.click();}, findings.length ? toolAvailability(el) : 'Run Detect differences to create a report first.', 'export:'+format);
+  }
+  for (const [action,label] of [['save','Save report baseline'],['clear','Clear report baseline'],['undo-fixes','Undo all preview fixes']]) {
+    const el=$('[data-baseline="'+action+'"]');
+    add(label, 'Reports', 'Manage saved comparison baselines or temporary CSS fixes in Differences.', ['baseline','regression','fix','undo'], ()=>{revealToolControl(el);el?.click();},el?toolAvailability(el):'Available after a report, baseline or preview fix exists.','baseline:'+action);
+  }
+  add('Refresh metadata', 'Panels', 'Read the reference preview’s metadata again after page changes.', ['refresh meta','read meta','update metadata'], () => { showTab('meta'); readMeta(); }, pageReady());
+  // Index the actual controls too, including features added by later scripts. Do not read text-field values.
+  for (const el of document.querySelectorAll('#sidebar button[id],#sidebar input[id]:not([type=hidden]):not([type=password]):not([type=file]),#sidebar select[id],#sidebar textarea[id],#panel button[id],#panel input[id]:not([type=hidden]):not([type=password]):not([type=file]),#panel select[id]')) {
+    if (covered.has(el) || ['closepanel','device-search','workspace-name','test-check','find-selector','command-input'].includes(el.id)) continue;
+    const label = toolControlLabel(el); if (!label) continue;
+    const section = el.closest('.sidebar-drawer')?.querySelector('summary')?.firstChild?.textContent.trim();
+    const category = section || (el.closest('#pane-outline') ? 'Inspect' : el.closest('#pane-console') ? 'Console' : 'Checks');
+    add(label, category, el.matches('button,input[type=checkbox]') ? 'Use this control in ' + category + '.' : 'Open ' + category + ' and configure ' + label + '.', [el.id.replace(/-/g,' '), category], () => {
+      revealToolControl(el);
+      if (el.matches('button,input[type=checkbox]')) el.click(); else el.focus({ preventScroll: true });
+    }, toolAvailability(el), '#' + el.id);
+  }
+  for (const [label, selector, category, desc] of [
+    ['Grid layout','#mode [data-v=grid]','Layout','Arrange previews in a grid.'], ['Single-row layout','#mode [data-v=row]','Layout','Arrange previews in one horizontal row.'], ['Focus one device','#mode [data-v=focus]','Layout','Show one selected preview at a time.']
+  ]) control(label, selector, category, desc);
+  for (const key of Object.keys(SYNC)) {
+    const el = $('#synclist input[data-sync="' + key + '"]') || [...document.querySelectorAll('#synclist input')].find(e => e.value === key || e.dataset.k === key);
+    if (el) add('Sync: ' + SYNC[key][0], 'Sync', 'Toggle ' + SYNC[key][0].toLowerCase() + ' between linked screens.', [key,'mirror','synchronization'], () => { revealToolControl(el); el.click(); }, toolAvailability(el), 'sync:' + key);
+  }
+  add('Preview annotations', 'Inspect', 'Add notes, strokes, lines and arrows to the reference preview.', ['annotate','annotation','note','draw','arrow','mark up'], () => {
+    const d = referenceScreen(), button = d?.el?.querySelector('.annotation-toggle');
+    if (button) button.click();
+    else if (d) { const candidate = d.el.querySelector('[aria-label*="Annotate"],[title*="Annotate"]'); candidate?.click(); }
+  }, pageReady());
+  for (const item of list) {
+    const help = window.samestateFeatureHelpCatalog?.entry(item.id);
+    if (help) item.description = help.text;
+  }
+  return list;
+}
+function commandNear(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; } else { if (++edits > 1) return false; if (a.length <= b.length) j++; if (a.length >= b.length) i++; } }
+  return edits + (i < a.length || j < b.length ? 1 : 0) <= 1;
+}
+let commandList = [], commandAt = 0, commandOpener = null;
+function renderCommands() {
+  const typed = commandText($('#command-input').value), tokens = typed.split(' ').filter(Boolean), meaningful = tokens.filter(w=>!['a','an','the','and','or','to','for','how','where','can','i','my','show','find','search','use','want'].includes(w)), words = meaningful.length ? meaningful : tokens, category = $('#command-category').value;
+  const catalog = commands(), categories = [...new Set(catalog.map(c => c.hint))].sort();
+  $('#command-category').innerHTML = '<option value="">All categories</option>' + categories.map(c => `<option${c === category ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const score = c => {
+    const label = commandText(c.label), name = commandText(c.label.split(': ').pop()), aliases = c.aliases.map(commandText), hay = commandText([c.label,c.hint,c.description,...c.aliases].join(' '));
+    if (!words.length) return 0;
+    if (typed === name || typed === label) return 0;
+    if (aliases.includes(typed)) return 10;
+    if (!words.every(w => hay.includes(w) || w.length >= 4 && hay.split(' ').some(t => t.length >= 4 && commandNear(w,t)))) return Infinity;
+    return name.startsWith(typed) || label.startsWith(typed) ? 20 : label.includes(typed) ? 30 : hay.includes(typed) ? 40 : 50;
+  };
+  commandList = catalog.filter(c => !category || c.hint === category).map((c,i) => ({c,i,score:score(c)})).filter(r => Number.isFinite(r.score)).sort((a,b) => a.score-b.score || a.i-b.i).map(r => r.c);
+  commandAt = Math.min(commandAt, Math.max(0, commandList.length-1));
+  $('#command-count').textContent = typed || category ? commandList.length + (commandList.length === 1 ? ' match' : ' matches') + ' · ' + catalog.length + ' tools and features' : catalog.length + ' tools and features';
+  $('#command-message').textContent = '';
+  $('#command-list').innerHTML = commandList.map((c,i) => `<li role="option" id="command-${i}" aria-selected="${i===commandAt}" aria-disabled="${!c.available}" data-i="${i}"><div><span>${esc(c.label)}</span><p>${esc(c.description)}</p>${!c.available ? `<em>${esc(c.reason)}</em>` : ''}</div><small>${esc(c.hint)}</small></li>`).join('') || '<li class="command-empty" role="presentation">No matching tool. Try a name or purpose, such as “meta”, “spacing”, “recording”, or “AI”.</li>';
+  if (commandList.length) $('#command-input').setAttribute('aria-activedescendant','command-'+commandAt); else $('#command-input').removeAttribute('aria-activedescendant');
+  $('#command-'+commandAt)?.scrollIntoView({block:'nearest'});
+}
+async function openCommandBar({ fromTour = false } = {}) {
+  if (window.samestateChecks?.running) return;
+  if (!fromTour && (tourRunning || window.samestateTourFeatures?.active)) await endTour(false);
+  commandOpener = document.activeElement; $('#command-input').value = ''; $('#command-category').value = ''; commandAt = 0; renderCommands();
+  if (!$('#command-bar').open) $('#command-bar').showModal(); $('#command-input').focus();
+}
+function runCommand(i) {
+  const c = commandList[i]; if (!c) return;
+  // Availability can change while the dialog is open. Resolve the action from the current catalog.
+  const current = commands().find(item => item.id === c.id);
+  if (!current?.available) { commandAt=i; renderCommands(); $('#command-input').focus(); $('#command-message').textContent = current?.reason || 'This feature is no longer available. Search again.'; return; }
+  $('#command-bar').close(); current.run();
+}
+$('#search-tools').addEventListener('click',openCommandBar);
+$('#command-close').addEventListener('click',()=>$('#command-bar').close());
+$('#command-input').addEventListener('input',()=>{commandAt=0;renderCommands();});
+$('#command-category').addEventListener('change',()=>{commandAt=0;renderCommands();$('#command-input').focus();});
+$('#command-input').addEventListener('keydown',event=>{
+  if (event.key==='ArrowDown'||event.key==='ArrowUp') {event.preventDefault();commandAt=(commandAt+(event.key==='ArrowDown'?1:-1)+commandList.length)%Math.max(1,commandList.length);renderCommands();}
+  else if ((event.ctrlKey||event.metaKey)&&['Home','End'].includes(event.key)) {event.preventDefault();commandAt=event.key==='Home'?0:Math.max(0,commandList.length-1);renderCommands();}
+  else if (event.key==='Enter') {event.preventDefault();runCommand(commandAt);}
+});
+$('#command-list').addEventListener('click',event=>{const li=event.target.closest('[data-i]');if(li)runCommand(Number(li.dataset.i));});
+$('#command-bar').addEventListener('close',()=>{if(commandOpener?.isConnected&&document.activeElement===document.body)commandOpener.focus();});
+$('#command-bar').addEventListener('click',event=>{if(event.target===$('#command-bar'))$('#command-bar').close();});
+document.addEventListener('keydown',event=>{
+  const mod=event.metaKey||event.ctrlKey;
+  if(window.samestateChecks?.running&&mod&&['k','f'].includes(event.key.toLowerCase())){event.preventDefault();return;}
+  if(mod&&!event.shiftKey&&event.key.toLowerCase()==='k'){event.preventDefault();if($('#command-bar').open)$('#command-bar').close();else openCommandBar();}
+  else if(mod&&event.shiftKey&&event.key.toLowerCase()==='f'){event.preventDefault();openFind();}
+});
