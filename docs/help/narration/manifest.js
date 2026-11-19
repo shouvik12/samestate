@@ -2,6 +2,7 @@
 window.samestateFeatureHelpNarration = Object.freeze({
   "version": 1,
   "voice": "Kokoro af_heart",
+  "speed": 1.0,
   "clips": [
     {
       "key": "#open-outline",
@@ -3786,7 +3787,15 @@ window.samestateFeatureHelpNarration = Object.freeze({
       "file": "help-37f3f0804f978b.mp3",
       "duration": 8.979,
       "speech": "Workspace portability. Human review · save, reopen, export and import. Select this group to include it in a combined check run."
+    },
+    {
+      "key": "#feature-help-open",
+      "title": "Feature help",
+      "caption": "Open the help browser from the question-mark icon in the top bar. Search for a feature, button or section, choose its explanation, and press Hear explanation for natural voice guidance.",
+      "file": "help-f9463b728bb99f.mp3",
+      "duration": 13.219,
+      "speech": "Feature help. Open the help browser from the question-mark icon in the top bar. Search for a feature, button or section, choose its explanation, and press Hear explanation for natural voice guidance."
     }
   ],
-  "build": "ba0e48161f8f5e75"
+  "build": "a8a84f887e5d35da"
 });

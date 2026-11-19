@@ -43,6 +43,7 @@ def main():
     parser.add_argument('--voice', default='af_heart')
     parser.add_argument('--speed', type=float, default=1.0)
     parser.add_argument('--help-catalog', type=Path, help='Build app-wide help audio from a feature-help JSON catalogue instead.')
+    parser.add_argument('--reuse-existing', action='store_true', help='Reuse existing clips only when voice, speed and spoken text match.')
     args = parser.parse_args()
     source = json.loads((args.help_catalog or ROOT / 'tools/demo-narration.json').read_text())
     if not args.help_catalog:
@@ -54,7 +55,13 @@ def main():
     options.inter_op_num_threads = 1
     session = ort.InferenceSession(str(args.model), sess_options=options, providers=['CPUExecutionProvider'])
     voice = Kokoro.from_session(session, str(args.voices))
-    manifest = {'version': 1, 'voice': f'Kokoro {args.voice}', 'clips': []}
+    manifest = {'version': 1, 'voice': f'Kokoro {args.voice}', 'speed': args.speed, 'clips': []}
+    cached = {}
+    previous = output / 'manifest.js'
+    if args.reuse_existing and previous.exists():
+        old = json.loads(previous.read_text().split('Object.freeze(', 1)[1].rsplit(');', 1)[0])
+        if old.get('voice') == manifest['voice'] and old.get('speed', 1.0) == args.speed:
+            cached = {clip.get('key', clip['file']): clip for clip in old['clips']}
     digest = hashlib.sha256(json.dumps(source, sort_keys=True).encode() + args.voice.encode() + str(args.speed).encode()).hexdigest()[:16]
     manifest['build'] = digest
     built = {}
@@ -65,6 +72,12 @@ def main():
                 caption = item['extensionCaption' if prefix else 'caption']
                 filename = item['extensionFile' if prefix else 'file']
                 text = spoken(item['title'] + '. ' + caption)
+                old = cached.get(item.get('key', item['file']), {})
+                duration_key, speech_key, file_key = ('extensionDuration', 'extensionSpeech', 'extensionFile') if prefix else ('duration', 'speech', 'file')
+                if old.get(file_key) == filename and old.get(speech_key) == text and old.get(duration_key) and (output / filename).is_file():
+                    clip[duration_key], clip[speech_key] = old[duration_key], text
+                    built[filename] = old[duration_key]
+                    continue
                 if filename in built:
                     clip['duration'] = built[filename]
                     clip['speech'] = text

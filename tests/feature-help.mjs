@@ -108,12 +108,21 @@ async function main(){
   record('All tooltip audio files match between extension and web builds',unique.every(f=>{const a=readFileSync(join(ROOT,'help/narration',f)),b=readFileSync(join(ROOT,'../extension/help/narration',f));return a.length>3000&&a.equals(b)}),`${unique.length} audio files`);
   const decoded=await evaluate(`(async()=>{const ctx=new OfflineAudioContext(1,1,44100);let n=0;for(const file of new Set(samestateFeatureHelpNarration.clips.map(c=>c.file))){const response=await fetch('help/narration/'+file);if(!response.ok)throw Error(file);const b=await ctx.decodeAudioData(await response.arrayBuffer());const x=b.getChannelData(0);let peak=0;for(let i=0;i<x.length;i+=160)peak=Math.max(peak,Math.abs(x[i]));if(b.duration<.5||peak<.02)throw Error(file+' is silent');n++;}return n})()`);
   record('Every tooltip voice clip decodes to non-silent audio',decoded===unique.length,`${decoded} decoded clips`);
-  const point=await evaluate(`(()=>{const r=$('#search-tools').getBoundingClientRect();return{x:r.x+10,y:r.y+10}})()`);await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await until("samestateFeatureHelp.get().key==='#search-tools'");
-  record('Hover opens a description without automatically speaking',await evaluate(`!$('#feature-help').hidden && $('#feature-help-text').textContent.includes('Command K') && $('#feature-help-audio').paused`));
+  const point=await evaluate(`(()=>{const r=$('#search-tools').getBoundingClientRect();return{x:r.x+10,y:r.y+10}})()`);await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',...point});await sleep(650);
+  record('Hovering a control leaves help closed',await evaluate(`!samestateFeatureHelp.get().open && $('#feature-help-audio').paused`));
+  await evaluate("$('#search-tools').focus()");await sleep(650);record('Focusing a control leaves help closed',await evaluate('!samestateFeatureHelp.get().open'));
+  await click('#feature-help-open');await until('samestateFeatureHelp.get().browsing');
+  record('Small top-bar icon opens searchable help without speech',await evaluate(`$('#feature-help-open').getAttribute('aria-expanded')==='true' && document.activeElement.id==='feature-help-search' && $('#feature-help-audio').paused && $('#feature-help-hear').disabled`));
+  await evaluate(`$('#feature-help-search').value='no-such-feature-847';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}))`);
+  record('Empty help searches explain how to continue',await evaluate(`!$('#feature-help-results button') && $('#feature-help-count').textContent.includes('No explanations found')`));
+  await evaluate(`$('#feature-help-search').value='Search tools';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}))`);
+  await click('#feature-help-results [data-help-key="#search-tools"]');
+  record('Choosing an explanation does not run its tool',await evaluate(`!$('#command-bar').open && $('#feature-help-text').textContent.includes('Command K') && $('#feature-help-audio').paused && document.activeElement.id==='feature-help-hear'`));
   await click('#feature-help-hear');await until("!$('#feature-help-audio').paused && $('#feature-help-audio').currentTime>.1");
   record('Hear explanation plays real bundled audio',await evaluate(`samestateFeatureHelp.get().playing && $('#feature-help-hear').getAttribute('aria-pressed')==='true'`));
   await click('#feature-help-hear');record('Stop voice stops the explanation',await evaluate(`!samestateFeatureHelp.get().playing && $('#feature-help-audio').paused`));
-  await key('Escape');await sleep(550);record('Escape dismisses help, restores focus and stays closed',await evaluate(`!samestateFeatureHelp.get().open && document.activeElement.id==='search-tools'`));
+  await key('Escape');await sleep(550);record('Escape dismisses help and restores the top-bar icon',await evaluate(`!samestateFeatureHelp.get().open && document.activeElement.id==='feature-help-open' && $('#feature-help-open').getAttribute('aria-expanded')==='false'`));
+  await evaluate("$('#search-tools').focus()");
   await key('F1');record('F1 makes the voice control keyboard reachable',await evaluate(`samestateFeatureHelp.get().open && document.activeElement.id==='feature-help-hear'`));
   await key('Escape');await evaluate("$('#search-tools').click()");await until("$('#command-bar').open");
   await evaluate("samestateFeatureHelp.show($('#command-input'),true)");
@@ -147,6 +156,11 @@ async function main(){
     const fits=await evaluate(`(()=>{const r=$('#feature-help').getBoundingClientRect();return r.width>0&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&$('#feature-help').scrollWidth<=$('#feature-help').clientWidth})()`);if(!fits)throw Error('Tooltip overflow: '+theme+' '+mode+' '+width);layouts++;
    }
   }record('Tooltip text and voice controls fit across themes and window widths',layouts===48,`${layouts} layouts`);
+  await evaluate('samestateFeatureHelp.open()');let browserLayouts=0;
+  for(const width of [320,480,800,1600]){
+   await page.send('Emulation.setDeviceMetricsOverride',{width,height:740,deviceScaleFactor:1,mobile:false});await sleep(80);
+   record('Help browser fits '+width+'px',await evaluate(`(()=>{const p=$('#feature-help'),r=p.getBoundingClientRect();return samestateFeatureHelp.get().browsing&&r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&p.scrollWidth<=p.clientWidth})()`));browserLayouts++;
+  }
   await evaluate(`uiTheme.preview('samestate','dark');samestateFeatureHelp.close()`);await page.send('Emulation.setDeviceMetricsOverride',{width:1600,height:1000,deviceScaleFactor:1,mobile:false});
   await evaluate('startTour();true');await until("tourRunning && tourPhase==='waiting'");await click('#tour-mute');await until("!$('#tour-audio').paused && $('#tour-audio').currentTime>.1");await evaluate("samestateFeatureHelp.show($('#search-tools'),true)");await click('#feature-help-hear');await until('samestateFeatureHelp.get().playing && tourPaused && Number.isFinite($("#feature-help-audio").duration) && !$("#feature-help-audio").paused');
   record('Help narration pauses the demo to avoid competing voices',await evaluate(`$('#tour-audio').paused && samestateFeatureHelp.get().pausedDemo`));
@@ -158,10 +172,15 @@ async function main(){
   await evaluate("samestateFeatureHelp.show($('#search-tools'),true)");await click('#feature-help-hear');await until('samestateFeatureHelp.get().playing');await evaluate("$('#feature-help-audio').src='help/narration/missing.mp3';$('#feature-help-audio').load();true");await until('!samestateFeatureHelp.get().playing');
   record('A missing voice clip recovers to a usable Hear control',await evaluate("$('#feature-help-hear span').textContent==='Hear explanation' && !$('#feature-help-hear').disabled"));
   await click('#feature-help-hear');await until("!$('#feature-help-audio').paused && $('#feature-help-audio').currentTime>.1");record('Voice retry replays the correct explanation',true);await evaluate('samestateFeatureHelp.close()');
-  await evaluate(`$('#device-search').focus();samestateFeatureHelp.close();$('#search-tools').dispatchEvent(new PointerEvent('pointerdown',{pointerId:22,pointerType:'touch',clientX:10,clientY:10,bubbles:true}))`);await sleep(650);await evaluate(`$('#search-tools').dispatchEvent(new PointerEvent('pointerup',{pointerId:22,pointerType:'touch',bubbles:true}));$('#search-tools').click()`);
-  record('Long press reveals help without running the underlying action',await evaluate("samestateFeatureHelp.get().key==='#search-tools' && !$('#command-bar').open"));
+  await click('#feature-help-open');await until('samestateFeatureHelp.get().browsing');await click('#feature-help-open');
+  record('Pressing the top-bar icon again closes help',await evaluate("!samestateFeatureHelp.get().open && $('#feature-help-open').getAttribute('aria-expanded')==='false'"));
+  await click('#feature-help-open');await evaluate(`$('#feature-help-search').value='Feature help';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}))`);await click('#feature-help-results [data-help-key="#feature-help-open"]');await click('#feature-help-hear');await until('samestateFeatureHelp.get().playing');
+  record('The new help icon has its own natural voice explanation',true);
+  await evaluate(`$('#feature-help-search').value='metadata';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}))`);
+  record('A new help search stops the previous voice',await evaluate('!samestateFeatureHelp.get().playing && !samestateFeatureHelp.get().key && $("#feature-help-hear").disabled'));
+  await key('Escape');await click('#search-tools');await until("$('#command-bar').open");record('Normal controls still run their usual action',true);await key('Escape');
   await evaluate('samestateFeatureHelp.close()');await sleep(750);
-  if(process.env.HELP_SCREENSHOT){await evaluate("samestateFeatureHelp.show($('#open-outline'))");await sleep(150);const shot=await page.send('Page.captureScreenshot',{format:'png'});writeFileSync(process.env.HELP_SCREENSHOT,Buffer.from(shot.data,'base64'));}
+  if(process.env.HELP_SCREENSHOT){await evaluate(`samestateFeatureHelp.open();$('#feature-help-search').value='measure';$('#feature-help-search').dispatchEvent(new Event('input',{bubbles:true}));$('#feature-help-results [data-help-key="#open-outline"]').click()`);await sleep(150);const shot=await page.send('Page.captureScreenshot',{format:'png'});writeFileSync(process.env.HELP_SCREENSHOT,Buffer.from(shot.data,'base64'));}
   record('No page errors',errors.length===0,errors.join('; '));
   const failed=results.filter(r=>!r.ok);console.log(`\n${results.length-failed.length}/${results.length} voiced help checks passed`);if(failed.length)process.exitCode=1;
  }finally{page?.ws.close();chrome.kill();server.closeAllConnections();server.close();await sleep(300);rmSync(profile,{recursive:true,force:true});}

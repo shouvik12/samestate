@@ -385,6 +385,17 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke
 /* Feature help is an interactive, non-modal popover so its voice control is keyboard accessible. */
 #feature-help{position:fixed;inset:auto;margin:0;width:min(330px,calc(100vw - 20px));max-height:calc(100dvh - 20px);overflow:auto;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--side);color:var(--text);box-shadow:0 12px 38px color-mix(in srgb,var(--shadow) 45%,transparent);z-index:1000;font-family:inherit;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
 #feature-help[hidden]{display:none}
+#feature-help.help-browser{width:min(420px,calc(100vw - 20px))}
+#feature-help-open{display:grid;place-items:center;align-self:center;flex:none;width:28px;height:28px;border:1px solid var(--line);border-radius:7px;color:var(--mute)}
+#feature-help-open[aria-expanded=true]{color:var(--acc);background:var(--raise)}
+#feature-help-browser[hidden]{display:none}
+#feature-help-browser label{display:block;color:var(--mute);margin:9px 0 5px}
+#feature-help-search{width:100%;min-width:0;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+#feature-help-count{color:var(--mute);font-size:11px}
+#feature-help-results{display:flex;flex-direction:column;gap:3px;max-height:190px;overflow:auto;overscroll-behavior:contain;border-bottom:1px solid var(--line);padding:0 0 8px;margin-bottom:10px}
+#feature-help-results button{flex:none;min-height:34px;border-radius:5px;padding:7px 8px;text-align:left;white-space:normal;overflow-wrap:anywhere;font:inherit;color:var(--text)}
+#feature-help-results button:hover,#feature-help-results button[aria-pressed=true]{background:var(--raise);color:var(--acc)}
+#feature-help input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .feature-help-heading{display:flex;align-items:flex-start;gap:9px}
 #feature-help-title{flex:1;min-width:0;font-size:13px}
 #feature-help-close{flex:none;width:24px;height:24px;border-radius:5px;color:var(--mute);font-size:19px;line-height:1}
