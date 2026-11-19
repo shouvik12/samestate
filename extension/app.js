@@ -1937,11 +1937,24 @@ async function playIntro(id) {
   el.hidden = false; void el.offsetWidth; el.classList.add('playing');
   $('#tour-callout').hidden = true;
   window.samestateTourVoice?.start(INTRO);
-  for (let t = 0; (t < ms || tourPaused) && !introSkipped; t += tourPaused ? 0 : 100) {
+  const voice = () => window.samestateTourVoice?.get() || {};
+  let end = ms, waitedForSound = false;
+  for (let t = 0; (t < end || tourPaused) && !introSkipped; t += tourPaused ? 0 : 100) {
     if (!touring(id)) break;
     el.classList.toggle('paused', tourPaused);
+    const v = voice();
+    $('#tour-intro-sound').hidden = !v.blocked;
+    if (v.blocked) waitedForSound = true;
+    else if (waitedForSound && v.title === INTRO.title && !v.paused) {
+      // The browser held the narration until the visitor clicked; give the intro its full length from here.
+      waitedForSound = false;
+      end = t + ms;
+      const bar = el.querySelector('.tour-intro-progress i');
+      bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+    }
     await sleep(100);
   }
+  $('#tour-intro-sound').hidden = true;
   if (introSkipped || !touring(id)) window.samestateTourVoice?.stop();
   el.classList.add('leaving');
   await sleep(introSkipped ? 0 : 350);
@@ -1950,7 +1963,8 @@ async function playIntro(id) {
   return touring(id);
 }
 $('#tour-intro-skip').addEventListener('click', () => { introSkipped = true; });
-$('#tour-intro').addEventListener('click', event => { if (!event.target.closest('button')) introSkipped = true; });
+// A click on the intro skips it, except the click that turned the sound on.
+$('#tour-intro').addEventListener('click', event => { if (!event.target.closest('button') && Date.now() - (window.samestateTourVoice?.get().unlockedAt || 0) > 1000) introSkipped = true; });
 
 async function startTour(options = {}) {
   if (!tourRunning && (window.samestateChecks?.running || window.samestateTest?.busy || window.wallCapture?.busy || sweepRun || pendingSnap.size)) return;
