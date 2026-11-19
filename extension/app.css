@@ -749,3 +749,16 @@ button.link{color:var(--acc);text-decoration:underline;text-underline-offset:2px
 @keyframes intro-up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes intro-progress{to{transform:scaleX(1)}}
 @media (prefers-reduced-motion:reduce){.tour-intro.playing *{animation:none!important}.tour-intro-progress i{transform:scaleX(1)}.tour-intro{transition:none}}
+/* Start screen: the intro card waits for Start demo (web demo only). */
+.tour-intro:not(.waiting) .tour-intro-start{display:none}
+.tour-intro.waiting .tour-intro-progress,.tour-intro.waiting .tour-intro-skip{display:none}
+.tour-intro-start{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:24px}
+.tour-intro-play{display:inline-flex;align-items:center;gap:9px;padding:12px 26px;border-radius:999px;background:var(--acc);color:var(--on-acc);font-size:17px;font-weight:700;box-shadow:0 8px 26px color-mix(in srgb,var(--acc) 35%,transparent);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+.tour-intro-play svg{width:18px;height:18px;fill:currentColor;stroke:none}
+.tour-intro-play:hover{transform:translateY(-1px);box-shadow:0 10px 30px color-mix(in srgb,var(--acc) 45%,transparent)}
+.tour-intro-play:focus-visible{outline:3px solid var(--text);outline-offset:3px}
+.tour-intro-explore{padding:5px 10px;border-radius:7px;color:var(--mute);font-size:13px}
+.tour-intro-explore:hover{color:var(--text);background:var(--raise)}
+.tour-intro-explore:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tour-intro-note{margin:2px 0 0;color:var(--mute);font-size:12.5px}
+.tour-intro.playing.waiting .tour-intro-start{animation:intro-up .45s ease 1.3s both}

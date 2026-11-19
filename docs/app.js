@@ -1933,7 +1933,7 @@ async function playIntro(id) {
   const ms = Math.min(7000, Math.max(5000, (clip?.duration || 6) * 1000 + 250)) * tourPace;
   introSkipped = false;
   el.style.setProperty('--intro-ms', Math.round(ms) + 'ms');
-  el.classList.remove('leaving', 'paused');
+  el.classList.remove('leaving', 'paused', 'waiting'); // from the start screen, the card is already in place
   el.hidden = false; void el.offsetWidth; el.classList.add('playing');
   $('#tour-callout').hidden = true;
   window.samestateTourVoice?.start(INTRO);
@@ -1961,8 +1961,24 @@ async function playIntro(id) {
   return touring(id);
 }
 $('#tour-intro-skip').addEventListener('click', () => { introSkipped = true; });
+// The web demo opens on the intro card with Start demo. Browsers only play sound after a click, so starting the demo
+// with one means the narration is heard from the first word. The sample site loads behind the card meanwhile.
+function showStartScreen() {
+  const el = $('#tour-intro');
+  el.classList.remove('leaving', 'paused');
+  el.classList.add('waiting');
+  el.hidden = false; void el.offsetWidth; el.classList.add('playing');
+  $('#tour-intro-play').focus({ preventScroll: true });
+  open(DEMO_URL);
+}
+$('#tour-intro-play').addEventListener('click', () => startTour());
+$('#tour-intro-explore').addEventListener('click', () => {
+  const el = $('#tour-intro');
+  el.hidden = true; el.classList.remove('waiting', 'playing');
+  if (!target) open(DEMO_URL);
+});
 // A click on the intro skips it, except the click that turned the sound on.
-$('#tour-intro').addEventListener('click', event => { if (!event.target.closest('button') && Date.now() - (window.samestateTourVoice?.get().unlockedAt || 0) > 1000) introSkipped = true; });
+$('#tour-intro').addEventListener('click', event => { if (!event.target.closest('button') && !$('#tour-intro').classList.contains('waiting') && Date.now() - (window.samestateTourVoice?.get().unlockedAt || 0) > 1000) introSkipped = true; });
 
 async function startTour(options = {}) {
   if (!tourRunning && (window.samestateChecks?.running || window.samestateTest?.busy || window.wallCapture?.busy || sweepRun || pendingSnap.size)) return;
@@ -3096,7 +3112,7 @@ async function openClickedPage(address) {
   $('#joblog').textContent = `Press Enter to open ${url.host}. Chrome asks once for access to the site.`;
 }
 const clickedPage = IS_EXT && new URLSearchParams(location.search).get('open');
-addEventListener('DOMContentLoaded', () => { if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else startTour(); }, { once: true });
+addEventListener('DOMContentLoaded', () => { if (clickedPage) openClickedPage(clickedPage); else if (IS_EXT) openDefault(); else if (/[?&](tour-pace|media)=/.test(location.search)) startTour(); else showStartScreen(); }, { once: true }); // automated runs start the demo themselves
 
 /* ------------------------------ debug menu ------------------------------ */
 // The menu's items and each screen's state are defined near the top of this file (DEBUG_MENU).

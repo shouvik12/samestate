@@ -146,6 +146,12 @@ async function main(){
   await click('#tourcount');if(await evaluate('tourPaused'))await click('#tourpause');await until("!samestateTourVoice.get().failed && !$('#tour-audio').paused && $('#tour-audio').src.includes('click-sync.mp3')");
   record('The next click retries and plays the correct clip',true);
   await click('#skip');await until('!tourRunning && !samestateTourFeatures.active');
+  // A visitor's first view: the start screen, silent until Start demo, whose click lets the narration play from the start.
+  await page.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/`});await until("!!window.samestateTourVoice && $('#tour-intro').classList.contains('waiting')");
+  record('Opening the page shows Start demo and plays nothing yet',await evaluate(`!tourRunning && !$('#tour-intro').hidden && getComputedStyle($('#tour-intro-start')).display!=='none' && $('#tour-audio').paused && document.activeElement===$('#tour-intro-play')`));
+  await click('#tour-intro-play');await until("tourRunning && samestateTourVoice.get().title==='Samestate' && !$('#tour-audio').paused && $('#tour-audio').currentTime>.3");
+  record('Start demo plays the intro narration from the first word',await evaluate(`!samestateTourVoice.get().blocked && $('#tour-audio').src.includes('intro.mp3')`));
+  await click('#skip');await until('!tourRunning && !samestateTourFeatures.active');
   record('No page errors',errors.length===0,errors.join('; '));
   const failed=results.filter(r=>!r.ok);console.log(`\n${results.length-failed.length}/${results.length} narration checks passed`);if(failed.length)process.exitCode=1;
  }finally{page?.ws.close();chrome.kill();server.closeAllConnections();server.close();await sleep(300);rmSync(profile,{recursive:true,force:true});}
