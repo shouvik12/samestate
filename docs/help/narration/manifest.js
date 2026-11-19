@@ -2261,6 +2261,38 @@ window.samestateFeatureHelpNarration = Object.freeze({
       "speech": "Mute demo narration. Turn demo narration off or on. The choice is saved in this browser."
     },
     {
+      "key": "#tour-intro-name",
+      "title": "Samestate demo intro",
+      "caption": "The demo opens with what Samestate is for: test your site on every screen size at once, click once and every device follows, then see what breaks.",
+      "file": "help-b541b196515d56.mp3",
+      "duration": 11.456,
+      "speech": "Same state demo intro. The demo opens with what Same state is for: test your site on every screen size at once, click once and every device follows, then see what breaks."
+    },
+    {
+      "key": "#tour-intro-play",
+      "title": "Start the demo",
+      "caption": "Start the 46-step guided demo with narration. Starting it with a click also lets the browser play the voice from the first word.",
+      "file": "help-58102843ab14c6.mp3",
+      "duration": 9.237,
+      "speech": "Start the demo. Start the 46-step guided demo with narration. Starting it with a click also lets the browser play the voice from the first word."
+    },
+    {
+      "key": "#tour-intro-explore",
+      "title": "Skip the demo and explore",
+      "caption": "Close the intro and use the app on the sample site, without the guided demo.",
+      "file": "help-a05aab61d9cfbd.mp3",
+      "duration": 6.528,
+      "speech": "Skip the demo and explore. Close the intro and use the app on the sample site, without the guided demo."
+    },
+    {
+      "key": "#tour-intro-skip",
+      "title": "Skip the intro",
+      "caption": "End the intro and go straight to the first demo step.",
+      "file": "help-4d3e2391adb98d.mp3",
+      "duration": 4.331,
+      "speech": "Skip the intro. End the intro and go straight to the first demo step."
+    },
+    {
       "key": "#skip",
       "title": "Close the guided demo",
       "caption": "Stop the walkthrough and narration, restore temporary demo settings, and keep the sample site available to explore.",
@@ -3797,5 +3829,5 @@ window.samestateFeatureHelpNarration = Object.freeze({
       "speech": "Feature help. Open the help browser from the question-mark icon in the top bar. Search for a feature, button or section, choose its explanation, and press Hear explanation for natural voice guidance."
     }
   ],
-  "build": "a8a84f887e5d35da"
+  "build": "fdcc069c1d1b6014"
 });
