@@ -1886,6 +1886,7 @@ function updateTourNavigation() {
 }
 
 function showTourLoading(index) {
+  introSkipped = true; // a jump to a step ends the intro
   window.samestateFeatureHelp?.close(false);
   window.samestateTourVoice?.stop();
   tourPhase = 'preparing';
@@ -1923,6 +1924,34 @@ function setTourPaused(paused) {
   updateTourNavigation();
 }
 
+// The demo opens with 5–7 seconds of logo and purpose while the sample site loads behind it. Its length follows the
+// intro narration (clamped to 5–7 s); Pause holds it, and Skip intro, clicking it or a jump to a step ends it.
+const INTRO = { title: 'Samestate' };
+let introSkipped = false;
+async function playIntro(id) {
+  const el = $('#tour-intro'), clip = window.samestateDemoNarration?.clips.find(c => c.title === INTRO.title);
+  const ms = Math.min(7000, Math.max(5000, (clip?.duration || 6) * 1000 + 250)) * tourPace;
+  introSkipped = false;
+  el.style.setProperty('--intro-ms', Math.round(ms) + 'ms');
+  el.classList.remove('leaving', 'paused');
+  el.hidden = false; void el.offsetWidth; el.classList.add('playing');
+  $('#tour-callout').hidden = true;
+  window.samestateTourVoice?.start(INTRO);
+  for (let t = 0; (t < ms || tourPaused) && !introSkipped; t += tourPaused ? 0 : 100) {
+    if (!touring(id)) break;
+    el.classList.toggle('paused', tourPaused);
+    await sleep(100);
+  }
+  if (introSkipped || !touring(id)) window.samestateTourVoice?.stop();
+  el.classList.add('leaving');
+  await sleep(introSkipped ? 0 : 350);
+  el.hidden = true; el.classList.remove('playing', 'leaving', 'paused');
+  if (touring(id)) $('#tour-callout').hidden = false;
+  return touring(id);
+}
+$('#tour-intro-skip').addEventListener('click', () => { introSkipped = true; });
+$('#tour-intro').addEventListener('click', event => { if (!event.target.closest('button')) introSkipped = true; });
+
 async function startTour(options = {}) {
   if (!tourRunning && (window.samestateChecks?.running || window.samestateTest?.busy || window.wallCapture?.busy || sweepRun || pendingSnap.size)) return;
   if (tourRunning) endTour(false);
@@ -1951,12 +1980,14 @@ async function startTour(options = {}) {
   $('#skip').textContent = 'Skip demo';
   $('#tourdots').innerHTML = STEPS.map(() => '<i></i>').join('');
   showTourLoading(index);
+  const intro = index === 0 && !tourManual ? playIntro(id) : null; // plays while the sample site loads
   clearInterval(tourWatch);
   tourWatch = setInterval(placeTour, 120); // the wall scrolls and screens move, so the ring and the message keep up
   renderLeft(); setMode('grid'); $('#panel').hidden = true;
   $('#src').value = ''; await open(DEMO_URL);
   await until(id, () => target && active().length && active().every(d => d.ready), 15000);
-  if (!await nap(id, tourManual ? 150 : 1200)) return;
+  if (intro && !await intro) return;
+  if (!await nap(id, tourManual ? 150 : intro ? 300 : 1200)) return;
   const t = {
     ok: () => touring(id), nap: ms => nap(id, ms), until: (ready, ms) => until(id, ready, ms),
     point: target => tourPoint(id, target), click: target => tourClick(id, target), focus: tourFocus
@@ -2003,6 +2034,7 @@ function endTour(clear) {
   clearInterval(tourWatch);
   tourAnchor = null;
   $('#tour').hidden = $('#tour-callout').hidden = $('#tour-ring').hidden = tourPointer.hidden = true;
+  introSkipped = true; $('#tour-intro').hidden = true;
   $('#frames').classList.remove('tour-glide');
   document.querySelectorAll('.dev.dragging').forEach(el => el.classList.remove('dragging'));
   document.querySelectorAll('.tour-badge').forEach(badge => badge.remove());
@@ -2012,13 +2044,15 @@ function endTour(clear) {
 }
 $('#tourpause').onclick = () => { if (tourPaused) tourManual = false; setTourPaused(!tourPaused); };
 $('#tour-prev').onclick = () => goTourStep(tourStep - 1);
-$('#tour-next').onclick = () => goTourStep(tourStep + 1);
+// During the intro, Next (or the right arrow) ends the intro and starts step 1 instead of jumping past it.
+const introShowing = () => !$('#tour-intro').hidden && !introSkipped;
+$('#tour-next').onclick = () => { if (introShowing()) introSkipped = true; else goTourStep(tourStep + 1); };
 $('#tour-step').addEventListener('input', event => event.stopPropagation());
 $('#tour-step').addEventListener('change', event => { event.stopPropagation(); goTourStep(Number(event.target.value)); });
 $('#tour').addEventListener('keydown', event => {
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.target.closest('select,input,textarea,[contenteditable]')) return;
   const index = event.key === 'ArrowLeft' ? tourStep - 1 : event.key === 'ArrowRight' ? tourStep + 1 : event.key === 'Home' ? 0 : event.key === 'End' ? STEPS.length - 1 : null;
-  if (index !== null) { event.preventDefault(); goTourStep(index); }
+  if (index !== null) { event.preventDefault(); if (event.key === 'ArrowRight' && introShowing()) introSkipped = true; else goTourStep(index); }
 });
 let tourSwipe = null;
 $('#tour').addEventListener('pointerdown', event => { tourSwipe = !event.target.closest('button,select,input,a') && event.button === 0 ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null; });
