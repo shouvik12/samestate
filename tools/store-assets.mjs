@@ -18,7 +18,7 @@ for(const [n,name] of [[1,'sync'],[2,'report'],[3,'checks'],[4,'measure'],[5,'to
 
 // Promo tiles from the motion promo's end card (frame 885 of 900).
 execFileSync(process.execPath,[join(ROOT,'promo/record-motion.mjs'),'--frames','885'],{stdio:'ignore'});
-const card=join(ROOT,'promo/out/motion-frames/still-0885.png');
+const card=join(ROOT,'promo/out/samestate-motion-frames/still-0885.png');
 ff('-i',card,'-vf','crop=1414:900:93:0,scale=440:280:flags=lanczos','-frames:v','1',join(out,'promo-small-440x280.png'));
 ff('-i',card,'-vf','crop=1600:640:0:130,scale=1400:560:flags=lanczos','-frames:v','1',join(out,'promo-marquee-1400x560.png'));
 console.log('Wrote 5 screenshots and 2 promo tiles to store/images/.');

@@ -1,0 +1,236 @@
+<!doctype html>
+<!-- "Samestate for Claude Code": a 75 s narrated tutorial. render(t) draws any moment, so promo/record-motion.mjs
+     can capture it frame by frame: node promo/record-motion.mjs --story promo/tutorial.json
+     The tool output shown is real, captured from the MCP server on the sample site before and after the fix
+     (localhost:8765 is the repository's docs/ folder served locally). Claude's own sentences are written for the video.
+     Open with ?play to preview in real time. -->
+<html lang="en"><head><meta charset="utf-8"><title>Samestate for Claude Code</title>
+<style>
+:root{--bg:#f6f8fc;--ink:#14203d;--mute:#5b6787;--acc:#2f6fe0;--acc2:#6ea8ff;--ok:#12805a;--warn:#e0a020;--bad:#cf2f45;--term:#1b1d23;--tline:#2a2d36}
+*{box-sizing:border-box;margin:0}
+html,body{width:1600px;height:900px;overflow:hidden;background:var(--bg);font-family:system-ui,-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:var(--ink)}
+#stage{position:absolute;inset:0;overflow:hidden}
+#glow{position:absolute;left:50%;top:50%;width:1500px;height:1100px;margin:-550px 0 0 -750px;border-radius:50%;background:radial-gradient(closest-side,rgba(110,168,255,.38),rgba(110,168,255,.08) 60%,transparent)}
+#dots{position:absolute;inset:-40px;background-image:radial-gradient(rgba(47,111,224,.14) 1.4px,transparent 1.6px);background-size:34px 34px}
+.w{display:inline-block;white-space:pre}
+.logo{display:flex;align-items:flex-end;gap:10px}
+.logo i{display:block;border:6px solid var(--acc);border-radius:10px;width:84px;height:62px;transform-origin:50% 100%}
+.logo i:nth-child(2){width:50px;height:88px;border-color:var(--ok)}
+.logo i:nth-child(3){width:30px;height:54px;border-color:var(--warn)}
+#title{position:absolute;left:0;right:0;top:270px;text-align:center}
+#title .logo{justify-content:center;margin-bottom:34px}
+#title h1{font-size:104px;font-weight:800;letter-spacing:-.045em}
+#title h1 b{color:var(--acc)}
+#title p{font-size:36px;color:var(--mute);font-weight:550;margin-top:16px;letter-spacing:-.01em}
+#term{position:absolute;left:56px;top:56px;width:1000px;height:700px;border-radius:18px;background:var(--term);box-shadow:0 40px 90px -24px rgba(20,32,61,.55),0 0 0 1px rgba(255,255,255,.06);overflow:hidden}
+#bar{height:44px;display:flex;align-items:center;gap:9px;padding:0 18px;background:#24272f;border-bottom:1px solid #30343e}
+#bar i{width:13px;height:13px;border-radius:50%;background:#ff5f57}#bar i:nth-child(2){background:#febc2e}#bar i:nth-child(3){background:#28c840}
+#bar span{flex:1;text-align:center;color:#9aa1b2;font:600 15px system-ui;margin-right:57px}
+#body{position:absolute;left:0;right:0;top:44px;bottom:0;padding:18px 26px;overflow:hidden}
+#lines{position:absolute;left:26px;right:26px;top:18px}
+.ln{height:27px;line-height:27px;font:16.5px ui-monospace,"SF Mono",Menlo,monospace;color:#d6d9e0;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.ln.prompt{color:#fff}.ln.prompt b{color:#8fb4ff}
+.ln.ok{color:#5fe0a6}.ln.out{color:#8f96a8}.ln.claude{color:#f2f3f5}.ln.claude b{color:#e8e9ed;font-weight:400}
+.ln.tool{color:#c7b6ff}.ln.tool b{color:#fff}.ln.res{color:#9aa1b2}
+.ln.issue{color:#ff8a98}.ln.issue b{color:#ff8a98}.ln.el{color:#ffd479}.ln.fixed{color:#5fe0a6}
+.ln.del{color:#ff9aa6;background:rgba(207,47,69,.18)}.ln.add{color:#8ff0bf;background:rgba(18,128,90,.25)}
+.ln .dot{color:#d6d9e0}.ln.tool .dot{color:#a993ff}.ln.ok .dot{color:#5fe0a6}
+.caret{display:inline-block;width:10px;height:20px;background:#d6d9e0;vertical-align:-4px;margin-left:2px}
+.glowline{background:rgba(255,212,121,.16);box-shadow:inset 3px 0 0 #ffd479;border-radius:4px}
+#side{position:absolute;left:1090px;top:56px;width:460px;height:700px}
+.step{position:absolute;left:0;top:0;display:flex;align-items:center;gap:14px}
+.step b{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:var(--acc);color:#fff;font-size:26px;font-weight:800}
+.step span{font-size:34px;font-weight:800;letter-spacing:-.03em}
+.card{position:absolute;left:0;width:460px;border-radius:20px;background:#fff;box-shadow:0 24px 60px -18px rgba(20,32,61,.3),0 0 0 1px rgba(20,32,61,.08);padding:22px 26px}
+.card h4{font-size:15px;letter-spacing:.12em;color:var(--mute);font-weight:700;margin-bottom:12px}
+.card p{font-size:23px;line-height:1.35;font-weight:600;letter-spacing:-.01em}
+.card code{font:600 19px ui-monospace,Menlo,monospace;background:#f1f4fa;border-radius:8px;padding:3px 8px;color:var(--acc)}
+.card ul{list-style:none;padding:0}.card li{font:600 20px ui-monospace,Menlo,monospace;padding:7px 0;border-bottom:1px solid #eef1f7}.card li:last-child{border:0}
+.card li small{display:block;font:500 15px system-ui;color:var(--mute);margin-top:2px}
+#phone{position:absolute;left:80px;top:78px;width:300px;height:620px;border-radius:44px;background:#0d1220;padding:12px;box-shadow:0 40px 80px -20px rgba(20,32,61,.55)}
+#phone .scr{position:relative;width:276px;height:596px;border-radius:34px;overflow:hidden;background:#fff url(tutorial/iphone-before.png) top/276px auto no-repeat}
+#mark{position:absolute;left:4px;width:268px;top:216px;height:88px;border:4px solid #ff5d73;border-radius:12px;box-shadow:0 0 0 6px rgba(255,93,115,.25)}
+#marklabel{position:absolute;left:150px;top:540px;width:300px;padding:12px 16px;border-radius:14px;background:#fff;box-shadow:0 20px 40px -12px rgba(20,32,61,.35);font-size:19px;font-weight:650}
+#marklabel code{font:600 17px ui-monospace,Menlo,monospace;color:var(--bad)}
+.diff{font:600 18px ui-monospace,Menlo,monospace;line-height:1.7;white-space:pre}
+.diff .d{color:var(--bad);background:#fde8eb;display:block;border-radius:6px;padding:0 8px}
+.diff .a{color:var(--ok);background:#e3f6ec;display:block;border-radius:6px;padding:0 8px}
+.diff .c{color:var(--mute);display:block;padding:0 8px}
+#count{font-size:120px;font-weight:850;letter-spacing:-.05em;line-height:1}
+#count s{color:#b9c1d4;text-decoration-thickness:6px}
+#count b{color:var(--ok)}
+#cap{position:absolute;left:0;right:0;top:786px;text-align:center}
+#cap span{display:inline-block;max-width:1380px;padding:14px 30px;border-radius:999px;background:rgba(20,32,61,.9);color:#fff;font-size:27px;font-weight:600;letter-spacing:-.01em;box-shadow:0 14px 34px -14px rgba(20,32,61,.5)}
+#end{position:absolute;left:0;right:0;top:170px;text-align:center}
+#end .logo{justify-content:center;margin-bottom:30px}
+#end h1{font-size:96px;font-weight:850;letter-spacing:-.05em}
+#end h1 b{color:var(--acc)}
+#end .cmds{display:inline-flex;flex-direction:column;gap:14px;margin-top:40px;text-align:left}
+#end code{font:600 28px ui-monospace,Menlo,monospace;background:var(--term);color:#fff;border-radius:14px;padding:16px 26px;box-shadow:0 18px 40px -16px rgba(20,32,61,.5)}
+#end code b{color:#8fb4ff;font-weight:600}
+#end .url{display:inline-block;margin-top:34px;font-size:26px;font-weight:650;color:var(--acc);padding:12px 26px;border-radius:999px;background:#fff;box-shadow:0 10px 30px -10px rgba(20,32,61,.3)}
+.ring{position:absolute;left:800px;top:330px;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;border:5px solid var(--acc2)}
+#flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(246,248,252,.12)}#play[hidden]{display:none}
+#play span{font-size:30px;font-weight:750;color:#fff;background:rgba(20,32,61,.88);padding:12px 26px;border-radius:999px;letter-spacing:-.01em}
+</style></head><body>
+<div id="stage">
+ <div id="glow"></div><div id="dots"></div>
+ <div id="title"><div class="logo" id="tl"><i></i><i></i><i></i></div><h1><span class="w">Samestate </span><span class="w">for </span><b class="w">Claude </b><b class="w">Code</b></h1><p>Check every screen size while you code.</p></div>
+ <div id="term"><div id="bar"><i></i><i></i><i></i><span>~/tidepool — claude</span></div><div id="body"><div id="lines"></div></div></div>
+ <div id="side">
+  <div class="step" id="st"><b id="stn">1</b><span id="stt">Install</span></div>
+  <div class="card" id="c-tools" style="top:96px"><h4>THE PLUGIN ADDS</h4><ul>
+   <li>check_responsive<small>What breaks, on which screens, and where</small></li>
+   <li>screenshot<small>Look at any screen</small></li>
+   <li>run_checks<small>Layout, accessibility, meta, speed</small></li>
+   <li>/samestate:check<small>Check, fix and check again</small></li></ul></div>
+  <div class="card" id="c-local" style="top:110px"><h4>WORKS WITH</h4><p>Your local dev server: <code>localhost</code> pages open in a hidden Chrome on your computer.</p></div>
+  <div class="card" id="c-sel" style="top:110px"><h4>EXACT ELEMENT</h4><p>Every finding names its element as a CSS selector: <code>table</code>, <code>#cookies</code>, <code>div.tabs &gt; button</code></p></div>
+  <div class="card" id="c-fix" style="top:330px"><h4>USUAL FIX</h4><p>And the CSS that usually fixes it: <code>overflow-x: auto</code></p></div>
+  <div id="phone"><div class="scr"><div id="mark"></div></div></div>
+  <div id="marklabel"><code>#cookies</code> covers 3 links on iPhone</div>
+  <div class="card" id="c-diff" style="top:110px"><h4>DEMO/STYLE.CSS · PHONES</h4><div class="diff"><span class="c">  .carousel blockquote{…}</span><span class="d">- .tabs button{padding:3px 8px;</span><span class="d">    font-size:11px}</span><span class="a">+ .tabs button{padding:10px 16px;</span><span class="a">    font-size:14px}</span><span class="a">+ table{display:block;max-width:100%;</span><span class="a">    overflow-x:auto}</span></div></div>
+  <div class="card" id="c-count" style="top:110px"><h4>ISSUES ON IPHONE</h4><div id="count"><s>4</s> → <b>2</b></div><p style="margin-top:14px;color:var(--mute);font-size:20px">Sideways scroll and the wide table are gone. The cookie banner and one small toggle are left.</p></div>
+  <div class="card" id="c-skill" style="top:110px"><h4>ONE COMMAND</h4><p><code>/samestate:check</code> checks the page, looks, fixes the source and checks again, then tells you what it changed.</p></div>
+ </div>
+ <div id="cap"><span id="capt"></span></div>
+ <div id="end"><div class="logo" id="el"><i></i><i></i><i></i></div><h1>Samestate <b>for Claude Code</b></h1><br>
+  <div class="cmds"><code id="e1"><b>/plugin</b> marketplace add shouvik12/samestate</code><code id="e2"><b>/plugin</b> install samestate@samestate</code></div><br>
+  <span class="url" id="eu">shouvik12.github.io/samestate</span></div>
+ <div class="ring" id="burst"></div>
+ <div id="flash"></div>
+ <div id="play" hidden><svg viewBox="0 0 120 120" width="150" height="150"><circle cx="60" cy="60" r="56" fill="rgba(20,32,61,.82)"/><path d="M48 36 L88 60 L48 84 Z" fill="#fff"/></svg><span>Watch: Samestate with Claude Code · 75s</span></div>
+</div>
+<script>
+const BEAT=60/128,BAR=BEAT*4,DURATION=75;
+const $=id=>document.getElementById(id);
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),P=(t,a,b)=>clamp((t-a)/(b-a));
+const out3=p=>1-(1-p)**3,in2=p=>p*p,io=p=>p<.5?4*p*p*p:1-(-2*p+2)**3/2,lerp=(a,b,p)=>a+(b-a)*p;
+const back=p=>{const c=1.9;return 1+(c+1)*(p-1)**3+c*(p-1)**2;};
+function st(el,{o=1,x=0,y=0,s=1,r=0,rx=0,ry=0,b=0}={}){el.style.opacity=o;el.style.transform=`translate(${x}px,${y}px) rotateX(${rx}deg) rotateY(${ry}deg) rotate(${r}deg) scale(${s})`;el.style.filter=b>.05?`blur(${b}px)`:'none';}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+// The session. Tool output is real (see the note at the top); "type" lines are typed over `dur` seconds.
+const L=[];
+const at=(t,kind,html,extra={})=>L.push({t,kind,html,...extra});
+const typed=(t,dur,text,prefix='&gt; ')=>L.push({t,kind:'prompt',type:text,dur,prefix});
+// 1 · Install
+typed(6.0,1.4,'/plugin marketplace add shouvik12/samestate');
+at(7.9,'ok','<span class="dot">✔</span> Successfully added marketplace: samestate');
+typed(8.9,1.2,'/plugin install samestate@samestate');
+at(10.6,'ok','<span class="dot">✔</span> Successfully installed plugin: samestate@samestate (scope: user)');
+at(11.8,'out','  Restart Claude Code to load the plugin.');
+// 2 · Ask (a new session after the restart)
+const CLEAR1=15.0;
+at(15.05,'out','claude · ~/tidepool',{after:CLEAR1});
+at(15.1,'out','',{after:CLEAR1});
+typed(15.4,2.4,'Check http://localhost:8765/demo/index.html on iPhone and Desktop and fix what breaks');
+at(18.4,'claude','<span class="dot">⏺</span> I\'ll check the page on both screens with Samestate.');
+at(19.5,'tool','<span class="dot">⏺</span> <b>samestate · check_responsive</b>(url: "http://localhost:8765/demo/index.html", devices: ["iphone", "desktop"])');
+// 3 · Report (real output, condensed to one line per finding)
+at(22.7,'res','  ⎿  Samestate difference report · iPhone 11 Pro (375×812), Desktop (1920×1080)');
+at(23.0,'res','     4 issues · 11 warnings · 13 adaptations');
+at(23.5,'issue','     ISSUE · Page scrolls sideways (+288px) — iPhone 11 Pro');
+at(23.7,'el','       Elements: `table`',{glow:[26.8,32]});
+at(24.1,'issue','     ISSUE · Overlay hides 3 controls — iPhone 11 Pro');
+at(24.3,'el','       Elements: `#cookies`',{glow:[26.8,32]});
+at(24.7,'issue','     ISSUE · Table is wider than its container — iPhone 11 Pro');
+at(24.9,'el','       Elements: `table`',{glow:[26.8,32]});
+at(25.1,'res','       Usually fixed by: display: block; max-width: 100%; overflow-x: auto;',{glow:[29.4,34]});
+at(25.5,'issue','     ISSUE · 3 tap targets under 24px — iPhone 11 Pro');
+at(25.7,'el','       Elements: `div.tabs > button:nth-of-type(1)`, `div.tabs > button:nth-of-type(2)`, `summary`',{glow:[26.8,32]});
+at(26.0,'res','     … 11 warnings (images, cut-off text, text under 12px, tap targets under 40px)');
+// 4 · Look
+at(35.8,'tool','<span class="dot">⏺</span> <b>samestate · screenshot</b>(url: "http://localhost:8765/demo/index.html", devices: ["iphone"])');
+at(36.9,'res','  ⎿  iPhone 11 Pro (375×812) · 1 image');
+// 5 · Fix
+at(43.4,'claude','<span class="dot">⏺</span> The table pushes the page 288px sideways on phones. I\'ll let it scroll');
+at(43.5,'claude','  inside its own box, and make the tab buttons big enough to tap.');
+at(45.3,'tool','<span class="dot">⏺</span> <b>Update</b>(demo/style.css)');
+at(45.9,'res','  ⎿  Updated demo/style.css with 2 additions and 1 removal');
+at(46.2,'out','      83     .carousel blockquote{flex-basis:80vw}');
+at(46.4,'del','      84 -   .tabs button{padding:3px 8px;font-size:11px}');
+at(46.6,'add','      84 +   .tabs button{padding:10px 16px;font-size:14px}');
+at(46.8,'add','      85 +   table{display:block;max-width:100%;overflow-x:auto}');
+at(47.0,'out','      86   }');
+// 6 · Check again (real output after the fix)
+at(54.6,'tool','<span class="dot">⏺</span> <b>samestate · check_responsive</b>(url: "http://localhost:8765/demo/index.html", devices: ["iphone", "desktop"])');
+at(56.2,'res','  ⎿  2 issues · 11 warnings · 15 adaptations');
+at(56.5,'issue','     ISSUE · Overlay hides 3 controls — iPhone 11 Pro · `#cookies`');
+at(56.8,'issue','     ISSUE · 1 tap target under 24px — iPhone 11 Pro · `summary`');
+at(58.3,'claude','<span class="dot">⏺</span> Fixed: the sideways scroll and the wide table, and the tab buttons are');
+at(58.4,'claude','  now big enough. Left: the cookie banner covers 3 links on iPhone, and the');
+at(58.5,'claude','  summary toggle is 20px tall. Want me to fix those too?');
+// 7 · The skill (a fresh prompt)
+const CLEAR2=63.75;
+at(63.8,'out','claude · ~/tidepool',{after:CLEAR2});
+at(63.85,'out','',{after:CLEAR2});
+typed(64.1,1.7,'/samestate:check http://localhost:3000/pricing');
+at(66.3,'out','  Check a web page on phones, tablets and desktops at once with Samestate',{after:CLEAR2});
+at(66.4,'out','  and fix what breaks.',{after:CLEAR2});
+
+const LH=27,ROWS=23;
+function renderTerm(t){
+ const clear=t>=CLEAR2?CLEAR2:t>=CLEAR1?CLEAR1:0;
+ const shown=L.filter(l=>t>=l.t&&l.t>=clear);
+ const rows=shown.map(l=>{
+  let html=l.html,cls=l.kind;
+  if(l.kind==='prompt'){const n=Math.floor(l.type.length*clamp((t-l.t)/l.dur));const typing=t<l.t+l.dur+.35;html=`<b>${l.prefix}</b>${esc(l.type.slice(0,n))}${typing&&Math.floor(t*2.5)%2===0?'<span class="caret"></span>':''}`;}
+  else if(l.kind==='el'||l.kind==='issue'||l.kind==='res'||l.kind==='out'||l.kind==='del'||l.kind==='add')html=esc(l.html).replace(/`([^`]+)`/g,'$1');
+  const g=l.glow&&t>=l.glow[0]&&t<l.glow[1];
+  const o=out3(P(t,l.t,l.t+.18));
+  return `<div class="ln ${cls}${g?' glowline':''}" style="opacity:${o};transform:translateY(${(1-o)*6}px)">${html}</div>`;
+ });
+ // Scroll up a line at a time once the window is full, easing each step.
+ let shift=0;shown.forEach((l,i)=>{if(i>=ROWS)shift+=out3(P(t,l.t,l.t+.2));});
+ $('lines').innerHTML=rows.join('');
+ $('lines').style.transform=`translateY(${-shift*LH}px)`;
+}
+
+const STEPS=[[5.625,'1','Install'],[15,'2','Ask Claude'],[22.5,'3','Read the report'],[35.625,'4','Look'],[43.125,'5','Fix the source'],[54.375,'6','Check again'],[63.75,'★','Or use the skill']];
+const CARDS={'c-tools':[12.2,15],'c-local':[18.2,22.5],'c-sel':[26.8,35.4],'c-fix':[29.4,35.4],'c-diff':[46.4,54.2],'c-count':[56.4,63.6],'c-skill':[66.3,69.2]};
+const CUES=[[.3,5.5,"Here's how to use Samestate with Claude Code."],[5.7,14.8,'Install the plugin with two commands, then restart Claude Code.'],[15.1,22.4,'Ask Claude to check your page. Local dev servers work too.'],[22.6,35.4,'Samestate opens the page on every screen in a hidden Chrome, and reports what breaks, with the exact element and the CSS that usually fixes it.'],[35.7,43,'Claude can look at any screen too, like this iPhone.'],[43.2,54.2,'Then it fixes the cause in your own code. Here, the wide table and the small tab buttons.'],[54.45,63.6,'And it checks again, so you know the fix worked, and what is left.'],[63.85,69.2,'Or type /samestate:check with any address.'],[71.3,74.9,'Samestate, for Claude Code.']];
+
+function render(t){
+ const sinceBeat=t%BEAT,pulse=Math.exp(-sinceBeat/.14)*(t%BAR<BEAT?1:.5);
+ st($('glow'),{o:.5+.35*pulse,s:1+.03*pulse});st($('dots'),{o:.55,x:-(t*8)%34,y:-(t*4)%34});
+ // Title
+ const ti=out3(P(t,.1,.8)),to=in2(P(t,5.1,5.6));
+ st($('title'),{o:ti*(1-to),y:(1-ti)*40-to*40,s:1-to*.05});
+ [...$('tl').children].forEach((i,n)=>{const p=back(P(t,.2+n*.1,.65+n*.1));st(i,{s:lerp(.2,1,p),o:clamp(p*1.4)});});
+ [...$('title').querySelectorAll('h1 .w')].forEach((w,i)=>{const p=out3(P(t,.45+i*.12,.85+i*.12));st(w,{o:p,y:(1-p)*40,b:(1-p)*10});});
+ // Terminal and side panel
+ const tin=out3(P(t,5.625,6.3)),tout=in2(P(t,69.0,69.6));
+ st($('term'),{o:tin*(1-tout),y:(1-tin)*80+tout*40,s:lerp(.94,1,tin)-tout*.04});
+ st($('side'),{o:tin*(1-tout),x:(1-tin)*60});
+ if(t>=5.6&&t<69.7)renderTerm(t);
+ const step=[...STEPS].reverse().find(s=>t>=s[0]);
+ if(step){$('stn').textContent=step[1];$('stt').textContent=step[2];const p=back(P(t,step[0],step[0]+.4));st($('st'),{s:lerp(.85,1,p),o:clamp(p*1.4)});}
+ for(const [id,[a,b]] of Object.entries(CARDS)){const p=out3(P(t,a,a+.45)),q=in2(P(t,b-.3,b));st($(id),{o:p*(1-q),y:(1-p)*40,s:lerp(.96,1,p)});}
+ // Phone with the real screenshot, then the covered links marked
+ const ph=out3(P(t,36.9,37.6)),phq=in2(P(t,42.7,43.1));
+ st($('phone'),{o:ph*(1-phq),y:(1-ph)*90,r:lerp(4,0,ph)});
+ const mk=out3(P(t,38.6,39.0));st($('mark'),{o:mk*(1-phq),s:lerp(1.08,1,mk)});
+ st($('marklabel'),{o:out3(P(t,39.1,39.5))*(1-phq),y:(1-out3(P(t,39.1,39.5)))*16});
+ // Captions follow the narration
+ const cue=CUES.find(c=>t>=c[0]&&t<c[1]);
+ $('capt').textContent=cue?cue[2]:'';
+ const cp=cue?out3(P(t,cue[0],cue[0]+.25))*(1-in2(P(t,cue[1]-.2,cue[1]))):0;
+ st($('cap'),{o:cp,y:(1-cp)*12});
+ // End card: commands, then the logo on the final hit
+ const e=out3(P(t,69.4,70.1));st($('end'),{o:e,y:(1-e)*30});
+ [...$('el').children].forEach((i,n)=>{const p=back(P(t,71.25+n*.08,71.7+n*.08));st(i,{s:lerp(.3,1,p),o:clamp(p*1.4)});});
+ ['e1','e2'].forEach((id,n)=>{const p=out3(P(t,69.8+n*.25,70.3+n*.25));st($(id),{o:p,x:(1-p)*30});});
+ const u=out3(P(t,72.2,72.6));st($('eu'),{o:u,y:(1-u)*14});
+ const r=P(t,71.25,72.2);st($('burst'),{o:t<71.25?0:(1-r)*.9,s:lerp(1,26,out3(r))});
+ $('flash').style.opacity=t<71.25?in2(P(t,70.95,71.25))*.6:.6*(1-out3(P(t,71.25,71.6)));
+}
+// ?poster shows a play button over the frame, for the README thumbnail (tools/readme-media.mjs).
+if(location.search.includes('poster')){$('play').hidden=false;$('cap').hidden=true;}
+window.render=render;window.DURATION=DURATION;
+window.ready=new Promise(done=>{const i=new Image();i.onload=i.onerror=done;i.src='tutorial/iphone-before.png';}).then(()=>document.fonts.ready);
+render(0);
+if(location.search.includes('play')){const a=new Audio('out/tutorial-soundtrack.wav');const s=performance.now();a.play().catch(()=>{});(function f(){render(((performance.now()-s)/1000)%DURATION);requestAnimationFrame(f);})();}
+</script>
+</body></html>

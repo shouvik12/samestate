@@ -21,6 +21,8 @@ claude mcp add samestate -- node /path/to/samestate/mcp/server.mjs
 
 Any other MCP client that runs local stdio servers takes the same command: `node /path/to/samestate/mcp/server.mjs`.
 
+A 75-second tutorial video shows it in use: https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4
+
 ## Tools
 
 | Tool | Arguments | Returns |

@@ -30,6 +30,6 @@ try{
 // The narrated app walkthrough stays as samestate-demo.mp4 (and the GIF). The README's 30s video is the motion promo
 // from promo/record-motion.mjs, copied when it has been rendered.
 copyFileSync(video,join(out,'samestate-demo.mp4'));
-for(const [from,file] of [['samestate-motion.mp4','samestate-promo.mp4'],['samestate-motion-portrait.mp4','samestate-promo-mobile.mp4']])if(existsSync(join(ROOT,'promo/out',from)))copyFileSync(join(ROOT,'promo/out',from),join(out,file));
+for(const [from,file] of [['samestate-motion.mp4','samestate-promo.mp4'],['samestate-motion-portrait.mp4','samestate-promo-mobile.mp4'],['samestate-claude-code.mp4','samestate-claude-code.mp4']])if(existsSync(join(ROOT,'promo/out',from)))copyFileSync(join(ROOT,'promo/out',from),join(out,file));
 execFileSync(FFMPEG,['-y','-loglevel','error','-i',video,'-filter_complex','[0:v]setpts=0.5*PTS,fps=8,scale=960:540:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle','-an','-loop','0',join(out,'samestate-demo.gif')]);
 console.log('Updated banner, link card, nine screenshots, 15s GIF, walkthrough video and the motion promo videos.');
