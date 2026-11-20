@@ -350,6 +350,39 @@ In GitHub Actions, run it after the preview deploy and attach the folder as an a
   with: { name: samestate-report, path: samestate-report }
 ```
 
+## Use it from Claude Code
+
+Samestate also works as a tool for AI assistants. Its MCP server (`mcp/server.mjs`) lets Claude open a page on every
+screen size, read the difference report and look at screenshots, so it can fix a layout and check it again. It runs on
+your computer, started by Claude Code when needed: there is no server to host, and `localhost` pages work.
+It needs Node 22 or later and Google Chrome.
+
+Install it as a Claude Code plugin from this repository:
+
+```
+/plugin marketplace add shouvik12/samestate
+/plugin install samestate@samestate
+```
+
+Or add only the MCP server from a checkout:
+
+```
+claude mcp add samestate -- node /path/to/samestate/mcp/server.mjs
+```
+
+Then ask, for example, “check http://localhost:3000 on phones and fix what breaks”, or run `/samestate:check <url>`.
+
+| Tool | What it does |
+|------|--------------|
+| `check_responsive` | Opens the page on the chosen screens (the seven starters by default) and returns the difference report grouped by problem, with the affected screens and the CSS that usually fixes it |
+| `screenshot` | One screenshot per screen, at the screen's own width (up to 900px) |
+| `run_checks` | The automated check groups (layout, accessibility, meta, performance, links; optionally the width sweep and screen settings) with pass, warning or fail |
+| `list_devices` | Every screen id and size, for the `devices` and `reference` options |
+
+The server loads the extension from `extension/` in a hidden Chrome with its own temporary profile, so the checks are
+the app's own. That profile has access to http and https sites because nobody is there to answer Chrome's prompt; it
+holds none of your sign-ins and is deleted when the server stops. Details: [`mcp/README.md`](mcp/README.md).
+
 ## Search every tool and feature
 
 Press **Search tools** in the toolbar, or **⌘K / Ctrl+K**, to open one lookup for Samestate's features. Search by name or purpose: try **metadata**, **spacing**, **recording**, **best practices**, **PDF**, **OpenRouter**, or **where can I find meta data**. Minor spelling mistakes are tolerated, and exact tool names rank first.
@@ -475,7 +508,7 @@ tests/testrun.mjs Writes a test with a stand-in AI service in the extension, rep
 tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
 ```
 
-Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, plays all 46 demo steps, and runs on every push and pull request to `main`. `node tests/tool-search.mjs` checks the lookup, ranking, keyboard navigation, availability, discoverability and field-value exclusions. `node tests/outline.mjs` checks outlines, measurements, overlays, safe picking and privacy. `node tests/checks.mjs` checks the grouped UI workflow, review decisions, exports, missing measurements and cancellation. `node tests/testrun.mjs` checks test runs in the extension, with a stand-in for the AI service, and needs no key.
+Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, plays all 46 demo steps, and runs on every push and pull request to `main`. `node tests/tool-search.mjs` checks the lookup, ranking, keyboard navigation, availability, discoverability and field-value exclusions. `node tests/outline.mjs` checks outlines, measurements, overlays, safe picking and privacy. `node tests/checks.mjs` checks the grouped UI workflow, review decisions, exports, missing measurements and cancellation. `node tests/testrun.mjs` checks test runs in the extension, with a stand-in for the AI service, and needs no key. `node tests/mcp.mjs` checks the MCP server over its stdio protocol against the sample site.
 
 `node tests/tour-navigation.mjs` checks Previous/Next, direct jumps, keyboard navigation, swipes, interrupted work and saved preferences against the live demo scenes. `node tests/tour-cleanup.mjs` checks that Skip and manual tool takeover restore the tester’s previous state.
 
@@ -551,6 +584,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Claude Code plugin and MCP server**: AI assistants can check a page on every screen size with the extension's own checks, in a hidden Chrome on your computer: difference report with fix CSS, screenshots per screen, combined checks and the screen list; `localhost` works; install with `/plugin marketplace add shouvik12/samestate`, plus a `/samestate:check` skill ([details](changelogs/CHANGELOG-mcp-plugin.md)) |
 | **2026-11-20** | | | **Motion promo video**: a new 30-second video in a motion-graphics style (kinetic words, tilted real app screens, a camera that pushes into the report) on the same 128 BPM music, with new words on its beats; a 1080×1920 mobile version; the README links both, and the narrated walkthrough stays as its own video ([details](changelogs/CHANGELOG-motion-promo.md)) |
 | **2026-11-19** | | | **Start demo button**: the live demo opens on the intro card with Start demo, so its narration plays from the first word (browsers block sound until a click); Skip demo and explore opens the app; the sample site loads behind the card ([details](changelogs/CHANGELOG-start-demo-button.md)) |
 | **2026-11-19** | | | **Video opens with the demo intro**: the narrated 30-second video and the README GIF now start with the app's own intro (logo, tagline, purpose, chips) instead of a separate title card; screenshots, banner and link card re-recorded ([details](changelogs/CHANGELOG-promo-demo-intro.md)) |
