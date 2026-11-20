@@ -1,0 +1,13 @@
+{
+  "name": "samestate",
+  "owner": { "name": "shouvik12", "url": "https://github.com/shouvik12" },
+  "metadata": { "description": "Samestate: test your site on every screen size at once." },
+  "plugins": [
+    {
+      "name": "samestate",
+      "source": "./",
+      "description": "Check a page on every screen size at once: difference report, combined checks and screenshots, locally in a hidden Chrome.",
+      "category": "development"
+    }
+  ]
+}
