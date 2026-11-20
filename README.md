@@ -8,6 +8,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
   <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
+  <a href="#use-it-from-chatgpt-desktop-and-codex">Use with ChatGPT</a> ·
   <a href="#samestate-with-claude-code--demo">Use with Claude Code</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial">75s video</a>) ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
@@ -356,6 +357,29 @@ In GitHub Actions, run it after the preview deploy and attach the folder as an a
   with: { name: samestate-report, path: samestate-report }
 ```
 
+## Use it from ChatGPT Desktop and Codex
+
+The same Samestate plugin provides responsive checks and per-screen screenshots in local ChatGPT Desktop and Codex chats. It runs a hidden Chrome on your computer, so your `localhost` development sites work. Install **Node 22 or later**, **Google Chrome** and a current **Codex CLI with plugin support** on the computer running the chat.
+
+Run these commands in a terminal:
+
+```bash
+codex plugin marketplace add shouvik12/samestate
+codex plugin add samestate@samestate
+```
+
+Check that the plugin is listed:
+
+```bash
+codex plugin list --marketplace samestate
+```
+
+Restart ChatGPT Desktop, open **Plugins** and find **Samestate**, then start a new **local Work or Codex chat**. Select `@Samestate` when the plugin picker is available. Start your site's development server and ask, for example:
+
+> Use Samestate to check http://localhost:3000 on iPhone and Desktop. Show the layout issues and take a screenshot of each screen.
+
+The existing Claude-compatible marketplace and plugin are reused. This local stdio integration needs desktop execution; using the tools from ChatGPT in a browser requires a remote MCP integration. Plugin availability also depends on your client version and workspace settings. See OpenAI's [plugin packaging and marketplace guide](https://developers.openai.com/plugins/build/plugins) and [desktop-only MCP guidance](https://developers.openai.com/plugins/deploy/desktop-only), plus the [Samestate MCP setup guide](mcp/README.md#chatgpt-desktop-and-codex).
+
 ## Use it from Claude Code
 
 Samestate also works as a tool for AI assistants. Its MCP server (`mcp/server.mjs`) lets Claude open a page on every
@@ -599,6 +623,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **ChatGPT Desktop installation**: terminal commands to add the Samestate marketplace, install and list the plugin, plus local chat setup, requirements and a usage example ([details](changelogs/CHANGELOG-chatgpt-install.md)) |
 | **2026-11-20** | | | **Claude Code tutorial video**: a 75-second narrated video on using Samestate from Claude Code (install, ask, report with selectors, screenshot, fix, check again), with captions and the Samestate music looped on its bars; the tool output in it is real; linked from the README ([details](changelogs/CHANGELOG-claude-code-tutorial.md)) |
 | **2026-11-20** | | | **Plugin everywhere**: the demo's last step and the video's end card mention the Claude Code plugin; How it works covers the MCP server; the GIF, screenshots, banner, card and walkthrough are re-recorded; README media links use a new cache key; a Chrome Web Store listing with images is in `store/` ([details](changelogs/CHANGELOG-plugin-everywhere.md)) |
 | **2026-11-20** | | | **README links the Claude Code plugin**: the links under the title include "Use with Claude Code", which jumps to the install steps ([details](changelogs/CHANGELOG-readme-claude-code-link.md)) |

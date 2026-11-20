@@ -6,12 +6,39 @@ Needs Node 22 or later and Google Chrome (or set `CHROME_PATH`, for example to C
 
 ## Install
 
+### ChatGPT Desktop and Codex
+
+With a current Codex CLI that supports plugins, run in a terminal:
+
+```bash
+codex plugin marketplace add shouvik12/samestate
+codex plugin add samestate@samestate
+```
+
+Verify the installation:
+
+```bash
+codex plugin list --marketplace samestate
+```
+
+Restart ChatGPT Desktop, open **Plugins** and find **Samestate**, then start a new **local Work or Codex chat**. Select `@Samestate` when the plugin picker is available. With your site's development server running, ask:
+
+> Use Samestate to check http://localhost:3000 on iPhone and Desktop. Show the layout issues and take a screenshot of each screen.
+
+Node 22+ and Chrome must be installed on the computer running the local chat. The existing Claude-compatible marketplace and plugin configuration supply the same four tools listed below. This stdio server runs locally; connecting the tools to ChatGPT in a browser requires a remote MCP integration. Availability depends on client version and workspace settings.
+
+References: OpenAI's [plugin packaging and marketplace guide](https://developers.openai.com/plugins/build/plugins) and [desktop-only MCP guidance](https://developers.openai.com/plugins/deploy/desktop-only).
+
+### Claude Code
+
 As a Claude Code plugin (adds the server and the `/samestate:check` skill):
 
 ```
 /plugin marketplace add shouvik12/samestate
 /plugin install samestate@samestate
 ```
+
+### Local MCP server only
 
 Only the server, from a checkout of this repository:
 
