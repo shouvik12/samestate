@@ -8,7 +8,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
   <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
-  <a href="#use-it-from-claude-code">Use with Claude Code</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial">75s video</a>) ·
+  <a href="#samestate-with-claude-code--demo">Use with Claude Code</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial">75s video</a>) ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
@@ -22,6 +22,11 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261120-plugin" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
 <p align="center">The animated preview is silent. Watch the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile version</a>), the <a href="https://shouvik12.github.io/samestate/media/samestate-demo.mp4?v=20261120-plugin">narrated walkthrough</a>, or try the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
+
+## Samestate with Claude Code — demo
+
+<p align="center"><a href="https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial"><img src="docs/media/claude-code-video.png?v=20261120-tutorial" alt="Play the 75-second video: Claude Code checks a page with Samestate, reads the report with each element's CSS selector, fixes the CSS and checks again" width="900"></a></p>
+<p align="center">Claude Code checks a page on iPhone and Desktop with Samestate, reads which element breaks, looks at a screenshot, fixes the CSS and checks again (4 issues → 2). <a href="#use-it-from-claude-code">Install the plugin</a> in two commands.</p>
 
 ## Why Samestate
 

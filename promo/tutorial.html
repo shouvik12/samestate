@@ -71,6 +71,8 @@ html,body{width:1600px;height:900px;overflow:hidden;background:var(--bg);font-fa
 #end .url{display:inline-block;margin-top:34px;font-size:26px;font-weight:650;color:var(--acc);padding:12px 26px;border-radius:999px;background:#fff;box-shadow:0 10px 30px -10px rgba(20,32,61,.3)}
 .ring{position:absolute;left:800px;top:330px;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;border:5px solid var(--acc2)}
 #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#play{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(246,248,252,.12)}#play[hidden]{display:none}
+#play span{font-size:30px;font-weight:750;color:#fff;background:rgba(20,32,61,.88);padding:12px 26px;border-radius:999px;letter-spacing:-.01em}
 </style></head><body>
 <div id="stage">
  <div id="glow"></div><div id="dots"></div>
@@ -98,6 +100,7 @@ html,body{width:1600px;height:900px;overflow:hidden;background:var(--bg);font-fa
   <span class="url" id="eu">shouvik12.github.io/samestate</span></div>
  <div class="ring" id="burst"></div>
  <div id="flash"></div>
+ <div id="play" hidden><svg viewBox="0 0 120 120" width="150" height="150"><circle cx="60" cy="60" r="56" fill="rgba(20,32,61,.82)"/><path d="M48 36 L88 60 L48 84 Z" fill="#fff"/></svg><span>Watch: Samestate with Claude Code · 75s</span></div>
 </div>
 <script>
 const BEAT=60/128,BAR=BEAT*4,DURATION=75;
@@ -223,6 +226,8 @@ function render(t){
  const r=P(t,71.25,72.2);st($('burst'),{o:t<71.25?0:(1-r)*.9,s:lerp(1,26,out3(r))});
  $('flash').style.opacity=t<71.25?in2(P(t,70.95,71.25))*.6:.6*(1-out3(P(t,71.25,71.6)));
 }
+// ?poster shows a play button over the frame, for the README thumbnail (tools/readme-media.mjs).
+if(location.search.includes('poster')){$('play').hidden=false;$('cap').hidden=true;}
 window.render=render;window.DURATION=DURATION;
 window.ready=new Promise(done=>{const i=new Image();i.onload=i.onerror=done;i.src='tutorial/iphone-before.png';}).then(()=>document.fonts.ready);
 render(0);
