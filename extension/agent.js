@@ -1592,7 +1592,12 @@
     snapMap = new Map();
     const mediaUnder = new Map();
     const de = document.documentElement, vw = de.clientWidth, items = [], textTasks = [];
-    const reg = (key, el) => { if (!snapMap.has(key)) snapMap.set(key, []); snapMap.get(key).push(el); };
+    // Numbered keys (ov|0, fx|1 …) also get the element's path, so tools outside the page can find the element.
+    const keyPaths = {};
+    const reg = (key, el) => {
+      if (!snapMap.has(key)) { snapMap.set(key, []); const path = elementPath(el); if (path && key.slice(key.indexOf('|') + 1) !== path) keyPaths[key] = path; }
+      snapMap.get(key).push(el);
+    };
     const push = (cat, el, extra) => {
       if (items.length >= 1800) return;
       const key = cat + '|' + elementPath(el);
@@ -1696,7 +1701,7 @@
     // Chrome stops drawing some previews that are out of view, and records no paints or shifts for them meanwhile.
     const drawn = await new Promise(done => { const timer = setTimeout(() => done(false), 300); requestAnimationFrame(() => { clearTimeout(timer); done(true); }); });
     return {
-      vw, docW: de.scrollWidth, metaViewport: !!document.querySelector('meta[name=viewport]'),
+      vw, docW: de.scrollWidth, keyPaths, metaViewport: !!document.querySelector('meta[name=viewport]'),
       lang: !!de.getAttribute('lang')?.trim(), zoomBlocked: zoomBlocked(), links,
       meta: pageMeta(), outline: outlineFacts(reg), errors: errorsNow(),
       vitals: { lcp: Math.round(vitals.lcp), cls: Math.round(vitals.cls * 1000) / 1000, inp: Math.round(vitals.inp), shifted, drawn },

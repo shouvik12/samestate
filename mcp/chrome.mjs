@@ -11,6 +11,34 @@ import {fileURLToPath} from 'node:url';
 export const EXTENSION=resolve(dirname(fileURLToPath(import.meta.url)),'../extension');
 const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 
+// Runs inside a screen's page: turns Samestate's element paths (child positions from <body>, "2.1.3") into short CSS
+// selectors that match one element, so an assistant can find the element in the source. Ids and class names that look
+// generated (long digit runs, CSS-in-JS prefixes) are skipped.
+const SELECTORS=`paths=>{
+ const at=path=>{let el=document.body;if(!path)return el;for(const n of path.split('.')){el=el&&el.children[Number(n)-1];if(!el)return null;}return el;};
+ const unique=sel=>{try{return document.querySelectorAll(sel).length===1;}catch{return false;}};
+ const generated=name=>/\\d{3,}|^(css|sc|jsx|svelte|emotion|tw)-|^[a-z]{1,3}[A-Z0-9][a-zA-Z0-9]{4,}$/.test(name);
+ const part=el=>{
+  if(el.id&&!generated(el.id)&&unique('#'+CSS.escape(el.id)))return '#'+CSS.escape(el.id);
+  let sel=el.localName+[...el.classList].filter(c=>!generated(c)).slice(0,2).map(c=>'.'+CSS.escape(c)).join('');
+  const parent=el.parentElement;
+  if(parent){const same=[...parent.children].filter(x=>x.localName===el.localName);if(same.length>1)sel+=':nth-of-type('+(same.indexOf(el)+1)+')';}
+  return sel;
+ };
+ const out={};
+ for(const path of paths){
+  const el=at(path);if(!el){out[path]=null;continue;}
+  if(el===document.body){out[path]='body';continue;}
+  let sel='';
+  for(let node=el,depth=0;node&&node!==document.body&&depth<6;node=node.parentElement,depth++){
+   const p=part(node);sel=sel?p+' > '+sel:p;
+   if(unique(sel))break;
+  }
+  out[path]=sel.length>160?sel.slice(sel.length-160).replace(/^[^>]*> /,''):sel;
+ }
+ return out;
+}`;
+
 const CHROME_PATHS={
  darwin:['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome','/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing','/Applications/Chromium.app/Contents/MacOS/Chromium'],
  linux:['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/usr/bin/chromium-browser','/snap/bin/chromium'],
@@ -47,6 +75,12 @@ export class Samestate{
   });
   chrome.on('exit',()=>{for(const {fail} of pending.values())fail(Error('Chrome closed'));pending.clear();this.session=null;});
   this.send=(method,params={},sessionId)=>new Promise((done,fail)=>{const id=++next;pending.set(id,{done,fail});chrome.stdio[3].write(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})})+'\0');});
+  // Each screen's page runs in its own frame process; its DevTools session is kept by frame id to read element selectors.
+  this.frames=new Map();
+  this.events.push(message=>{
+   if(message.method==='Target.attachedToTarget'&&message.params.targetInfo.type==='iframe')this.frames.set(message.params.targetInfo.targetId,message.params.sessionId);
+   if(message.method==='Target.detachedFromTarget')for(const [frame,session] of this.frames)if(session===message.params.sessionId)this.frames.delete(frame);
+  });
   const {id}=await this.send('Extensions.loadUnpacked',{path:ext});
   this.base=`chrome-extension://${id}/app.html`;
   const {targetId}=await this.send('Target.createTarget',{url:'about:blank'});
@@ -54,6 +88,7 @@ export class Samestate{
   this.session=sessionId;
   await this.send('Emulation.setDeviceMetricsOverride',{width:4000,height:2400,deviceScaleFactor:1,mobile:false},sessionId);
   await this.send('Runtime.enable',{},sessionId);
+  await this.send('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:false,flatten:true},sessionId);
   this.log('Chrome ready with the Samestate extension '+manifest.version);
  }
 
@@ -93,6 +128,20 @@ export class Samestate{
   return this.evaluate(`({url:previewUrl,reference:document.querySelector('#ref').value,screens:active().map(d=>({id:d.id,name:screenName(d),width:d.w,height:d.h,ready:!!d.ready}))})`);
  }
 
+ // Element paths on one screen → CSS selectors, read inside that screen's frame. Empty when the frame can't be reached.
+ async selectors(deviceId,paths){
+  if(!paths.length)return {};
+  try{
+   const {result}=await this.send('Runtime.evaluate',{expression:`active().find(d=>d.id===${JSON.stringify(deviceId)})?.iframe`},this.session);
+   if(!result?.objectId)return {};
+   const {node}=await this.send('DOM.describeNode',{objectId:result.objectId},this.session);
+   const frame=this.frames.get(node.frameId);
+   if(!frame)return {};
+   const reply=await this.send('Runtime.evaluate',{expression:`(${SELECTORS})(${JSON.stringify(paths)})`,returnByValue:true},frame);
+   return reply.result?.value||{};
+  }catch(error){this.log('Selectors unavailable on '+deviceId+': '+error.message);return {};}
+ }
+
  listDevices(){return this.run(async()=>{
   await this.start();
   if(!await this.evaluate("typeof DEVICES!=='undefined'").catch(()=>false)){await this.send('Page.navigate',{url:this.base},this.session);await this.until("typeof DEVICES!=='undefined'",15000);}
@@ -102,13 +151,28 @@ export class Samestate{
  differences(url,options={}){return this.run(async()=>{
   const opened=await this.open(url,options);
   if(options.links)await this.evaluate("document.querySelector('#check-links').checked=true");
+  // detect() is the app's own report; its snapshots are kept on the way through, for the element paths they carry.
+  await this.evaluate(`(()=>{if(!window.mcpAnalyze){window.mcpAnalyze=analyze;analyze=(snaps,ref)=>{window.mcpSnaps=snaps;return mcpAnalyze(snaps,ref);};}window.mcpSnaps=[];})()`);
   await this.evaluate('detect(true)');
   const report=await this.evaluate(`(()=>{
    const fixCss=k=>FIX_CSS[k]?Object.entries(FIX_CSS[k]).map(([p,v])=>p+': '+v+';').join(' '):null;
    const advice=k=>(FIX_ADVICE.find(([start])=>k.startsWith(start))||[])[1]||null;
-   return {findings:findings.map(f=>({severity:{issue:'issue',warn:'warning',info:'adaptation'}[f.sev]||f.sev,category:f.cat,kind:f.kind,screen:screenName(f.dev),title:f.title,detail:f.detail,fixCss:fixCss(f.kind),advice:advice(f.kind)})),
+   return {keyPaths:Object.fromEntries((window.mcpSnaps||[]).map(s=>[s.dev.id,s.data.keyPaths||{}])),findings:findings.map(f=>({severity:{issue:'issue',warn:'warning',info:'adaptation'}[f.sev]||f.sev,category:f.cat,kind:f.kind,screen:screenName(f.dev),device:f.dev.id,keys:f.keys||[],title:f.title,detail:f.detail,fixCss:fixCss(f.kind),advice:advice(f.kind)})),
     unmeasured:(lastScan?.missing||[]).map(screenName)};
   })()`);
+  // Keys are "category|path"; only element paths (digits and dots) can be turned into selectors.
+  // Keys are "category|path", or numbered ("ov|0") with the path in that screen's keyPaths.
+  const pathOf=(device,key)=>{const known=report.keyPaths[device]?.[key];if(known!==undefined)return known;const path=String(key).slice(String(key).indexOf('|')+1);return /^(\d+(\.\d+)*)?$/.test(path)?path:null;};
+  const byDevice=new Map();
+  for(const f of report.findings)for(const key of f.keys){const path=pathOf(f.device,key);if(path!==null){if(!byDevice.has(f.device))byDevice.set(f.device,new Set());byDevice.get(f.device).add(path);}}
+  const resolved=new Map();
+  for(const [device,paths] of byDevice)resolved.set(device,await this.selectors(device,[...paths]));
+  for(const f of report.findings){
+   const map=resolved.get(f.device)||{};
+   f.elements=[...new Set(f.keys.map(key=>pathOf(f.device,key)).filter(p=>p!==null).map(p=>map[p]).filter(Boolean))];
+   delete f.keys;
+  }
+  delete report.keyPaths;
   return {...opened,...report};
  });}
 
@@ -128,7 +192,9 @@ export class Samestate{
   if(!opened.screens.some(s=>s.ready))throw Error(`${opened.url} did not load on any screen within 30 seconds. Check that the address is right and its server is running.`);
   const shots=[];
   // The wall shows each screen scaled down (a desktop at about 30%), so each one is shown at 100% while it is captured.
-  for(const screen of opened.screens){
+  const order=options.devices||[];
+  const screens=[...opened.screens].sort((a,b)=>(order.indexOf(a.id)+1||99)-(order.indexOf(b.id)+1||99));
+  for(const screen of screens){
    if(!screen.ready)continue;
    const pick=`active().find(x=>x.id===${JSON.stringify(screen.id)})`;
    await this.evaluate(`(()=>{const d=${pick};d.mcpScale=d.scaleOverride;d.scaleOverride=1;layout(d);})()`);
