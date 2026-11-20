@@ -31,6 +31,19 @@ def main():
     output = HERE / 'out'; output.mkdir(exist_ok=True)
     if not (output / 'music.wav').exists():
         subprocess.run([sys.executable, str(HERE / 'music.py'), str(output / 'music.wav')], check=True)
+    music_file = output / story.get('music', 'music.wav')
+    if 'musicLoop' in story:
+        # A longer bed from the same track: the intro, a bar-aligned section repeated, then the ending.
+        loop = story['musicLoop']
+        base, base_rate = sf.read(output / 'music.wav')
+        cut = lambda a, b: base[int(a * base_rate):int(b * base_rate)]
+        parts = [cut(*loop['intro'])] + [cut(*loop['loop'])] * loop['times'] + [cut(*loop['outro'])]
+        fade = int(.012 * base_rate)  # a short crossfade at each join keeps decaying notes from clicking
+        bed = parts[0]
+        for part in parts[1:]:
+            ramp = np.linspace(0, 1, fade)[:, None] if bed.ndim == 2 else np.linspace(0, 1, fade)
+            bed = np.concatenate([bed[:-fade], bed[-fade:] * (1 - ramp) + part[:fade] * ramp, part[fade:]])
+        sf.write(music_file, bed, base_rate)
     options = ort.SessionOptions(); options.intra_op_num_threads = 4; options.inter_op_num_threads = 1
     model = Kokoro.from_session(ort.InferenceSession(args.model, sess_options=options, providers=['CPUExecutionProvider']), args.voices)
     rate = 24000
@@ -54,7 +67,7 @@ def main():
         voice_path = output / 'voice.wav'; music_path = temp / 'music.wav'
         def run(*parts): subprocess.run([args.ffmpeg, '-y', '-loglevel', 'error', *map(str, parts)], check=True)
         run('-i', raw, '-af', 'highpass=f=70,loudnorm=I=-18:TP=-2:LRA=7', '-ar', 48000, '-ac', 2, voice_path)
-        run('-i', output / 'music.wav', '-ar', 48000, '-ac', 2, music_path)
+        run('-i', music_file, '-ar', 48000, '-ac', 2, music_path)
         voice, sr = sf.read(voice_path); music, _ = sf.read(music_path)
         n = min(len(voice), len(music)); voice, music = voice[:n], music[:n]
         gain = np.ones(n)

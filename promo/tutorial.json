@@ -1,0 +1,21 @@
+{
+  "duration": 75,
+  "voice": "af_heart",
+  "page": "tutorial.html",
+  "output": "samestate-claude-code",
+  "soundtrack": "tutorial-soundtrack.wav",
+  "music": "tutorial-music.wav",
+  "musicLoop": {"intro": [0, 7.5], "loop": [7.5, 22.5], "times": 4, "outro": [22.5, 30]},
+  "note": "How to use Samestate with Claude Code, 75 s. The music is promo/music.py's track with bars 5-12 played four times (same tempo, 128 BPM). Every cue starts on a bar (1.875 s). The tool output shown in promo/tutorial.html is real: captured from the MCP server on the sample site before and after the fix.",
+  "cues": [
+    {"start": 0.3,     "duration": 5.2,  "voice": "Here's how to use Samestate with Claude Code."},
+    {"start": 5.7,     "duration": 9.2,  "voice": "Install the plugin with two commands, then restart Claude Code."},
+    {"start": 15.1,    "duration": 7.3,  "voice": "Ask Claude to check your page. Local dev servers work too."},
+    {"start": 22.6,    "duration": 12.9, "voice": "Samestate opens the page on every screen in a hidden Chrome, and reports what breaks, with the exact element, and the CSS that usually fixes it."},
+    {"start": 35.7,    "duration": 7.3,  "voice": "Claude can look at any screen too, like this iPhone."},
+    {"start": 43.2,    "duration": 11.1, "voice": "Then it fixes the cause in your own code. Here, the wide table and the small tab buttons."},
+    {"start": 54.45,   "duration": 9.2,  "voice": "And it checks again, so you know the fix worked, and what is left."},
+    {"start": 63.85,   "duration": 5.4,  "voice": "Or type slash Samestate check, with any address."},
+    {"start": 71.3,    "duration": 3.6,  "voice": "Samestate, for Claude Code."}
+  ]
+}

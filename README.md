@@ -8,7 +8,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
   <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
-  <a href="#use-it-from-claude-code">Use with Claude Code</a> ·
+  <a href="#use-it-from-claude-code">Use with Claude Code</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial">75s video</a>) ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
@@ -373,6 +373,8 @@ claude mcp add samestate -- node /path/to/samestate/mcp/server.mjs
 
 Then ask, for example, “check http://localhost:3000 on phones and fix what breaks”, or run `/samestate:check <url>`.
 
+**Watch it:** the [75-second tutorial video](https://shouvik12.github.io/samestate/media/samestate-claude-code.mp4?v=20261120-tutorial) shows the whole loop on the sample site: install, ask, read the report with each element's selector, look at a screenshot, fix the CSS, and check again (4 issues → 2).
+
 | Tool | What it does |
 |------|--------------|
 | `check_responsive` | Opens the page on the chosen screens (the seven starters by default) and returns the difference report grouped by problem, with the affected screens, a CSS selector for each element involved and the CSS that usually fixes it |
@@ -592,6 +594,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Claude Code tutorial video**: a 75-second narrated video on using Samestate from Claude Code (install, ask, report with selectors, screenshot, fix, check again), with captions and the Samestate music looped on its bars; the tool output in it is real; linked from the README ([details](changelogs/CHANGELOG-claude-code-tutorial.md)) |
 | **2026-11-20** | | | **Plugin everywhere**: the demo's last step and the video's end card mention the Claude Code plugin; How it works covers the MCP server; the GIF, screenshots, banner, card and walkthrough are re-recorded; README media links use a new cache key; a Chrome Web Store listing with images is in `store/` ([details](changelogs/CHANGELOG-plugin-everywhere.md)) |
 | **2026-11-20** | | | **README links the Claude Code plugin**: the links under the title include "Use with Claude Code", which jumps to the install steps ([details](changelogs/CHANGELOG-readme-claude-code-link.md)) |
 | **2026-11-20** | | | **Element selectors for AI assistants**: the MCP server's difference report names each element involved with a short CSS selector (for example `#cookies` or `div.tabs > button:nth-of-type(1)`), so an assistant can find it in the source; screenshots come back in the order asked for; plugin 0.1.4 ([details](changelogs/CHANGELOG-mcp-selectors.md)) |
