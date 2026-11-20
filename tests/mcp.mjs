@@ -51,11 +51,16 @@ try {
   check('Reports sideways scroll on the phone', /Page scrolls sideways — iPhone 11 Pro/.test(body), body.split('\n')[2]);
   check('Reports the table wider than its container', /Table is wider than its container — iPhone 11 Pro/.test(body));
   check('Includes the CSS that usually fixes it', /Usually fixed by this CSS on the affected elements: max-width: 100%;/.test(body));
+  check('Names the element that pushes the page sideways', /Page scrolls sideways \(\+\d+px\)[^\n]*\n  Elements: `table`/.test(body));
+  check('Names the overlay that hides controls', /Overlay hides \d+ controls[^\n]*\n  Elements: `#cookies`/.test(body));
+  check('Gives unique selectors for small tap targets', /Elements: `div\.tabs > button:nth-of-type\(1\)`, `div\.tabs > button:nth-of-type\(2\)`/.test(body));
   check('Leaves adaptations out unless asked', /adaptations \(not listed\)/.test(body) && !/ADAPTATION ·/.test(body));
   const all = text(await tool('check_responsive', { url: page, devices: ['iphone', 'desktop'], include_adaptations: true }));
   check('Lists adaptations when asked', /ADAPTATION · Navigation · Navigation collapses behind a menu button/.test(all));
 
   const shots = await tool('screenshot', { url: page, devices: ['iphone', 'desktop'] });
+  const reversed = await tool('screenshot', { url: page, devices: ['desktop', 'iphone'] });
+  check('Returns screenshots in the order asked for', reversed.content.filter(c => c.type === 'text').slice(1).map(c => c.text).join(',') === 'Desktop,iPhone 11 Pro');
   const images = shots.content.filter(c => c.type === 'image');
   check('Returns one sharp screenshot per screen', images.length === 2 && pngWidth(images[0].data) === 375 && pngWidth(images[1].data) === 900, images.map(i => pngWidth(i.data)).join(' and ') + ' px wide');
 

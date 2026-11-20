@@ -32,7 +32,10 @@ function differencesText(r,{adaptations}){
  for(const list of [...groups.values()].sort((a,b)=>order[a[0].severity]-order[b[0].severity])){
   const f=list[0];
   lines.push('',`## ${f.severity.toUpperCase()} · ${f.category} · ${f.kind} — ${list.map(x=>x.screen).join(', ')}`);
-  for(const x of list)lines.push(`- ${x.screen}: ${x.title}. ${x.detail}`);
+  for(const x of list){
+   lines.push(`- ${x.screen}: ${x.title}. ${x.detail}`);
+   if(x.elements?.length)lines.push(`  Elements: ${x.elements.slice(0,5).map(e=>'`'+e+'`').join(', ')}${x.elements.length>5?` (+${x.elements.length-5} more)`:''}`);
+  }
   if(f.fixCss)lines.push(`Usually fixed by this CSS on the affected elements: ${f.fixCss}`);
   if(f.advice)lines.push(`Suggestion: ${f.advice}`);
  }

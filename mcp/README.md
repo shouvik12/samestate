@@ -25,8 +25,8 @@ Any other MCP client that runs local stdio servers takes the same command: `node
 
 | Tool | Arguments | Returns |
 |------|-----------|---------|
-| `check_responsive` | `url`; optional `devices`, `reference`, `include_adaptations`, `check_links` | The difference report grouped by problem: severity, category, affected screens, each screen's detail, and the CSS that usually fixes it or a suggestion |
-| `screenshot` | `url`; optional `devices` (default `iphone`, `ipad`, `desktop`), `width` | One PNG per screen at the screen's own width, at most 900px |
+| `check_responsive` | `url`; optional `devices`, `reference`, `include_adaptations`, `check_links` | The difference report grouped by problem: severity, category, affected screens, each screen's detail with a CSS selector for each element involved (up to five), and the CSS that usually fixes it or a suggestion |
+| `screenshot` | `url`; optional `devices` (default `iphone`, `ipad`, `desktop`), `width` | One PNG per screen at the screen's own width, at most 900px, in the order of `devices` |
 | `run_checks` | `url`; optional `devices`, `reference`, `groups` (`layout`, `accessibility`, `meta`, `performance`, `links`, `widths`, `settings`) | Pass, warning, fail or incomplete per group with its findings, as in **Run all checks** |
 | `list_devices` | none | Every screen id with its name, CSS size, kind and whether it is on by default |
 
@@ -37,7 +37,8 @@ Any other MCP client that runs local stdio servers takes the same command: `node
 1. On the first tool call, `chrome.mjs` copies `extension/` to a temporary folder, turns its optional site access into granted access (nobody is there to answer Chrome's prompt), and starts Chrome headless with `--remote-debugging-pipe`.
 2. The extension is loaded with the DevTools `Extensions.loadUnpacked` command, as `tools/samestate-ci.mjs` does, and its app page is opened with `?open=<url>`, the same path as the toolbar button.
 3. Each tool selects the screens, waits until every one has loaded and connected, then calls the app's own functions: `detect()` for the difference report, the **Run all checks** button for combined checks, and a capture of each screen shown at 100% for screenshots.
-4. Chrome stays open between calls, one call at a time. It closes, and the temporary profile and extension copy are deleted, when the assistant stops the server.
+4. Element selectors: each finding carries the elements' paths in the page (child positions from `<body>`; numbered keys such as `ov|0` get theirs from the snapshot's `keyPaths`). The server reads them inside each screen's frame through its own DevTools session and builds a short selector that matches one element, preferring ids and readable class names over generated ones. Only the assistant on your computer receives them.
+5. Chrome stays open between calls, one call at a time. It closes, and the temporary profile and extension copy are deleted, when the assistant stops the server.
 
 The hidden Chrome uses its own empty profile: none of your sign-ins, cookies or extensions are in it, and nothing is sent anywhere except the requests the pages themselves make.
 

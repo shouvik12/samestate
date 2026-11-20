@@ -374,7 +374,7 @@ Then ask, for example, “check http://localhost:3000 on phones and fix what bre
 
 | Tool | What it does |
 |------|--------------|
-| `check_responsive` | Opens the page on the chosen screens (the seven starters by default) and returns the difference report grouped by problem, with the affected screens and the CSS that usually fixes it |
+| `check_responsive` | Opens the page on the chosen screens (the seven starters by default) and returns the difference report grouped by problem, with the affected screens, a CSS selector for each element involved and the CSS that usually fixes it |
 | `screenshot` | One screenshot per screen, at the screen's own width (up to 900px) |
 | `run_checks` | The automated check groups (layout, accessibility, meta, performance, links; optionally the width sweep and screen settings) with pass, warning or fail |
 | `list_devices` | Every screen id and size, for the `devices` and `reference` options |
@@ -584,6 +584,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Element selectors for AI assistants**: the MCP server's difference report names each element involved with a short CSS selector (for example `#cookies` or `div.tabs > button:nth-of-type(1)`), so an assistant can find it in the source; screenshots come back in the order asked for; plugin 0.1.4 ([details](changelogs/CHANGELOG-mcp-selectors.md)) |
 | **2026-11-20** | | | **Claude Code plugin and MCP server**: AI assistants can check a page on every screen size with the extension's own checks, in a hidden Chrome on your computer: difference report with fix CSS, screenshots per screen, combined checks and the screen list; `localhost` works; install with `/plugin marketplace add shouvik12/samestate`, plus a `/samestate:check` skill ([details](changelogs/CHANGELOG-mcp-plugin.md)) |
 | **2026-11-20** | | | **Motion promo video**: a new 30-second video in a motion-graphics style (kinetic words, tilted real app screens, a camera that pushes into the report) on the same 128 BPM music, with new words on its beats; a 1080×1920 mobile version; the README links both, and the narrated walkthrough stays as its own video ([details](changelogs/CHANGELOG-motion-promo.md)) |
 | **2026-11-19** | | | **Start demo button**: the live demo opens on the intro card with Start demo, so its narration plays from the first word (browsers block sound until a click); Skip demo and explore opens the app; the sample site loads behind the card ([details](changelogs/CHANGELOG-start-demo-button.md)) |
