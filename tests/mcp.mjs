@@ -11,15 +11,37 @@ import { fileURLToPath } from 'node:url';
 const REPO = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const ROOT = join(REPO, 'docs');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.woff2': 'font/woff2' };
+const branches = ['primary-' + 'nested-control-'.repeat(12), 'secondary'];
+let scanStarted, scanStopped, slowLinkOpen = false, queuedVisits = 0;
+const slowLinkRequested = new Promise(done => { scanStarted = done; });
+const slowLinkClosed = new Promise(done => { scanStopped = done; });
 const site = createServer((req, res) => {
   let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (path === '/deep-selectors') {
+    const controls = branches.map((id, index) => '<section id="' + id + '">' + '<div>'.repeat(8) +
+      '<button aria-label="Control ' + (index + 1) + '"></button>' + '</div>'.repeat(8) + '</section>').join('');
+    res.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><meta name="viewport" content="width=device-width"><title>Deep selectors</title><style>button{width:20px;height:20px;padding:0}</style>' + controls);
+    return;
+  }
+  if (path === '/scan') {
+    res.writeHead(200, { 'content-type': 'text/html' }).end('<!doctype html><title>Slow scan</title><a href="/slow-link">Slow link</a>');
+    return;
+  }
+  if (path === '/slow-link' && req.method === 'HEAD') {
+    slowLinkOpen = true;
+    res.once('close', () => { slowLinkOpen = false; scanStopped(); });
+    scanStarted();
+    return;
+  }
+  if (path === '/queued') queuedVisits++;
   if (path.endsWith('/')) path += 'index.html';
   const file = resolve(ROOT, '.' + path);
   if (!file.startsWith(ROOT + sep)) { res.writeHead(403).end(); return; }
   try { if (!statSync(file).isFile()) throw new Error(); res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' }).end(readFileSync(file)); } catch { res.writeHead(404).end(); }
 });
 await new Promise(done => site.listen(0, '127.0.0.1', done));
-const page = `http://localhost:${site.address().port}/demo/index.html`;
+const origin = `http://localhost:${site.address().port}`;
+const page = origin + '/demo/index.html';
 
 const server = spawn(process.execPath, [join(REPO, 'mcp/server.mjs')], { stdio: ['pipe', 'pipe', 'ignore'] });
 let buffer = '', next = 0;
@@ -29,7 +51,20 @@ server.stdout.on('data', chunk => {
   let end;
   while ((end = buffer.indexOf('\n')) >= 0) { const message = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1); pending.get(message.id)?.(message); pending.delete(message.id); }
 });
-const rpc = (method, params) => new Promise(done => { const id = ++next; pending.set(id, done); server.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n'); });
+const send = (method, params, id) => server.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+const request = (method, params, id = ++next) => {
+  const reply = new Promise(done => pending.set(id, done));
+  send(method, params, id);
+  return { id, reply };
+};
+const rpc = (method, params) => request(method, params).reply;
+const cancel = requestId => send('notifications/cancelled', { requestId });
+async function within(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, fail) => { timer = setTimeout(() => fail(Error(message)), ms); });
+  try { return await Promise.race([promise, timeout]); }
+  finally { clearTimeout(timer); }
+}
 const tool = async (name, args) => (await rpc('tools/call', { name, arguments: args })).result;
 const text = result => result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
 const pngWidth = data => Buffer.from(data, 'base64').readUInt32BE(16);
@@ -54,6 +89,11 @@ try {
   check('Names the element that pushes the page sideways', /Page scrolls sideways \(\+\d+px\)[^\n]*\n  Elements: `table`/.test(body));
   check('Names the overlay that hides controls', /Overlay hides \d+ controls[^\n]*\n  Elements: `#cookies`/.test(body));
   check('Gives unique selectors for small tap targets', /Elements: `div\.tabs > button:nth-of-type\(1\)`, `div\.tabs > button:nth-of-type\(2\)`/.test(body));
+  const deep = text(await tool('check_responsive', { url: origin + '/deep-selectors', devices: ['iphone'] }));
+  const targets = deep.match(/2 tap targets under 24px[^\n]*\n  Elements: ([^\n]+)/)?.[1] || '';
+  const expected = branches.map(id => '#' + id + ' > ' + 'div > '.repeat(8) + 'button');
+  check('Distinguishes deep repeated controls and preserves long selectors',
+    expected.every(selector => targets.includes('`' + selector + '`')), targets);
   check('Leaves adaptations out unless asked', /adaptations \(not listed\)/.test(body) && !/ADAPTATION ·/.test(body));
   const all = text(await tool('check_responsive', { url: page, devices: ['iphone', 'desktop'], include_adaptations: true }));
   check('Lists adaptations when asked', /ADAPTATION · Navigation · Navigation collapses behind a menu button/.test(all));
@@ -73,9 +113,25 @@ try {
   check('Rejects addresses that are not http or https', scheme.isError && /Only http and https/.test(text(scheme)));
   const down = await tool('check_responsive', { url: 'http://localhost:9/', devices: ['iphone'] });
   check('Says so when the page never loads', down.isError && /did not load on any screen/.test(text(down)));
+
+  const scan = request('tools/call', { name: 'check_responsive', arguments: {
+    url: origin + '/scan', devices: ['iphone'], check_links: true
+  } }, 'slow-scan');
+  await within(slowLinkRequested, 20000, 'The link scan did not start');
+  const queued = request('tools/call', { name: 'screenshot', arguments: { url: origin + '/queued' } });
+  cancel(queued.id);
+  await rpc('ping');
+  check('Cancelling a queued call leaves the active scan running', slowLinkOpen && pending.has(scan.id));
+  cancel(scan.id);
+  await within(slowLinkClosed, 3500, 'Cancellation did not close the pending link request before its own timeout');
+  const nextDevices = await within(tool('list_devices', {}), 15000, 'The queue did not recover after cancellation');
+  check('Cancels an active scan and restarts Chrome for the next call', /^iphone —/m.test(text(nextDevices)));
+  check('Skips the queued call and sends no cancellation responses',
+    queuedVisits === 0 && pending.has(queued.id) && pending.has(scan.id));
 } finally {
   server.stdin.end();
   site.close();
+  site.closeAllConnections();
 }
 const passed = results.filter(Boolean).length;
 console.log(`\n${passed}/${results.length} MCP server checks passed`);

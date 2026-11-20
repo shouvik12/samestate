@@ -1704,6 +1704,7 @@
       vw, docW: de.scrollWidth, keyPaths, metaViewport: !!document.querySelector('meta[name=viewport]'),
       lang: !!de.getAttribute('lang')?.trim(), zoomBlocked: zoomBlocked(), links,
       meta: pageMeta(), outline: outlineFacts(reg), errors: errorsNow(),
+      documentStatus: performance.getEntriesByType('navigation')[0]?.responseStatus,
       vitals: { lcp: Math.round(vitals.lcp), cls: Math.round(vitals.cls * 1000) / 1000, inp: Math.round(vitals.inp), shifted, drawn },
       dpr: devicePixelRatio, requests: requests(),
       vh, items, overflow, scrollers, fixed, hiddenFocus,

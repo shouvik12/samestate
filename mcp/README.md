@@ -66,8 +66,8 @@ A 75-second tutorial video shows it in use: https://shouvik12.github.io/samestat
 1. On the first tool call, `chrome.mjs` copies `extension/` to a temporary folder, turns its optional site access into granted access (nobody is there to answer Chrome's prompt), and starts Chrome headless with `--remote-debugging-pipe`.
 2. The extension is loaded with the DevTools `Extensions.loadUnpacked` command, as `tools/samestate-ci.mjs` does, and its app page is opened with `?open=<url>`, the same path as the toolbar button.
 3. Each tool selects the screens, waits until every one has loaded and connected, then calls the app's own functions: `detect()` for the difference report, the **Run all checks** button for combined checks, and a capture of each screen shown at 100% for screenshots.
-4. Element selectors: each finding carries the elements' paths in the page (child positions from `<body>`; numbered keys such as `ov|0` get theirs from the snapshot's `keyPaths`). The server reads them inside each screen's frame through its own DevTools session and builds a short selector that matches one element, preferring ids and readable class names over generated ones. Only the assistant on your computer receives them.
-5. Chrome stays open between calls, one call at a time. It closes, and the temporary profile and extension copy are deleted, when the assistant stops the server.
+4. Each finding carries the elements' child positions from `<body>`. The server resolves them inside the screen's frame and only returns selectors that match exactly the intended element. It prefers readable IDs and class names and can use the full path when the element is nested deeply.
+5. Chrome stays open between calls, one call at a time. A cancellation skips the matching queued call or closes Chrome and deletes its temporary profile and extension copy for a running call. The next call starts a fresh Chrome session. Stopping the server also closes Chrome and deletes its temporary files.
 
 The hidden Chrome uses its own empty profile: none of your sign-ins, cookies or extensions are in it, and nothing is sent anywhere except the requests the pages themselves make.
 

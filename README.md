@@ -140,7 +140,7 @@ Samestate opens a site in a wall of responsive previews for phones, tablets, lap
 | Performance | Web Vitals per screen: layout shifts (CLS) and slow interactions (INP) flagged, largest paint (LCP) shown |
 | Widths | From **Sweep widths**: the widths where each problem appears, including WCAG 1.4.10 Reflow at 320px |
 | Navigation links | With **Check links**: same-origin links that answer 404, 410 or a server error |
-| Errors | JavaScript errors and files that failed to load, per screen (details in the **Console** panel) |
+| Errors | HTTP errors from the main page, JavaScript errors and files that failed to load, per screen |
 | Meta | Title and description length, missing social card tags, relative og:image, canonical URL, favicon, noindex, charset, duplicate meta tags, invalid structured data (once, for the reference screen) |
 | Network | Page weight per screen, phones downloading as much as the desktop, hidden images that still download, images much larger than shown, API responses over 100 KB |
 
@@ -623,6 +623,8 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Page HTTP errors** · Main page responses with HTTP 4xx or 5xx count as issues in the app and CI ([details](changelogs/CHANGELOG-page-http-errors.md)) |
+| **2026-11-20** | | | **MCP selector and cancellation fixes** · Reports identify the intended element in deeply nested layouts. Cancelling a tool call stops its scan or skips it in the queue ([details](changelogs/CHANGELOG-mcp-selector-cancellation.md)) |
 | **2026-11-20** | | | **ChatGPT Desktop installation**: terminal commands to add the Samestate marketplace, install and list the plugin, plus local chat setup, requirements and a usage example ([details](changelogs/CHANGELOG-chatgpt-install.md)) |
 | **2026-11-20** | | | **Claude Code tutorial video**: a 75-second narrated video on using Samestate from Claude Code (install, ask, report with selectors, screenshot, fix, check again), with captions and the Samestate music looped on its bars; the tool output in it is real; linked from the README ([details](changelogs/CHANGELOG-claude-code-tutorial.md)) |
 | **2026-11-20** | | | **Plugin everywhere**: the demo's last step and the video's end card mention the Claude Code plugin; How it works covers the MCP server; the GIF, screenshots, banner, card and walkthrough are re-recorded; README media links use a new cache key; a Chrome Web Store listing with images is in `store/` ([details](changelogs/CHANGELOG-plugin-everywhere.md)) |

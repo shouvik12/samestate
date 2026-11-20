@@ -7,36 +7,46 @@ import {mkdtempSync,cpSync,readFileSync,writeFileSync,rmSync,existsSync} from 'n
 import {tmpdir} from 'node:os';
 import {join,resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {setTimeout as delay} from 'node:timers/promises';
 
 export const EXTENSION=resolve(dirname(fileURLToPath(import.meta.url)),'../extension');
-const sleep=ms=>new Promise(done=>setTimeout(done,ms));
 
 // Runs inside a screen's page: turns Samestate's element paths (child positions from <body>, "2.1.3") into short CSS
 // selectors that match one element, so an assistant can find the element in the source. Ids and class names that look
 // generated (long digit runs, CSS-in-JS prefixes) are skipped.
 const SELECTORS=`paths=>{
  const at=path=>{let el=document.body;if(!path)return el;for(const n of path.split('.')){el=el&&el.children[Number(n)-1];if(!el)return null;}return el;};
- const unique=sel=>{try{return document.querySelectorAll(sel).length===1;}catch{return false;}};
+ const matchesOnly=(sel,el)=>{
+  try{
+   const matches=document.querySelectorAll(sel);
+   return matches.length===1&&matches[0]===el;
+  }catch{return false;}
+ };
  const generated=name=>/\\d{3,}|^(css|sc|jsx|svelte|emotion|tw)-|^[a-z]{1,3}[A-Z0-9][a-zA-Z0-9]{4,}$/.test(name);
  const part=el=>{
-  if(el.id&&!generated(el.id)&&unique('#'+CSS.escape(el.id)))return '#'+CSS.escape(el.id);
-  let sel=el.localName+[...el.classList].filter(c=>!generated(c)).slice(0,2).map(c=>'.'+CSS.escape(c)).join('');
+  if(el.id&&!generated(el.id)&&matchesOnly('#'+CSS.escape(el.id),el))return '#'+CSS.escape(el.id);
+  let sel=CSS.escape(el.localName)+[...el.classList].filter(c=>!generated(c)).slice(0,2).map(c=>'.'+CSS.escape(c)).join('');
   const parent=el.parentElement;
-  if(parent){const same=[...parent.children].filter(x=>x.localName===el.localName);if(same.length>1)sel+=':nth-of-type('+(same.indexOf(el)+1)+')';}
+  if(parent){const same=[...parent.children].filter(x=>x.localName===el.localName&&x.namespaceURI===el.namespaceURI);if(same.length>1)sel+=':nth-of-type('+(same.indexOf(el)+1)+')';}
   return sel;
  };
- const out={};
- for(const path of paths){
-  const el=at(path);if(!el){out[path]=null;continue;}
-  if(el===document.body){out[path]='body';continue;}
+ const selectorFor=(el,path)=>{
   let sel='';
-  for(let node=el,depth=0;node&&node!==document.body&&depth<6;node=node.parentElement,depth++){
+  for(let node=el;node;node=node.parentElement){
    const p=part(node);sel=sel?p+' > '+sel:p;
-   if(unique(sel))break;
+   if(matchesOnly(sel,el))return sel;
+   if(node===document.body)break;
   }
-  out[path]=sel.length>160?sel.slice(sel.length-160).replace(/^[^>]*> /,''):sel;
- }
- return out;
+  // Fall back to exact child positions, independent of classes, namespaces and ids.
+  const bodyIndex=[...document.documentElement.children].indexOf(document.body)+1;
+  const positions=path?[bodyIndex,...path.split('.')]:[bodyIndex];
+  const fallback=':root'+positions.map(position=>' > :nth-child('+position+')').join('');
+  return matchesOnly(fallback,el)?fallback:null;
+ };
+ return Object.fromEntries(paths.map(path=>{
+  const el=at(path);
+  return [path,el?selectorFor(el,path):null];
+ }));
 }`;
 
 const CHROME_PATHS={
@@ -53,18 +63,62 @@ export function findChrome(){
 export class Samestate{
  constructor({log=()=>{}}={}){this.log=log;this.queue=Promise.resolve();}
  // One tool call at a time: they share one app tab.
- run(task){const next=this.queue.then(task,task);this.queue=next.catch(()=>{});return next;}
+ run(task,signal){
+  const next=this.queue.then(async()=>{
+   signal?.throwIfAborted();
+   this.signal=signal;
+   let stopping;
+   const abort=()=>{
+    // Page-side checks can keep running after a DevTools request is abandoned.
+    // Stop the private browser before letting another call use it.
+    stopping=this.close().catch(error=>this.log('Chrome cleanup failed: '+error.message));
+   };
+   signal?.addEventListener('abort',abort,{once:true});
+   try{
+    const result=await task();
+    signal?.throwIfAborted();
+    return result;
+   }finally{
+    signal?.removeEventListener('abort',abort);
+    this.signal=undefined;
+    if(stopping)await stopping;
+   }
+  });
+  this.queue=next.catch(()=>{});
+  return next;
+ }
+
+ wait(ms){return delay(ms,undefined,{signal:this.signal});}
 
  async start(){
   if(this.session)return;
+  await this.close();
+  this.signal?.throwIfAborted();
+  const executable=findChrome();
   this.temp=mkdtempSync(join(tmpdir(),'samestate-mcp-'));
   const ext=join(this.temp,'extension');cpSync(EXTENSION,ext,{recursive:true});
   const manifest=JSON.parse(readFileSync(join(ext,'manifest.json'),'utf8'));
   manifest.host_permissions=manifest.optional_host_permissions||['http://*/*','https://*/*'];delete manifest.optional_host_permissions;
   writeFileSync(join(ext,'manifest.json'),JSON.stringify(manifest));
-  const chrome=this.chrome=spawn(findChrome(),['--headless=new','--remote-debugging-pipe','--enable-unsafe-extension-debugging',`--user-data-dir=${join(this.temp,'profile')}`,'--no-first-run','--no-default-browser-check','--mute-audio','--hide-scrollbars','--window-size=4000,2400','about:blank'],{stdio:['ignore','ignore','pipe','pipe','pipe']});
+  const chrome=this.chrome=spawn(executable,['--headless=new','--remote-debugging-pipe','--enable-unsafe-extension-debugging',`--user-data-dir=${join(this.temp,'profile')}`,'--no-first-run','--no-default-browser-check','--mute-audio','--hide-scrollbars','--window-size=4000,2400','about:blank'],{stdio:['ignore','ignore','pipe','pipe','pipe']});
   chrome.stderr.on('data',()=>{});
   let buffer='',next=0;const pending=new Map();this.events=[];
+  let disconnected;
+  const disconnect=error=>{
+   disconnected=error;
+   this.session=null;
+   for(const {fail} of pending.values())fail(error);
+   pending.clear();
+  };
+  chrome.on('error',disconnect);
+  chrome.once('exit',()=>disconnect(disconnected||Error('Chrome closed')));
+  chrome.stdio[3].on('error',disconnect);
+  chrome.stdio[4].on('error',disconnect);
+  this.chromeClosed=new Promise(done=>chrome.once('close',()=>{
+   disconnect(disconnected||Error('Chrome closed'));
+   this.chrome=null;
+   done();
+  }));
   chrome.stdio[4].on('data',chunk=>{
    buffer+=chunk;let end;
    while((end=buffer.indexOf('\0'))>=0){
@@ -73,8 +127,15 @@ export class Samestate{
     else if(message.method)for(const listener of this.events)listener(message);
    }
   });
-  chrome.on('exit',()=>{for(const {fail} of pending.values())fail(Error('Chrome closed'));pending.clear();this.session=null;});
-  this.send=(method,params={},sessionId)=>new Promise((done,fail)=>{const id=++next;pending.set(id,{done,fail});chrome.stdio[3].write(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})})+'\0');});
+  this.send=async(method,params={},sessionId)=>{
+   this.signal?.throwIfAborted();
+   if(disconnected)throw disconnected;
+   return new Promise((done,fail)=>{
+    const id=++next;
+    pending.set(id,{done,fail});
+    chrome.stdio[3].write(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})})+'\0');
+   });
+  };
   // Each screen's page runs in its own frame process; its DevTools session is kept by frame id to read element selectors.
   this.frames=new Map();
   this.events.push(message=>{
@@ -85,10 +146,10 @@ export class Samestate{
   this.base=`chrome-extension://${id}/app.html`;
   const {targetId}=await this.send('Target.createTarget',{url:'about:blank'});
   const {sessionId}=await this.send('Target.attachToTarget',{targetId,flatten:true});
-  this.session=sessionId;
   await this.send('Emulation.setDeviceMetricsOverride',{width:4000,height:2400,deviceScaleFactor:1,mobile:false},sessionId);
   await this.send('Runtime.enable',{},sessionId);
   await this.send('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:false,flatten:true},sessionId);
+  this.session=sessionId;
   this.log('Chrome ready with the Samestate extension '+manifest.version);
  }
 
@@ -99,7 +160,11 @@ export class Samestate{
  }
  async until(expression,timeout,step=250){
   const end=Date.now()+timeout;
-  while(Date.now()<end){if(await this.evaluate(expression).catch(()=>false))return true;await sleep(step);}
+  while(Date.now()<end){
+   try{if(await this.evaluate(expression))return true;}
+   catch(error){if(this.signal?.aborted||!this.session)throw error;}
+   await this.wait(step);
+  }
   return false;
  }
 
@@ -124,7 +189,7 @@ export class Samestate{
    await this.evaluate(`(()=>{const ref=document.querySelector('#ref');ref.value=${JSON.stringify(reference)};ref.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   }
   await this.until('active().length&&active().every(d=>d.ready)',30000,400);
-  await sleep(1200); // the page's own resize and font loading settle, as in the app's delayed first scan
+  await this.wait(1200); // the page's own resize and font loading settle, as in the app's delayed first scan
   return this.evaluate(`({url:previewUrl,reference:document.querySelector('#ref').value,screens:active().map(d=>({id:d.id,name:screenName(d),width:d.w,height:d.h,ready:!!d.ready}))})`);
  }
 
@@ -139,14 +204,18 @@ export class Samestate{
    if(!frame)return {};
    const reply=await this.send('Runtime.evaluate',{expression:`(${SELECTORS})(${JSON.stringify(paths)})`,returnByValue:true},frame);
    return reply.result?.value||{};
-  }catch(error){this.log('Selectors unavailable on '+deviceId+': '+error.message);return {};}
+  }catch(error){
+   if(this.signal?.aborted||!this.session)throw error;
+   this.log('Selectors unavailable on '+deviceId+': '+error.message);
+   return {};
+  }
  }
 
- listDevices(){return this.run(async()=>{
+ listDevices(signal){return this.run(async()=>{
   await this.start();
   if(!await this.evaluate("typeof DEVICES!=='undefined'").catch(()=>false)){await this.send('Page.navigate',{url:this.base},this.session);await this.until("typeof DEVICES!=='undefined'",15000);}
   return this.evaluate("DEVICES.map(d=>({id:d.id,name:d.name,width:d.w,height:d.h,kind:d.kind,group:DEVICE_GROUPS[d.group]||d.group,default:!!d.starter}))");
- });}
+ },signal);}
 
  differences(url,options={}){return this.run(async()=>{
   const opened=await this.open(url,options);
@@ -160,7 +229,6 @@ export class Samestate{
    return {keyPaths:Object.fromEntries((window.mcpSnaps||[]).map(s=>[s.dev.id,s.data.keyPaths||{}])),findings:findings.map(f=>({severity:{issue:'issue',warn:'warning',info:'adaptation'}[f.sev]||f.sev,category:f.cat,kind:f.kind,screen:screenName(f.dev),device:f.dev.id,keys:f.keys||[],title:f.title,detail:f.detail,fixCss:fixCss(f.kind),advice:advice(f.kind)})),
     unmeasured:(lastScan?.missing||[]).map(screenName)};
   })()`);
-  // Keys are "category|path"; only element paths (digits and dots) can be turned into selectors.
   // Keys are "category|path", or numbered ("ov|0") with the path in that screen's keyPaths.
   const pathOf=(device,key)=>{const known=report.keyPaths[device]?.[key];if(known!==undefined)return known;const path=String(key).slice(String(key).indexOf('|')+1);return /^(\d+(\.\d+)*)?$/.test(path)?path:null;};
   const byDevice=new Map();
@@ -174,18 +242,18 @@ export class Samestate{
   }
   delete report.keyPaths;
   return {...opened,...report};
- });}
+ },options.signal);}
 
  checks(url,options={}){return this.run(async()=>{
   const opened=await this.open(url,options);
   const groups=options.groups?.length?options.groups:['layout','accessibility','meta','performance','links'];
   await this.evaluate(`(()=>{const want=new Set(${JSON.stringify(groups)});document.querySelectorAll('#checks-groups input').forEach(i=>{i.checked=want.has(i.value);i.dispatchEvent(new Event('change',{bubbles:true}));});document.querySelector('#checks-run').click();})()`);
-  await sleep(500);
+  await this.wait(500);
   if(!await this.until('!samestateChecks.running&&!!samestateChecks.get()?.finishedAt',(groups.includes('widths')?420:150)*1000,1000))throw Error('The checks did not finish in time.');
   const report=await this.evaluate('samestateChecks.get()');
   if(!opened.screens.some(s=>s.ready))throw Error(`${opened.url} did not load on any screen within 30 seconds. Check that the address is right and its server is running.`);
   return {...opened,report};
- });}
+ },options.signal);}
 
  screenshots(url,options={}){return this.run(async()=>{
   const opened=await this.open(url,options);
@@ -199,16 +267,34 @@ export class Samestate{
    const pick=`active().find(x=>x.id===${JSON.stringify(screen.id)})`;
    await this.evaluate(`(()=>{const d=${pick};d.mcpScale=d.scaleOverride;d.scaleOverride=1;layout(d);})()`);
    try{
-    await sleep(700); // the wall rearranges its screens around the larger one
-    await this.evaluate(`${pick}.el.scrollIntoView({block:'start',inline:'start'})`);await sleep(150);
+    await this.wait(700); // the wall rearranges its screens around the larger one
+    await this.evaluate(`${pick}.el.scrollIntoView({block:'start',inline:'start'})`);await this.wait(150);
     const rect=await this.evaluate(`(()=>{const r=${pick}.iframe.getBoundingClientRect();return {x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height};})()`);
     const width=Math.min(options.width||screen.width,screen.width,900);
     const {data}=await this.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{...rect,scale:width/rect.width}},this.session);
     shots.push({...screen,png:data});
-   }finally{await this.evaluate(`(()=>{const d=${pick};d.scaleOverride=d.mcpScale??null;delete d.mcpScale;layout(d);})()`);}
+   }finally{
+    if(!this.signal?.aborted&&this.session)await this.evaluate(`(()=>{const d=${pick};d.scaleOverride=d.mcpScale??null;delete d.mcpScale;layout(d);})()`);
+   }
   }
   return {...opened,shots};
- });}
+ },options.signal);}
 
- async close(){try{this.chrome?.kill();}catch{}await sleep(200);if(this.temp)rmSync(this.temp,{recursive:true,force:true});}
+ close(){
+  this.closing??=this.stopChrome().finally(()=>{this.closing=null;});
+  return this.closing;
+ }
+
+ async stopChrome(){
+  const chrome=this.chrome;
+  if(chrome){
+   chrome.kill();
+   const force=setTimeout(()=>chrome.kill('SIGKILL'),2000);
+   try{await this.chromeClosed;}finally{clearTimeout(force);}
+  }
+  if(this.temp){
+   rmSync(this.temp,{recursive:true,force:true});
+   this.temp=null;
+  }
+ }
 }

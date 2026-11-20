@@ -52,12 +52,12 @@ function checksText(r){
  return lines.join('\n');
 }
 
-async function call(name,args={}){
+async function call(name,args={},signal){
  if(name==='list_devices'){
-  const list=await samestate.listDevices();
+  const list=await samestate.listDevices(signal);
   return [{type:'text',text:list.map(d=>`${d.id} — ${d.name} ${d.width}×${d.height} (${d.kind}, ${d.group})${d.default?' · default':''}`).join('\n')}];
  }
- const options={devices:args.devices,reference:args.reference};
+ const options={devices:args.devices,reference:args.reference,signal};
  if(name==='check_responsive'){
   const r=await samestate.differences(args.url,{...options,links:!!args.check_links});
   if(r.unmeasured.length===r.screens.length)throw Error(`${r.url} did not load on any screen within 30 seconds. Check that the address is right and its server is running.`);
@@ -65,7 +65,7 @@ async function call(name,args={}){
  }
  if(name==='run_checks')return [{type:'text',text:checksText(await samestate.checks(args.url,{...options,groups:args.groups}))}];
  if(name==='screenshot'){
-  const r=await samestate.screenshots(args.url,{devices:args.devices?.length?args.devices:['iphone','ipad','desktop'],width:args.width});
+  const r=await samestate.screenshots(args.url,{devices:args.devices?.length?args.devices:['iphone','ipad','desktop'],width:args.width,signal});
   return [{type:'text',text:`Screenshots of ${r.url}: ${r.shots.map(s=>`${s.name} (${s.width}×${s.height})`).join(', ')}`+(r.shots.length<r.screens.length?`. Not loaded: ${r.screens.filter(s=>!s.ready).map(s=>s.name).join(', ')}.`:'')},
    ...r.shots.flatMap(s=>[{type:'text',text:s.name},{type:'image',data:s.png,mimeType:'image/png'}])];
  }
@@ -73,20 +73,44 @@ async function call(name,args={}){
 }
 
 const reply=(id,body)=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id,...body})+'\n');
+const requests=new Map();
 async function handle(message){
  const {id,method,params}=message;
- if(id===undefined)return; // notifications (initialized, cancelled) need no answer
+ if(id===undefined){
+  if(method==='notifications/cancelled')requests.get(params?.requestId)?.abort();
+  return;
+ }
  try{
   if(method==='initialize')return reply(id,{result:{protocolVersion:params?.protocolVersion||'2025-06-18',capabilities:{tools:{}},serverInfo:{name:'samestate',title:'Samestate',version:VERSION},instructions:'Use check_responsive after changing a page\'s layout or CSS to see what breaks on phones, tablets and desktops; screenshot to look at a problem; run_checks for the full automated check groups. Pages on localhost work.'}});
   if(method==='ping')return reply(id,{result:{}});
   if(method==='tools/list')return reply(id,{result:{tools:TOOLS}});
   if(method==='tools/call'){
-   try{return reply(id,{result:{content:await call(params.name,params.arguments)}});}
-   catch(error){if(error.code)throw error;log(error.message);return reply(id,{result:{content:[{type:'text',text:error.message}],isError:true}});}
+   if(requests.has(id))return;
+   const controller=new AbortController();
+   requests.set(id,controller);
+   try{
+    const content=await call(params.name,params.arguments,controller.signal);
+    if(!controller.signal.aborted)reply(id,{result:{content}});
+   }catch(error){
+    if(controller.signal.aborted)return;
+    if(error.code)throw error;
+    log(error.message);
+    reply(id,{result:{content:[{type:'text',text:error.message}],isError:true}});
+   }finally{requests.delete(id);}
+   return;
   }
   reply(id,{error:{code:-32601,message:'Method not found: '+method}});
  }catch(error){reply(id,{error:{code:error.code||-32603,message:error.message}});}
 }
 
-createInterface({input:process.stdin}).on('line',line=>{if(!line.trim())return;let message;try{message=JSON.parse(line);}catch{return reply(null,{error:{code:-32700,message:'Parse error'}});}handle(message);}).on('close',async()=>{await samestate.close();process.exit(0);});
-for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{await samestate.close();process.exit(0);});
+let stopping=false;
+async function shutdown(){
+ if(stopping)return;
+ stopping=true;
+ for(const request of requests.values())request.abort();
+ try{await samestate.close();}
+ catch(error){log(error.message);}
+ process.exit(0);
+}
+createInterface({input:process.stdin}).on('line',line=>{if(stopping||!line.trim())return;let message;try{message=JSON.parse(line);}catch{return reply(null,{error:{code:-32700,message:'Parse error'}});}handle(message);}).on('close',shutdown);
+for(const signal of ['SIGINT','SIGTERM'])process.on(signal,shutdown);
