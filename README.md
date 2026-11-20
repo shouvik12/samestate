@@ -8,6 +8,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
   <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-motion">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-motion">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
+  <a href="#use-it-from-claude-code">Use with Claude Code</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#release-notes">Release notes</a>
 </p>
@@ -584,6 +585,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **README links the Claude Code plugin**: the links under the title include "Use with Claude Code", which jumps to the install steps ([details](changelogs/CHANGELOG-readme-claude-code-link.md)) |
 | **2026-11-20** | | | **Element selectors for AI assistants**: the MCP server's difference report names each element involved with a short CSS selector (for example `#cookies` or `div.tabs > button:nth-of-type(1)`), so an assistant can find it in the source; screenshots come back in the order asked for; plugin 0.1.4 ([details](changelogs/CHANGELOG-mcp-selectors.md)) |
 | **2026-11-20** | | | **Claude Code plugin and MCP server**: AI assistants can check a page on every screen size with the extension's own checks, in a hidden Chrome on your computer: difference report with fix CSS, screenshots per screen, combined checks and the screen list; `localhost` works; install with `/plugin marketplace add shouvik12/samestate`, plus a `/samestate:check` skill ([details](changelogs/CHANGELOG-mcp-plugin.md)) |
 | **2026-11-20** | | | **Motion promo video**: a new 30-second video in a motion-graphics style (kinetic words, tilted real app screens, a camera that pushes into the report) on the same 128 BPM music, with new words on its beats; a 1080×1920 mobile version; the README links both, and the narrated walkthrough stays as its own video ([details](changelogs/CHANGELOG-motion-promo.md)) |
