@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/media/samestate-banner.png?v=20261119-demo-intro" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
+<p align="center"><img src="docs/media/samestate-banner.png?v=20261120-plugin" alt="Samestate in Zinc: every screen, one shared state, with narrated guidance and combined checks" width="100%"></p>
 
 <h1 align="center">Samestate</h1>
 <p align="center"><b>Test your site on every screen size at once, and see what breaks.</b><br>
@@ -6,7 +6,7 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
 
 <p align="center">·
   <a href="https://shouvik12.github.io/samestate/"><b>Try the 46-step voiced demo</b></a> ·
-  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-motion">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-motion">mobile</a>) ·
+  <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">Watch the 30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile</a>) ·
   <a href="https://chromewebstore.google.com/detail/samestate/fclklobjcdojompoloogenjhgijlkpha"><b>Add to Chrome</b></a> ·
   <a href="#use-it-from-claude-code">Use with Claude Code</a> ·
   <a href="#how-it-works">How it works</a> ·
@@ -20,8 +20,8 @@ Click once on any device. Every phone, tablet and desktop follows to the same st
   <img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-blue">
 </p>
 
-<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261119-demo-intro" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
-<p align="center">The animated preview is silent. Watch the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-motion">30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-motion">mobile version</a>), the <a href="https://shouvik12.github.io/samestate/media/samestate-demo.mp4?v=20261120-motion">narrated walkthrough</a>, or try the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
+<p align="center"><a href="https://shouvik12.github.io/samestate/"><img src="docs/media/samestate-demo.gif?v=20261120-plugin" alt="The Zinc interface demonstrating logical sync, measurements, metadata, combined checks, top-bar voice help and demo navigation" width="900"></a></p>
+<p align="center">The animated preview is silent. Watch the <a href="https://shouvik12.github.io/samestate/media/samestate-promo.mp4?v=20261120-plugin">30s video</a> (<a href="https://shouvik12.github.io/samestate/media/samestate-promo-mobile.mp4?v=20261120-plugin">mobile version</a>), the <a href="https://shouvik12.github.io/samestate/media/samestate-demo.mp4?v=20261120-plugin">narrated walkthrough</a>, or try the <a href="https://shouvik12.github.io/samestate/">interactive demo</a> to hear the explanations.</p>
 
 ## Why Samestate
 
@@ -61,22 +61,22 @@ that are too small, text that disappears.
 
 | Logical sync | Difference report |
 |---|---|
-| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261119-demo-intro) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261119-demo-intro) |
+| ![Desktop clicks Products; the phone and tablet open their navigation drawer](docs/media/screenshot-sync.png?v=20261120-plugin) | ![Current Zinc difference report beside responsive previews](docs/media/screenshot-report.png?v=20261120-plugin) |
 | Desktop clicks **Products**. The phone and tablet open their own drawer, then Products. | Every device measured against the Desktop, grouped by category. |
 
 | Measurements & suggestions | Metadata & social previews |
 |---|---|
-| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261119-demo-intro) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261119-demo-intro) |
+| ![Selected heading with CSS dimensions, spacing, typography and contrast measurements](docs/media/screenshot-measure.png?v=20261120-plugin) | ![Metadata overview highlighting missing values and social-card issues](docs/media/screenshot-meta.png?v=20261120-plugin) |
 | Inspect an element and review its measurements and practical guidance. | Find missing metadata and preview how the page appears when shared. |
 
 | Run all checks | Individual & top-bar help |
 |---|---|
-| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261119-demo-intro) | ![Individual question marks beside controls, with the Measure explanation and voice open](docs/media/screenshot-voice-help.png?v=20261119-demo-intro) |
+| ![Selected check groups and combined results with human-review decisions still pending](docs/media/screenshot-checks.png?v=20261120-plugin) | ![Individual question marks beside controls, with the Measure explanation and voice open](docs/media/screenshot-voice-help.png?v=20261120-plugin) |
 | Run selected groups together. Visual items await the tester’s review. | Hover a control to reveal **?**, then click for its explanation. The top-bar **?** searches all help. |
 
 | Narrated demo & carousel | Clean theme option |
 |---|---|
-| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261119-demo-intro) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261119-demo-intro) |
+| ![46-step demo with Previous, Resume, Mute and Next controls](docs/media/screenshot-tour.png?v=20261120-plugin) | ![Clean Green interface and preview theme selected in the theme drawer](docs/media/screenshot-theme.png?v=20261120-plugin) |
 | Jump between steps, pause and mute. Each step has natural AI narration. | Zinc is the default dark theme; Clean Green is available for the interface and previews. |
 
 ## What it does
@@ -305,7 +305,7 @@ With a preview open in desktop Chrome, click **Screenshot**, **Record** or **Aut
 - **Save to folder…** picks a folder, and every screenshot and recording part is written there as it is made. Chrome remembers the folder and asks again for permission after a restart; **Use Downloads** goes back to downloads. Without a folder, each file starts a download.
 - The pace, its unit and the frame rate are remembered in this browser.
 
-<p align="center"><img src="docs/media/screenshot-capture.png?v=20261119-demo-intro" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
+<p align="center"><img src="docs/media/screenshot-capture.png?v=20261120-plugin" alt="Zinc Capture drawer configured for screenshots every 0.5 seconds and 15 fps recordings, with the samestate-captures folder selected beside responsive previews" width="800"></p>
 
 Capture follows the visible part of the wall as you scroll or zoom. In **Compare sites**, the crop includes the visible site columns together. Samestate saves the files locally.
 
@@ -507,7 +507,14 @@ docs/             The same app as a static page for the live demo (GitHub Pages)
 tests/smoke.mjs   Plays the guided demo in headless Chrome and checks each step.
 tests/testrun.mjs Writes a test with a stand-in AI service in the extension, replays it, and runs it in CI.
 tools/samestate-ci.mjs  Runs the difference report on any site in headless Chrome, for CI.
+mcp/server.mjs    MCP server for AI assistants (stdio): check_responsive, screenshot, run_checks, list_devices.
+mcp/chrome.mjs    Loads the extension in a hidden Chrome and calls the app's own report, checks and capture code.
+.claude-plugin/   Claude Code plugin and marketplace manifests; skills/check is the /samestate:check skill.
+tests/mcp.mjs     Checks the MCP server over stdio against the sample site.
+store/            Chrome Web Store listing text and images; tools/store-assets.mjs rebuilds the images.
 ```
+
+The MCP server reuses the extension rather than reimplementing it: like `tools/samestate-ci.mjs`, it loads `extension/` unpacked in headless Chrome with site access granted, opens `app.html?open=<url>`, selects screens and calls `detect()`, the Run all checks button and the per-screen layout. Element selectors are built inside each screen's frame from the paths the agent reports. See [`mcp/README.md`](mcp/README.md).
 
 Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke.mjs`. It needs no packages, plays all 46 demo steps, and runs on every push and pull request to `main`. `node tests/tool-search.mjs` checks the lookup, ranking, keyboard navigation, availability, discoverability and field-value exclusions. `node tests/outline.mjs` checks outlines, measurements, overlays, safe picking and privacy. `node tests/checks.mjs` checks the grouped UI workflow, review decisions, exports, missing measurements and cancellation. `node tests/testrun.mjs` checks test runs in the extension, with a stand-in for the AI service, and needs no key. `node tests/mcp.mjs` checks the MCP server over its stdio protocol against the sample site.
 
@@ -585,6 +592,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-20** | | | **Plugin everywhere**: the demo's last step and the video's end card mention the Claude Code plugin; How it works covers the MCP server; the GIF, screenshots, banner, card and walkthrough are re-recorded; README media links use a new cache key; a Chrome Web Store listing with images is in `store/` ([details](changelogs/CHANGELOG-plugin-everywhere.md)) |
 | **2026-11-20** | | | **README links the Claude Code plugin**: the links under the title include "Use with Claude Code", which jumps to the install steps ([details](changelogs/CHANGELOG-readme-claude-code-link.md)) |
 | **2026-11-20** | | | **Element selectors for AI assistants**: the MCP server's difference report names each element involved with a short CSS selector (for example `#cookies` or `div.tabs > button:nth-of-type(1)`), so an assistant can find it in the source; screenshots come back in the order asked for; plugin 0.1.4 ([details](changelogs/CHANGELOG-mcp-selectors.md)) |
 | **2026-11-20** | | | **Claude Code plugin and MCP server**: AI assistants can check a page on every screen size with the extension's own checks, in a hidden Chrome on your computer: difference report with fix CSS, screenshots per screen, combined checks and the screen list; `localhost` works; install with `/plugin marketplace add shouvik12/samestate`, plus a `/samestate:check` skill ([details](changelogs/CHANGELOG-mcp-plugin.md)) |

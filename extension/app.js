@@ -1849,7 +1849,7 @@ const STEPS = [
   },
   {
     title: 'That is the tour', wait: 0,
-    text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top.' : 'Click around the screens yourself, or install the Chrome extension to open any page.',
+    text: IS_EXT ? 'Keep exploring the sample site, or type your own address in the bar at the top. The Claude Code plugin runs these checks while you code.' : 'Click around the screens yourself, install the Chrome extension to open any page, or add the Claude Code plugin to run these checks while you code.',
     run: async t => {
       await window.samestateTourFeatures?.reset();
       if (!t.ok()) return;

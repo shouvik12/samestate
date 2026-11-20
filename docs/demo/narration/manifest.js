@@ -329,15 +329,15 @@ window.samestateDemoNarration = Object.freeze({
     },
     {
       "title": "That is the tour",
-      "caption": "Click around the screens yourself, or install the Chrome extension to open any page.",
+      "caption": "Click around the screens yourself, install the Chrome extension to open any page, or add the Claude Code plugin to run these checks while you code.",
       "file": "that-is-the-tour.mp3",
-      "extensionCaption": "Keep exploring the sample site, or type your own address in the bar at the top.",
+      "extensionCaption": "Keep exploring the sample site, or type your own address in the bar at the top. The Claude Code plugin runs these checks while you code.",
       "extensionFile": "that-is-the-tour-extension.mp3",
-      "duration": 6.432,
-      "speech": "That is the tour. Click around the screens yourself, or install the Chrome extension to open any page.",
-      "extensionDuration": 6.111,
-      "extensionSpeech": "That is the tour. Keep exploring the sample site, or type your own address in the bar at the top."
+      "duration": 9.899,
+      "speech": "That is the tour. Click around the screens yourself, install the Chrome extension to open any page, or add the Claude Code plugin to run these checks while you code.",
+      "extensionDuration": 9.515,
+      "extensionSpeech": "That is the tour. Keep exploring the sample site, or type your own address in the bar at the top. The Claude Code plugin runs these checks while you code."
     }
   ],
-  "build": "c3af6f8f8b7a26f9"
+  "build": "8fa5bc6f6186ecc7"
 });
