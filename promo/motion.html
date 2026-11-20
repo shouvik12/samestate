@@ -131,7 +131,8 @@ html.portrait #glow{width:1300px;height:1700px;margin:-850px 0 0 -650px}
    <div class="logo" id="l8"><i></i><i></i><i></i></div><div id="wordmark">Samestate</div>
   </div>
   <div class="h" id="h8" style="top:530px;font-size:46px;font-weight:600;color:var(--mute);letter-spacing:-.015em"><span class="w">Test </span><span class="w">every </span><span class="w">screen </span><span class="w">size </span><span class="w blue">at </span><span class="w blue">once.</span></div>
-  <div id="urlrow" style="position:absolute;left:0;right:0;top:660px;text-align:center"><span id="url">shouvik12.github.io/samestate</span></div>
+  <div id="urlrow" style="position:absolute;left:0;right:0;top:640px;text-align:center"><span id="url">shouvik12.github.io/samestate</span></div>
+  <div class="h" id="plat" style="top:722px;font-size:28px;font-weight:600;color:var(--mute);letter-spacing:-.01em"><span class="w">Chrome extension </span><span class="w blue">· </span><span class="w">Claude Code plugin</span></div>
   <div class="ring" id="burst" style="left:800px;top:400px"></div>
  </section>
 
@@ -150,7 +151,7 @@ const L=PORTRAIT?{
  css:{p1:'top:780px;font-size:140px',p2:'top:700px;font-size:140px',p3:'top:780px;font-size:140px',sync:'left:40px;top:520px;width:1000px;height:562.5px',h2a:'top:1190px;font-size:90px',h2b:'top:1190px;font-size:90px',
   h3:'top:320px;font-size:110px',count:'left:100px;width:880px;top:700px',bar:'left:100px;top:890px;width:880px',countlabel:'left:100px;top:980px',report:'left:40px;top:640px;width:1000px;height:562.5px',
   h4:'top:300px',h5:'top:700px;font-size:110px',h5b:'top:850px',wave:'left:300px;top:1000px',h6a:'top:220px',h6b:'top:220px',phone:'left:425px;top:440px',issue:'left:60px;top:1000px;width:960px',
-  l7:'top:520px',h7:'top:720px;font-size:170px',end:'top:620px',h8:'top:1080px',urlrow:'top:1200px',burst:'left:540px;top:800px'}
+  l7:'top:520px',h7:'top:720px;font-size:170px',end:'top:620px',h8:'top:1080px',urlrow:'top:1190px',plat:'top:1290px;font-size:34px',burst:'left:540px;top:800px'}
 }:{
  devs:[[150,140,110,190,0],[330,560,250,160,1],[1260,120,200,280,2],[1150,600,300,190,0],[90,560,130,220,2],[600,130,170,110,1],[900,670,120,170,0]],
  syncW:1180,reportW:1200,cardW:340,cardAt:i=>[70+i*370,360],cardPick:i=>[70+i*370+250,560],curStart:[1500,860],
@@ -314,6 +315,7 @@ function render(t){
   [...$('l8').children].forEach((i,n)=>{const q=back(P(t,26.3+n*.08,26.75+n*.08));st(i,{s:lerp(.3,1,q),o:clamp(q*1.4)});});
   words($('h8'),t,27.6,{stagger:.08,rise:30});
   const u=out3(P(t,28.3,28.7));st($('url'),{o:u,y:(1-u)*20});
+  words($('plat'),t,28.75,{stagger:.1,rise:24});
   const r=P(t,26.25,27.2);st($('burst'),{o:t<26.25?0:(1-r)*.9,s:lerp(1,26,out3(r))});
  }
 }
