@@ -2564,6 +2564,8 @@ function analyze(snaps, refId) {
     const longLines = vis.filter(i => i.cpl > 80).sort((a, b) => b.cpl - a.cpl);
     if (longLines.length) add('warn', 'Typography', dev, 'Lines too long', `${plural(longLines.length, 'paragraph')} with lines over 80 characters`, more(longLines.map(i => `${q(i.name)} about ${i.cpl} per line`)) + '. 45–75 characters is easiest to read; limit the width, for example max-width: 70ch.', longLines.map(i => i.key));
     // ---- errors from the page
+    const status = data.documentStatus;
+    if (status >= 400 && status < 600) add('issue', 'Errors', dev, 'Page HTTP error', `Page returned HTTP ${status}`, 'The preview’s main document loaded with an HTTP error status.');
     const errs = data.errors || [], jsErrors = errs.filter(e => e.kind !== 'resource'), failed = errs.filter(e => e.kind === 'resource');
     const refErrors = (ref.data.errors || []).filter(e => e.kind !== 'resource').length;
     if (jsErrors.length) add('issue', 'Errors', dev, 'JavaScript errors', `${plural(jsErrors.reduce((n, e) => n + e.count, 0), 'JavaScript error')}`, more(jsErrors.map(e => q(e.message)), 2) + (dev !== ref.dev && !refErrors ? ` None on ${screenName(ref.dev)}.` : '') + ' See the Console panel.');

@@ -41,10 +41,13 @@ const HOME = page('Shop', `<h1>Test shop</h1>
 <p id="out" hidden></p>
 <script>document.getElementById('signup').onsubmit = e => { e.preventDefault(); const o = document.getElementById('out'); o.hidden = false; o.textContent = 'Thanks, we will write to ' + e.target.email.value; };</script>`);
 const ABOUT = page('About', '<h1>About this shop</h1><p>We sell test data.</p>');
+const STATUS_PAGE = page('Page status fixture', '<main><h1>Page status fixture</h1></main>');
 
 function serveSite() {
   const server = createServer((req, res) => {
     const path = new URL(req.url, 'http://x').pathname;
+    const status = { '/status/200': 200, '/status/404': 404, '/status/500': 500 }[path];
+    if (status) { res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }).end(STATUS_PAGE); return; }
     const body = path === '/' ? HOME : path === '/about' ? ABOUT : null;
     if (!body) { res.writeHead(404).end(); return; }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(body);
@@ -268,27 +271,45 @@ async function main() {
       const incomplete = await evaluate('samestateChecks.get()');
       record('An unfinished AI plan cannot pass', incomplete.results[0].status === 'failed' && !incomplete.results[0].steps.length, incomplete.results[0].detail);
     }
+
+    // The same HTML is served at all three addresses. Only the navigation status changes.
+    await evaluate(`(() => {
+      for (const el of document.querySelectorAll('#checks-groups input')) el.checked = el.value === 'meta';
+      $('#checks-groups').dispatchEvent(new Event('change'));
+    })()`);
+    for (const status of [500, 404, 200]) {
+      const url = new URL('status/' + status, siteUrl).href;
+      await evaluate(`open(new URL(${JSON.stringify(url)}), true)`);
+      if (!await allReady()) throw new Error('Could not load the HTTP ' + status + ' test page.');
+      const row = await evaluate(`(async () => {
+        $('#checks-run').click();
+        while (samestateChecks.running) await new Promise(done => setTimeout(done, 100));
+        return samestateChecks.get().results.find(row => row.group === 'meta');
+      })()`);
+      const errors = row?.findings.filter(f => f.kind === 'Page HTTP error') || [];
+      record(`Meta & page errors for HTTP ${status}`, status === 200 ? !!row && row.status !== 'failed' && !errors.length
+        : row?.status === 'failed' && errors.length === 3 && errors.every(f => f.severity === 'issue' && f.title === 'Page returned HTTP ' + status), row?.detail);
+    }
     chrome.kill();
     chrome = null;
 
     // 4. The CI tool replays the test file.
-    const ci = (testFile, out) => new Promise(done => {
-      const child = spawn(process.execPath, [join(REPO, 'tools/samestate-ci.mjs'), siteUrl, `--test=${testFile}`, '--devices=iphone,ipad,desktop', `--out=${out}`, '--fail-on=none'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const ci = (...args) => new Promise(done => {
+      const child = spawn(process.execPath, [join(REPO, 'tools/samestate-ci.mjs'), ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
       let log = '';
       child.stdout.on('data', c => { log += c; }); child.stderr.on('data', c => { log += c; });
       child.on('exit', code => done({ code, log }));
     });
-    const good = await ci(file, join(work, 'ci-good'));
+    const good = await ci(siteUrl, `--test=${file}`, '--devices=iphone,ipad,desktop', `--out=${join(work, 'ci-good')}`, '--fail-on=none');
     const goodJson = JSON.parse(readFileSync(join(work, 'ci-good', 'test-results.json'), 'utf8'));
     record('CI replays the test file', good.code === 0 && goodJson.passed === true && goodJson.steps.length === written.steps.length, good.log.split('\n').find(l => l.startsWith('Test:')) || good.log.slice(-300));
-    const bad = await new Promise(done => {
-      const child = spawn(process.execPath, [join(REPO, 'tools/samestate-ci.mjs'), `--test=${wrong}`, '--devices=iphone,desktop', `--out=${join(work, 'ci-bad')}`, '--fail-on=warn'], { stdio: ['ignore', 'pipe', 'pipe'] });
-      let log = '';
-      child.stdout.on('data', c => { log += c; }); child.stderr.on('data', c => { log += c; });
-      child.on('exit', code => done({ code, log }));
-    });
+    const bad = await ci(`--test=${wrong}`, '--devices=iphone,desktop', `--out=${join(work, 'ci-bad')}`, '--fail-on=warn');
     const badJson = JSON.parse(readFileSync(join(work, 'ci-bad', 'test-results.json'), 'utf8'));
     record('CI fails on a wrong expectation', bad.code === 1 && badJson.passed === false && badJson.screens.every(s => s.failures.some(f => f.step === written.steps.length + 1)), bad.log.split('\n').filter(l => /^(Test:|  fail)/.test(l)).join(' / '));
+    const httpOut = join(work, 'ci-http-error');
+    const httpError = await ci(new URL('status/500', siteUrl).href, '--devices=desktop', `--out=${httpOut}`);
+    const httpReport = JSON.parse(readFileSync(join(httpOut, 'report.json'), 'utf8'));
+    record('Default CI fails on a document HTTP error', httpError.code === 1 && httpReport.findings.some(f => f.category === 'Errors' && f.severity === 'issue' && f.title === 'Page returned HTTP 500'));
     if (errors.length) record('No page errors', false, errors.join(' / '));
   } finally {
     chrome?.kill();
