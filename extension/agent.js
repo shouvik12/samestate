@@ -168,6 +168,34 @@
     return null;
   }
 
+  // For a control that left the page when it was clicked, such as a list item's Remove. If another screen has already
+  // lost that item, its neighbour sits in the same place, so these screens must agree on how long each list is.
+  function rowsOf(el) {
+    const rows = [];
+    for (let a = el; a && a !== document.body && a.parentElement; a = a.parentElement) rows.unshift(Array.from(a.parentElement.children).filter(x => x.tagName === a.tagName).length);
+    return rows.join('.');
+  }
+  // Which of the control's attributes no other visible control here shares.
+  function onlyOnes(el, { kind, sig }) {
+    const others = Array.from(document.querySelectorAll(ACTIONABLE)).filter(x => x !== el && kindOf(x) === kind && visible(x)).slice(0, 400).map(signature);
+    return Object.fromEntries(['id', 'label', 'shape'].map(tier => [tier, !!sig[tier] && !others.some(o => o[tier] === sig[tier])]));
+  }
+  function sameAttributes(el, { sig }) { const own = signature(el); return own.id === sig?.id && own.label === sig?.label; }
+  async function findGone(description) {
+    const { gone, sig, kind, textKey, path } = description;
+    const el = locate(path);
+    if (el?.matches(ACTIONABLE) && kindOf(el) === kind && canMirrorClick(el, description.link) && visible(el) && sameAttributes(el, description) && rowsOf(el) === gone.rows
+      && (!textKey || !cfg.textKey || await textFingerprint(el) === textKey)) return { el, status: 'direct' };
+    const pool = Array.from(document.querySelectorAll(ACTIONABLE)).filter(x => canMirrorClick(x, description.link) && kindOf(x) === kind && visible(x)).slice(0, 400);
+    for (const tier of ['id', 'label', 'shape']) {
+      if (!gone.only?.[tier] || !sig?.[tier]) continue;
+      const hits = pool.filter(x => signature(x)[tier] === sig[tier]);
+      if (hits.length === 1) return { el: hits[0], status: 'semantic' };
+      if (hits.length > 1) break;
+    }
+    return { el: null, status: 'none' };
+  }
+
   function locate(path) {
     if (!path || !/^\d+(?:\.\d+)*$/.test(path)) return null;
     let el = document.body;
@@ -196,6 +224,7 @@
   }
 
   async function findTarget(description) {
+    if (description.gone && !description.demoControl) return findGone(description);
     const candidates = matchingControls(description).filter(el => canMirrorClick(el, description.link));
     if (description.textKey && cfg.textKey && !description.demoControl) {
       const structural = candidates.find(visible);
@@ -300,16 +329,28 @@
   document.addEventListener('mouseenter', () => { hovering = true; mark(); });
   document.addEventListener('mouseleave', () => { hovering = false; if (lastHover) { lastHover = null; act('unhover', {}); } });
 
-  function mirrorClick(el, link = false) {
+  // What the click was on, read before the page's own handlers run: they may remove or replace the control.
+  function beforeClick(el, link = false) {
     const description = { ...describe(el), ...(link && { link: true }) };
-    const version = playbackVersion;
+    return { description, rows: rowsOf(el), only: onlyOnes(el, description), textKey: description.demoControl ? Promise.resolve('') : textFingerprint(el).catch(() => ''), address: location.href, version: playbackVersion };
+  }
+  function mirrorClick(el, before) {
+    const { description, rows, only, address, version } = before;
     setTimeout(async () => {
-      if (!el.isConnected || version !== playbackVersion) return;
-      const expanded = el.matches('[aria-expanded=true]') ? true : el.matches('[aria-expanded=false]') ? false : null;
-      const open = el.matches('details > summary') ? el.parentElement.open : null;
-      const pressed = el.getAttribute('aria-pressed');
-      const textKey = description.demoControl ? '' : await textFingerprint(el).catch(() => '');
-      if (el.isConnected && version === playbackVersion) act('click', { d: { ...description, textKey }, expanded, open, pressed });
+      if (version !== playbackVersion) return;
+      let gone = null, state = el;
+      if (!el.isConnected) {
+        if (location.href !== address) return; // the click opened another page, which link sync shares
+        gone = { rows, only };
+        // A page that draws its controls again leaves a new copy in the same place; the copy has the state after the click.
+        const copy = locate(description.path);
+        state = copy && copy.matches(ACTIONABLE) && kindOf(copy) === description.kind && sameAttributes(copy, description) && rowsOf(copy) === rows ? copy : null;
+      }
+      const expanded = state?.matches('[aria-expanded=true]') ? true : state?.matches('[aria-expanded=false]') ? false : null;
+      const open = state?.matches('details > summary') ? state.parentElement.open : null;
+      const pressed = state?.getAttribute('aria-pressed') ?? null;
+      const textKey = gone ? await before.textKey : description.demoControl ? '' : await textFingerprint(el).catch(() => '');
+      if (version === playbackVersion) act('click', { d: { ...description, textKey, ...(gone && { gone }) }, expanded, open, pressed });
     }, 90);
   }
 
@@ -386,10 +427,15 @@
     }
     if (e.target.closest?.(playerControl)) return;
     const el = actionable(e.target);
-    if (el && canMirrorClick(el)) mirrorClick(el);
+    if (el && canMirrorClick(el)) mirrorClick(el, beforeClick(el));
     // A link the page handles itself (it cancels the click, then opens a menu, a tab or a dialog) acts as a button.
     // Links that open a page are left to link sync. The page's own handlers have all run by the next task.
-    else if (el && canMirrorClick(el, true)) setTimeout(() => { if (e.defaultPrevented) mirrorClick(el, true); }, 0);
+    else if (el && canMirrorClick(el, true)) {
+      const before = beforeClick(el, true);
+      setTimeout(() => { if (e.defaultPrevented) mirrorClick(el, before); }, 0);
+    }
+    // Form buttons are never clicked on the other screens; the Sync log says so.
+    else if (el && el.matches('button,input[type=button],input[type=submit],input[type=reset],input[type=image]') && el.closest('form')) send('stayed');
   }, true);
 
   // A link followed on this screen, or a page change a click here started (single-page apps change pages
@@ -1715,7 +1761,7 @@
   async function runDemo(m) {
     const el = m.sel && document.querySelector(m.sel); if (!el) return; send('active');
     if (m.do === 'console') { console.info('Samestate demo: this message came from the preview.'); return; }
-    if (m.do === 'click' && canMirrorClick(el)) { flash(el); press(el); mirrorClick(el); }
+    if (m.do === 'click' && canMirrorClick(el)) { const before = beforeClick(el); flash(el); press(el); mirrorClick(el, before); }
     else if (m.do === 'scroll') { const y0 = scrollY, y = el.getBoundingClientRect().top + scrollY - 90; for (let i = 1; i <= 28; i++) { window.scrollTo({ top: y0 + (y - y0) * i / 28, behavior: 'instant' }); act('scroll', scrollState()); await sleep(28); } }
     else if (m.do === 'link' && el.matches('a[href]')) { // a synthetic click is not user-initiated, so the tour shares the address itself
       flash(el);

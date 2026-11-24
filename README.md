@@ -562,6 +562,8 @@ Run the smoke test with Node 22 or later and Chrome installed: `node tests/smoke
 - With **Use my sign-ins** on, every screen acts on your real account: a synced click on Delete or Buy happens on
   each screen. Turn it off, or unlink screens, before testing actions like these.
 - Clicks and report comparisons can miss matches when a site uses different markup and text across screen sizes.
+- A button that leaves the page when clicked (a list item's Remove) is only clicked on screens whose lists have the
+  same length there, or where its own attributes are unique. Otherwise the Sync log shows `no match`, so a neighbour is not clicked by mistake.
 - In a single-page app, the other screens load the new address as a full page rather than through the app's
   router, so state kept only in memory (an open filter, a typed search) is not carried over.
 - The server user-agent applies to page loads in phone and tablet previews, not to their images, scripts or API
@@ -623,6 +625,7 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-24** | | | **Buttons that remove themselves** · Clicking a cookie banner's Accept, an item's Remove or a control the page redraws now reaches every screen again, and the Sync log says when a form button stays on one screen ([details](changelogs/CHANGELOG-removed-button-sync.md)) |
 | **2026-11-20** | | | **Page HTTP errors** · Main page responses with HTTP 4xx or 5xx count as issues in the app and CI ([details](changelogs/CHANGELOG-page-http-errors.md)) |
 | **2026-11-20** | | | **MCP selector and cancellation fixes** · Reports identify the intended element in deeply nested layouts. Cancelling a tool call stops its scan or skips it in the queue ([details](changelogs/CHANGELOG-mcp-selector-cancellation.md)) |
 | **2026-11-20** | | | **ChatGPT Desktop installation**: terminal commands to add the Samestate marketplace, install and list the plugin, plus local chat setup, requirements and a usage example ([details](changelogs/CHANGELOG-chatgpt-install.md)) |
