@@ -2197,6 +2197,16 @@ function handleMessage(device, message) {
       addResult(message, device);
       playbackResult(message, device);
       break;
+    case 'stayed': { // a click that sync leaves on the screen it was made on
+      if ((!device.site && pageSteps) || !device.linked || !SYNC.click[1] || !workspaceScreens().includes(device)) return;
+      const id = ++aid;
+      startEntry(id, device, { kind: 'click', d: { kind: 'form button' } });
+      const note = document.createElement('div');
+      note.className = 'r'; note.style.color = 'var(--mute)';
+      note.textContent = 'stays on this screen: form buttons are not synced';
+      entries.get(id).appendChild(note);
+      break;
+    }
     case 'act': {
       if ((!device.site && pageSteps) || !workspaceScreens().includes(device)) return;
       if (!Object.hasOwn(KIND_SYNC, message.kind) || !SYNC[KIND_SYNC[message.kind]][1]) return;

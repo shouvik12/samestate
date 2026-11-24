@@ -329,6 +329,81 @@ const AFTER_TOUR = `(async () => {
   return results;
 })()`;
 
+// Buttons that remove themselves when clicked (a cookie banner's Accept, a list item's Remove). Real mouse events:
+// the tour's own clicks are synthetic and do not go through the click listener.
+async function removedButtons(page) {
+  const out = [], wait = ms => new Promise(done => setTimeout(done, ms));
+  const record = (title, ok, detail) => out.push({ title, ok: !!ok, detail });
+  const fresh = setup => page.evaluate(`(async () => {
+    closeDebugMenu?.(false);
+    for (const d of active()) { d.ready = false; d.iframe.contentWindow.location.reload(); }
+    for (let i = 0; i < 80 && !active().every(d => d.ready); i++) await new Promise(r => setTimeout(r, 100));
+    await new Promise(r => setTimeout(r, 600));
+    for (const d of active()) { const doc = d.iframe.contentDocument; (${setup})(doc, d); }
+    document.querySelector('#log').replaceChildren(); entries.clear();
+    return active().length;
+  })()`);
+  const click = async selector => {
+    const at = await page.evaluate(`(async () => {
+      const d = active().find(x => x.id === 'iphone'), el = d.iframe.contentDocument.querySelector(${JSON.stringify(selector)});
+      d.el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' }); el.scrollIntoView({ block: 'center', behavior: 'instant' });
+      await new Promise(r => setTimeout(r, 400));
+      const f = d.iframe.getBoundingClientRect(), r = el.getBoundingClientRect(), k = f.width / d.iframe.offsetWidth;
+      return { x: f.left + (r.left + r.width / 2) * k, y: f.top + (r.top + r.height / 2) * k };
+    })()`);
+    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, ...at, button: 'left', clickCount: 1 });
+    await wait(2600);
+  };
+  const count = test => page.evaluate(`active().filter(d => (${test})(d.iframe.contentDocument)).length`);
+  const tags = () => page.evaluate(`[...document.querySelectorAll('#log .entry .tag')].map(t => t.textContent).join(',')`);
+  const LIST = `doc => { const ul = doc.createElement('ul'); ul.id = 'smoke-list'; ul.style.cssText = 'position:fixed;left:0;top:60px;z-index:99;background:#fff';
+    for (const n of ['A','B','C']) { const li = doc.createElement('li'), b = doc.createElement('button'); li.dataset.item = n; b.textContent = 'Remove'; b.className = 'rm'; b.onclick = () => li.remove(); li.append(b); ul.append(li); }
+    doc.body.append(ul); }`;
+  const items = () => page.evaluate(`active().map(d => [...d.iframe.contentDocument.querySelectorAll('#smoke-list li')].map(l => l.dataset.item).join('')).join(' ')`);
+  try {
+    const screens = await fresh('() => {}');
+    const before = await count(`d => !!d.querySelector('#cookies')`);
+    await click('#cookies button');
+    const after = await count(`d => !!d.querySelector('#cookies')`), log = await tags();
+    record('Cookie banner on every screen', before === screens && after === 0 && log === Array(screens - 1).fill('same').join(','), `banners ${before} → ${after}, Sync log: ${log || 'nothing'}`);
+
+    await fresh(LIST); await click('#smoke-list li:first-child button');
+    const removed = await items();
+    record('Remove item on every screen', removed === Array(screens).fill('BC').join(' '), removed);
+    await click('#smoke-list li:first-child button');
+    const twice = await items();
+    record('Remove the next item', twice === Array(screens).fill('C').join(' '), twice);
+
+    // One screen has already lost the item: its neighbour now sits at the same place and must not be clicked.
+    await fresh(`(doc, d) => { (${LIST})(doc); if (d.id === 'desktop') doc.querySelector('#smoke-list li').remove(); }`);
+    await click('#smoke-list li:first-child button');
+    const kept = await items();
+    record('Neighbour is left alone', kept === Array(screens).fill('BC').join(' '), kept + ', Sync log: ' + await tags());
+
+    await fresh('() => {}');
+    await page.evaluate(`(async () => { const m = document.querySelector('#match-text'); if (!m.checked) m.click(); await new Promise(r => setTimeout(r, 800)); })()`);
+    await click('#cookies button');
+    const text = await count(`d => !!d.querySelector('#cookies')`);
+    const matching = await page.evaluate(`document.querySelector('#match-text').checked && !!textSalt`);
+    await page.evaluate(`document.querySelector('#match-text').checked && document.querySelector('#match-text').click()`);
+    record('Cookie banner with Match visible text', matching && text === 0, `option on: ${matching}, banners left: ${text}`);
+
+    // A toggle the page re-renders as a new element is sent once, and ends in the same state everywhere.
+    const TOGGLE = `doc => { const box = doc.createElement('div'); box.id = 'smoke-toggle'; box.style.cssText = 'position:fixed;left:0;top:60px;z-index:99'; let on = false, n = 0;
+      const draw = () => { box.innerHTML = '<button aria-pressed="' + on + '">Star</button>'; box.dataset.clicks = n; box.firstChild.onclick = () => { on = !on; n++; draw(); }; }; draw(); doc.body.append(box); }`;
+    await fresh(TOGGLE); await click('#smoke-toggle button');
+    const toggled = await count(`d => d.querySelector('#smoke-toggle button').getAttribute('aria-pressed') === 'true' && d.querySelector('#smoke-toggle').dataset.clicks === '1'`);
+    record('Re-rendered toggle', toggled === screens, `on after one click: ${toggled} of ${screens}`);
+
+    await fresh(`doc => { const f = doc.createElement('form'); f.id = 'smoke-form'; f.style.cssText = 'position:fixed;left:0;top:60px;z-index:99'; f.onsubmit = e => e.preventDefault(); f.innerHTML = '<button>Save</button>'; f.firstChild.onclick = () => f.dataset.hit = 1; doc.body.append(f); }`);
+    await click('#smoke-form button');
+    await click('#cookies button'); // a later entry leaves the note in place
+    const hits = await count(`d => d.querySelector('#smoke-form').dataset.hit === '1'`), note = await page.evaluate(`document.querySelector('#log').textContent`);
+    record('Log says what stays on one screen', hits === 1 && /stays on this screen/.test(note), `clicked on ${hits}, log: ${note}`);
+  } catch (error) { record('Buttons that remove themselves', false, error.message); }
+  return out;
+}
+
 async function main() {
   const server = await serve();
   const profile = mkdtempSync(join(tmpdir(), 'samestate-smoke-'));
@@ -368,7 +443,7 @@ async function main() {
     }
     const results = state?.results || [];
     if (state?.done) {
-      for (const r of await page.evaluate(AFTER_TOUR)) {
+      for (const r of [...await page.evaluate(AFTER_TOUR), ...await removedButtons(page)]) {
         console.log(`${r.ok ? 'ok  ' : 'FAIL'}    ${r.title.padEnd(30)} ${r.detail}`);
         results.push(r);
       }
