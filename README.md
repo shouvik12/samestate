@@ -394,6 +394,8 @@ Install it as a Claude Code plugin from this repository:
 /plugin install samestate@samestate
 ```
 
+Existing installations can run `claude plugin update samestate@samestate` and restart Claude Code to load the **0.2.0** plugin.
+
 Or add only the MCP server from a checkout:
 
 ```
@@ -411,9 +413,9 @@ Then ask, for example, “check http://localhost:3000 on phones and fix what bre
 | `run_checks` | The automated check groups (layout, accessibility, meta, performance, links; optionally the width sweep and screen settings) with pass, warning or fail |
 | `list_devices` | Every screen id and size, for the `devices` and `reference` options |
 
-The server loads the extension from `extension/` in a hidden Chrome with its own temporary profile, so the checks are
-the app's own. That profile has access to http and https sites because nobody is there to answer Chrome's prompt; it
-holds none of your sign-ins and is deleted when the server stops. Details: [`mcp/README.md`](mcp/README.md).
+The server loads the extension from `extension/` in Chrome with its own temporary profile, so the checks are
+the app's own. That profile has access to http and https sites because nobody is there to answer Chrome's prompt.
+For protected pages, pass `sign_in` with a project test-session file, or a login URL and success URL to sign in through a separate temporary Chrome window. Pass the same option on every authenticated tool call. The profile is deleted when the server stops. [Test-account setup](mcp/README.md#test-account-sign-in)
 
 ## Search every tool and feature
 
@@ -625,6 +627,8 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
+| **2026-11-26** | | | **Plugin updates** · Plugin version 0.2.0 matches the extension, with CI enforcing matching versions and a version change when bundled code changes ([details](changelogs/CHANGELOG-plugin-version-sync.md)) |
+| **2026-11-26** | | | **Plugin test-account sign-in** · Restore a project session file or complete login in an isolated Chrome window before checking protected pages ([details](changelogs/CHANGELOG-plugin-sign-in.md)) |
 | **2026-11-24** | | | **Buttons that remove themselves** · Clicking a cookie banner's Accept, an item's Remove or a control the page redraws now reaches every screen again, and the Sync log says when a form button stays on one screen ([details](changelogs/CHANGELOG-removed-button-sync.md)) |
 | **2026-11-20** | | | **Page HTTP errors** · Main page responses with HTTP 4xx or 5xx count as issues in the app and CI ([details](changelogs/CHANGELOG-page-http-errors.md)) |
 | **2026-11-20** | | | **MCP selector and cancellation fixes** · Reports identify the intended element in deeply nested layouts. Cancelling a tool call stops its scan or skips it in the queue ([details](changelogs/CHANGELOG-mcp-selector-cancellation.md)) |

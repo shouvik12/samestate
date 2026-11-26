@@ -8,6 +8,7 @@ import {tmpdir} from 'node:os';
 import {join,resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
+import {readSignIn} from './auth.mjs';
 
 export const EXTENSION=resolve(dirname(fileURLToPath(import.meta.url)),'../extension');
 
@@ -90,7 +91,7 @@ export class Samestate{
 
  wait(ms){return delay(ms,undefined,{signal:this.signal});}
 
- async start(){
+ async start({visible=false}={}){
   if(this.session)return;
   await this.close();
   this.signal?.throwIfAborted();
@@ -100,7 +101,7 @@ export class Samestate{
   const manifest=JSON.parse(readFileSync(join(ext,'manifest.json'),'utf8'));
   manifest.host_permissions=manifest.optional_host_permissions||['http://*/*','https://*/*'];delete manifest.optional_host_permissions;
   writeFileSync(join(ext,'manifest.json'),JSON.stringify(manifest));
-  const chrome=this.chrome=spawn(executable,['--headless=new','--remote-debugging-pipe','--enable-unsafe-extension-debugging',`--user-data-dir=${join(this.temp,'profile')}`,'--no-first-run','--no-default-browser-check','--mute-audio','--hide-scrollbars','--window-size=4000,2400','about:blank'],{stdio:['ignore','ignore','pipe','pipe','pipe']});
+  const chrome=this.chrome=spawn(executable,[...(visible?[]:['--headless=new']),'--remote-debugging-pipe','--enable-unsafe-extension-debugging',`--user-data-dir=${join(this.temp,'profile')}`,'--no-first-run','--no-default-browser-check','--mute-audio','--hide-scrollbars',visible?'--window-size=1200,900':'--window-size=4000,2400','about:blank'],{stdio:['ignore','ignore','pipe','pipe','pipe']});
   chrome.stderr.on('data',()=>{});
   let buffer='',next=0;const pending=new Map();this.events=[];
   let disconnected;
@@ -138,19 +139,72 @@ export class Samestate{
   };
   // Each screen's page runs in its own frame process; its DevTools session is kept by frame id to read element selectors.
   this.frames=new Map();
+  this.frameSetupError=null;
   this.events.push(message=>{
-   if(message.method==='Target.attachedToTarget'&&message.params.targetInfo.type==='iframe')this.frames.set(message.params.targetInfo.targetId,message.params.sessionId);
+   if(message.method==='Target.attachedToTarget'&&message.params.targetInfo.type!=='iframe'&&message.params.waitingForDebugger){
+    this.send('Runtime.runIfWaitingForDebugger',{},message.params.sessionId).catch(()=>{});
+   }
+   if(message.method==='Target.attachedToTarget'&&message.params.targetInfo.type==='iframe'){
+    const frame=message.params.sessionId;
+    this.frames.set(message.params.targetInfo.targetId,frame);
+    if(this.authStorageScript)this.prepareStorageFrame(frame).catch(()=>{
+     if(this.chrome===chrome&&!this.signal?.aborted&&[...this.frames.values()].includes(frame)){
+      this.frameSetupError=Error('Could not restore test-account storage in a preview.');
+     }
+    });
+   }
    if(message.method==='Target.detachedFromTarget')for(const [frame,session] of this.frames)if(session===message.params.sessionId)this.frames.delete(frame);
   });
   const {id}=await this.send('Extensions.loadUnpacked',{path:ext});
   this.base=`chrome-extension://${id}/app.html`;
   const {targetId}=await this.send('Target.createTarget',{url:'about:blank'});
   const {sessionId}=await this.send('Target.attachToTarget',{targetId,flatten:true});
-  await this.send('Emulation.setDeviceMetricsOverride',{width:4000,height:2400,deviceScaleFactor:1,mobile:false},sessionId);
+  if(!visible)await this.send('Emulation.setDeviceMetricsOverride',{width:4000,height:2400,deviceScaleFactor:1,mobile:false},sessionId);
   await this.send('Runtime.enable',{},sessionId);
   await this.send('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:false,flatten:true},sessionId);
   this.session=sessionId;
   this.log('Chrome ready with the Samestate extension '+manifest.version);
+ }
+
+ async signIn(auth){
+  if(auth.mode==='login'){
+   this.log('Complete the test-account login in the separate Samestate Chrome window. Waiting for the success URL.');
+   await this.send('Page.navigate',{url:auth.loginUrl},this.session);
+   await this.send('Page.bringToFront',{},this.session);
+   if(!await this.until(`document.readyState==='complete'&&location.href===${JSON.stringify(auth.successUrl)}`,auth.timeout*1000)){
+    throw Error('Test-account sign-in did not reach success_url in time. Retry with a longer timeout to finish login.');
+   }
+   const localStorage=await this.evaluate('Object.entries(localStorage).map(([name,value])=>({name,value}))');
+   await this.setAuthStorage(auth.origin,localStorage);
+   await this.send('Emulation.setDeviceMetricsOverride',{width:4000,height:2400,deviceScaleFactor:1,mobile:false},this.session);
+   return;
+  }
+  try{
+   if(auth.cookies.length)await this.send('Storage.setCookies',{cookies:auth.cookies});
+   await this.setAuthStorage(auth.origin,auth.localStorage);
+  }catch(error){
+   if(this.signal?.aborted)throw error;
+   throw Error('Could not restore the saved test-account session. Check the file format and refresh expired login state.');
+  }
+ }
+
+ async setAuthStorage(origin,entries){
+  if(!entries.length)return;
+  // Preview storage is partitioned by the extension's top-level page. Seed the preview itself before its scripts run.
+  this.authStorageScript=`if(location.origin===${JSON.stringify(origin)}){for(const {name,value} of ${JSON.stringify(entries)})localStorage.setItem(name,value);}`;
+  await this.send('Target.setAutoAttach',{autoAttach:true,waitForDebuggerOnStart:true,flatten:true},this.session);
+ }
+
+ async prepareStorageFrame(frame){
+  // Enabling Page can wait for the paused navigation. Start it before registering the script, then resume.
+  const enabling=this.send('Page.enable',{},frame).then(()=>null,error=>error);
+  try{
+   await this.send('Page.addScriptToEvaluateOnNewDocument',{source:this.authStorageScript,runImmediately:true},frame);
+  }finally{
+   await this.send('Runtime.runIfWaitingForDebugger',{},frame);
+   const error=await enabling;
+   if(error)throw error;
+  }
  }
 
  async evaluate(expression){
@@ -161,6 +215,7 @@ export class Samestate{
  async until(expression,timeout,step=250){
   const end=Date.now()+timeout;
   while(Date.now()<end){
+   if(this.frameSetupError)throw this.frameSetupError;
    try{if(await this.evaluate(expression))return true;}
    catch(error){if(this.signal?.aborted||!this.session)throw error;}
    await this.wait(step);
@@ -169,10 +224,21 @@ export class Samestate{
  }
 
  // Opens url on the chosen screens (ids from listDevices) and waits until each has loaded and connected.
- async open(url,{devices,reference}={}){
-  await this.start();
+ async open(url,{devices,reference,sign_in}={}){
   let parsed;try{parsed=new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(url)?url:(/^(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test(url)?'http://':'https://')+url);}catch{throw Error('Not a valid address: '+url);}
   if(!/^https?:$/.test(parsed.protocol))throw Error('Only http and https addresses can be opened.');
+  const auth=readSignIn(sign_in,parsed);
+  if(this.authKey!==auth.key)await this.close();
+  await this.start({visible:auth.mode==='login'});
+  if(this.authKey!==auth.key){
+   try{
+    if(auth.mode)await this.signIn(auth);
+    this.authKey=auth.key;
+   }catch(error){
+    await this.close();
+    throw error;
+   }
+  }
   await this.send('Page.navigate',{url:this.base+'?open='+encodeURIComponent(parsed.href)},this.session);
   if(!await this.until("document.readyState==='complete'&&typeof active==='function'&&!!target",20000)){
    const why=await this.evaluate("document.querySelector('#joblog')?.textContent||''").catch(()=>'');
@@ -190,6 +256,13 @@ export class Samestate{
   }
   await this.until('active().length&&active().every(d=>d.ready)',30000,400);
   await this.wait(1200); // the page's own resize and font loading settle, as in the app's delayed first scan
+  if(auth.mode){
+   const pages=await this.evaluate('Promise.all(active().filter(d=>d.ready).map(screenAddress)).then(pages=>pages.map(page=>page&&({origin:page.origin,pathname:page.pathname})))');
+   const path=parsed.pathname.replace(/\/$/,'')||'/';
+   if(pages.some(page=>!page||page.origin!==parsed.origin||(page.pathname.replace(/\/$/,'')||'/')!==path)){
+    throw Error('Authenticated previews reached a different page. Refresh the test-account session or use the final page URL.');
+   }
+  }
   return this.evaluate(`({url:previewUrl,reference:document.querySelector('#ref').value,screens:active().map(d=>({id:d.id,name:screenName(d),width:d.w,height:d.h,ready:!!d.ready}))})`);
  }
 
@@ -296,5 +369,8 @@ export class Samestate{
    rmSync(this.temp,{recursive:true,force:true});
    this.temp=null;
   }
+  this.authKey=null;
+  this.authStorageScript=null;
+  this.frameSetupError=null;
  }
 }

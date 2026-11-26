@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 *.log
 *.zip
+.samestate/auth/
 # Promo video: Python venv, downloaded Piper voice, and rendered audio/video
 promo/.venv/
 promo/voices/
