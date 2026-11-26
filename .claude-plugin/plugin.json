@@ -1,6 +1,6 @@
 {
   "name": "samestate",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Check a page on every screen size at once: Samestate's difference report, combined checks and per-screen screenshots, run locally in a hidden Chrome. Works with localhost.",
   "author": { "name": "shouvik12", "url": "https://github.com/shouvik12" },
   "homepage": "https://github.com/shouvik12/samestate",

@@ -14,11 +14,22 @@ const samestate=new Samestate({log});
 const url={type:'string',description:'Page to open, for example http://localhost:3000/pricing or https://example.com. Local addresses work.'};
 const devices={type:'array',items:{type:'string'},description:'Screen ids from list_devices. Default: the seven starter screens (iPhone 11 Pro, Nexus 7, Desktop, MacBook Air, Android, Pixel 3 XL, iPad Pro 11″).'};
 const reference={type:'string',description:'Screen id the others are compared with (default: Desktop).'};
+const sign_in={
+ description:'Explicit test-account sign-in in Samestate’s isolated Chrome. Provide a project storage-state JSON file, or a login URL and the final URL reached after manual sign-in in a separate window. Repeat this option on each authenticated tool call.',
+ oneOf:[
+  {type:'object',properties:{state_file:{type:'string',description:'Path inside the project to a test-account storage-state JSON file with cookies and origins/localStorage. Relative to the server working directory.'}},required:['state_file'],additionalProperties:false},
+  {type:'object',properties:{
+   login_url:{type:'string',description:'Full URL for signing in to a test account. Opens in a separate temporary Chrome window.'},
+   success_url:{type:'string',description:'Full URL reached after successful login, on the same origin as the page being checked.'},
+   timeout_seconds:{type:'number',minimum:1,maximum:600,description:'Time to finish manual login, in seconds. Default 120.'}
+  },required:['login_url','success_url'],additionalProperties:false}
+ ]
+};
 const TOOLS=[
  {name:'list_devices',title:'List screens',description:'Lists the screen sizes Samestate can open (phones, tablets, desktops) with their ids, CSS pixel sizes and which ones are on by default.',inputSchema:{type:'object',properties:{}},annotations:{readOnlyHint:true}},
- {name:'check_responsive',title:'Check a page on every screen size',description:'Opens the page on several screen sizes at once and returns Samestate\'s difference report: what breaks on which screens (sideways scroll, tables wider than their container, cut-off text, small tap targets, tiny text, stretched or broken images, missing viewport tag, content missing compared with the reference screen, accessibility, meta and performance findings), each with the affected screens and, where one exists, the CSS that usually fixes it. Use after changing layout or CSS to see what broke.',inputSchema:{type:'object',properties:{url,devices,reference,include_adaptations:{type:'boolean',description:'Also list expected layout adaptations (for example a menu that collapses on phones). Default false.'},check_links:{type:'boolean',description:'Also check same-origin links for 404s. Slower. Default false.'}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}},
- {name:'run_checks',title:'Run combined checks',description:'Runs Samestate\'s automated check groups on the page across the chosen screens and returns pass, warning or fail per check with the findings. Groups: layout, accessibility, meta, performance, links (default: all five); widths adds a 320–1920px width sweep (takes minutes); settings scans screen settings and longer text.',inputSchema:{type:'object',properties:{url,devices,reference,groups:{type:'array',items:{type:'string',enum:['layout','accessibility','meta','performance','links','widths','settings']}}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}},
- {name:'screenshot',title:'Screenshot every screen',description:'Opens the page on the chosen screens and returns one screenshot per screen, as Samestate shows it. Use to look at a layout problem the report mentions. Keep to a few screens; each image is up to 900px wide.',inputSchema:{type:'object',properties:{url,devices:{...devices,description:'Screen ids from list_devices. Default: iphone, ipad, desktop.'},width:{type:'number',description:'Image width in pixels (default: the screen width, at most 900).'}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}}
+ {name:'check_responsive',title:'Check a page on every screen size',description:'Opens the page on several screen sizes at once and returns Samestate\'s difference report: what breaks on which screens (sideways scroll, tables wider than their container, cut-off text, small tap targets, tiny text, stretched or broken images, missing viewport tag, content missing compared with the reference screen, accessibility, meta and performance findings), each with the affected screens and, where one exists, the CSS that usually fixes it. Use after changing layout or CSS to see what broke.',inputSchema:{type:'object',properties:{url,devices,reference,sign_in,include_adaptations:{type:'boolean',description:'Also list expected layout adaptations (for example a menu that collapses on phones). Default false.'},check_links:{type:'boolean',description:'Also check same-origin links for 404s. Slower. Default false.'}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}},
+ {name:'run_checks',title:'Run combined checks',description:'Runs Samestate\'s automated check groups on the page across the chosen screens and returns pass, warning or fail per check with the findings. Groups: layout, accessibility, meta, performance, links (default: all five); widths adds a 320–1920px width sweep (takes minutes); settings scans screen settings and longer text.',inputSchema:{type:'object',properties:{url,devices,reference,sign_in,groups:{type:'array',items:{type:'string',enum:['layout','accessibility','meta','performance','links','widths','settings']}}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}},
+ {name:'screenshot',title:'Screenshot every screen',description:'Opens the page on the chosen screens and returns one screenshot per screen, as Samestate shows it. Use to look at a layout problem the report mentions. Keep to a few screens; each image is up to 900px wide.',inputSchema:{type:'object',properties:{url,sign_in,devices:{...devices,description:'Screen ids from list_devices. Default: iphone, ipad, desktop.'},width:{type:'number',description:'Image width in pixels (default: the screen width, at most 900).'}},required:['url']},annotations:{readOnlyHint:true,openWorldHint:true}}
 ];
 
 function differencesText(r,{adaptations}){
@@ -57,7 +68,7 @@ async function call(name,args={},signal){
   const list=await samestate.listDevices(signal);
   return [{type:'text',text:list.map(d=>`${d.id} — ${d.name} ${d.width}×${d.height} (${d.kind}, ${d.group})${d.default?' · default':''}`).join('\n')}];
  }
- const options={devices:args.devices,reference:args.reference,signal};
+ const options={devices:args.devices,reference:args.reference,sign_in:args.sign_in,signal};
  if(name==='check_responsive'){
   const r=await samestate.differences(args.url,{...options,links:!!args.check_links});
   if(r.unmeasured.length===r.screens.length)throw Error(`${r.url} did not load on any screen within 30 seconds. Check that the address is right and its server is running.`);
@@ -65,7 +76,7 @@ async function call(name,args={},signal){
  }
  if(name==='run_checks')return [{type:'text',text:checksText(await samestate.checks(args.url,{...options,groups:args.groups}))}];
  if(name==='screenshot'){
-  const r=await samestate.screenshots(args.url,{devices:args.devices?.length?args.devices:['iphone','ipad','desktop'],width:args.width,signal});
+  const r=await samestate.screenshots(args.url,{devices:args.devices?.length?args.devices:['iphone','ipad','desktop'],width:args.width,sign_in:args.sign_in,signal});
   return [{type:'text',text:`Screenshots of ${r.url}: ${r.shots.map(s=>`${s.name} (${s.width}×${s.height})`).join(', ')}`+(r.shots.length<r.screens.length?`. Not loaded: ${r.screens.filter(s=>!s.ready).map(s=>s.name).join(', ')}.`:'')},
    ...r.shots.flatMap(s=>[{type:'text',text:s.name},{type:'image',data:s.png,mimeType:'image/png'}])];
  }

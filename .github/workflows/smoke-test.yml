@@ -25,3 +25,23 @@ jobs:
 
       - name: Write a test with a stand-in AI, replay it, and run it in CI
         run: CHROME_PATH="$(command -v google-chrome)" node tests/testrun.mjs
+
+  plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Keep plugin and extension release versions together
+        env:
+          SAMESTATE_VERSION_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node tools/check-versions.mjs
+
+      - name: Check the MCP tools and isolated test-account sign-in
+        run: CHROME_PATH="$(command -v google-chrome)" xvfb-run -a node tests/mcp.mjs
