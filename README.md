@@ -627,8 +627,8 @@ Each change has a file in [`changelogs/`](changelogs/) with the details. Commit 
 
 | Date | Commit time | Commits | Feature / Update |
 |------|-------------|---------|------------------|
-| **2026-11-26** | | | **Plugin updates** · Plugin version 0.2.0 matches the extension, with CI enforcing matching versions and a version change when bundled code changes ([details](changelogs/CHANGELOG-plugin-version-sync.md)) |
-| **2026-11-26** | | | **Plugin test-account sign-in** · Restore a project session file or complete login in an isolated Chrome window before checking protected pages ([details](changelogs/CHANGELOG-plugin-sign-in.md)) |
+| **2026-11-26** | 18:45:54 +09:00 | `9ac7b58` | **Plugin updates** · Plugin version 0.2.0 matches the extension, with CI enforcing matching versions and a version change when bundled code changes ([details](changelogs/CHANGELOG-plugin-version-sync.md)) |
+| **2026-11-26** | 18:45:54 +09:00 | `9ac7b58` | **Plugin test-account sign-in** · Restore a project session file or complete login in an isolated Chrome window before checking protected pages ([details](changelogs/CHANGELOG-plugin-sign-in.md)) |
 | **2026-11-24** | | | **Buttons that remove themselves** · Clicking a cookie banner's Accept, an item's Remove or a control the page redraws now reaches every screen again, and the Sync log says when a form button stays on one screen ([details](changelogs/CHANGELOG-removed-button-sync.md)) |
 | **2026-11-20** | | | **Page HTTP errors** · Main page responses with HTTP 4xx or 5xx count as issues in the app and CI ([details](changelogs/CHANGELOG-page-http-errors.md)) |
 | **2026-11-20** | | | **MCP selector and cancellation fixes** · Reports identify the intended element in deeply nested layouts. Cancelling a tool call stops its scan or skips it in the queue ([details](changelogs/CHANGELOG-mcp-selector-cancellation.md)) |
